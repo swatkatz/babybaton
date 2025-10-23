@@ -1,16 +1,16 @@
-# Baby Handoff App - Technical Design Document (MVP)
+# Baby Baton App - Technical Design Document (MVP)
 
 ## 1. System Overview
 
 ### 1.1 Purpose
-A multi-caregiver baby tracking system with voice input for seamless care handoffs, smart feed predictions, and local notifications.
+A multi-caregiver baby tracking system with voice input for seamless care transitions, smart feed predictions, and local notifications. The app is called "Baby Baton" - representing the passing of care responsibility between caregivers.
 
 ### 1.2 MVP Scope
 **In Scope:**
-- Handoff session management (start, add activities, complete)
+- Care session management (start, add activities, complete)
 - Voice input with button confirmation
 - Track: Feeds, Diaper changes, Sleep
-- Display last 3-4 completed handoffs + current in-progress session
+- Display last 3-4 completed care sessions + current in-progress session
 - Smart rule-based feed predictions
 - Local push notifications (15 min before predicted feed)
 - Delete activities
@@ -93,9 +93,9 @@ CREATE TABLE caregivers (
 CREATE INDEX idx_caregivers_device_id ON caregivers(device_id);
 ```
 
-#### `handoff_sessions`
+#### `care_sessions`
 ```sql
-CREATE TABLE handoff_sessions (
+CREATE TABLE care_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     caregiver_id UUID NOT NULL REFERENCES caregivers(id),
     status VARCHAR(20) NOT NULL CHECK (status IN ('in_progress', 'completed')),
@@ -106,22 +106,22 @@ CREATE TABLE handoff_sessions (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_handoff_sessions_status ON handoff_sessions(status);
-CREATE INDEX idx_handoff_sessions_caregiver ON handoff_sessions(caregiver_id);
-CREATE INDEX idx_handoff_sessions_started_at ON handoff_sessions(started_at DESC);
+CREATE INDEX idx_care_sessions_status ON care_sessions(status);
+CREATE INDEX idx_care_sessions_caregiver ON care_sessions(caregiver_id);
+CREATE INDEX idx_care_sessions_started_at ON care_sessions(started_at DESC);
 ```
 
 #### `activities`
 ```sql
 CREATE TABLE activities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    handoff_session_id UUID NOT NULL REFERENCES handoff_sessions(id) ON DELETE CASCADE,
+    care_session_id UUID NOT NULL REFERENCES care_sessions(id) ON DELETE CASCADE,
     activity_type VARCHAR(20) NOT NULL CHECK (activity_type IN ('feed', 'diaper', 'sleep')),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_activities_session ON activities(handoff_session_id);
+CREATE INDEX idx_activities_session ON activities(care_session_id);
 CREATE INDEX idx_activities_type ON activities(activity_type);
 CREATE INDEX idx_activities_created_at ON activities(created_at DESC);
 ```
@@ -176,8 +176,8 @@ CREATE INDEX idx_sleep_details_start_time ON sleep_details(start_time DESC);
 ```
 
 ### 2.2 Notes on Schema
-- **Play activities:** Not tracked as separate activities; use handoff_sessions.notes field
-- **Cascading deletes:** When handoff_session is deleted, all activities and their details are removed
+- **Play activities:** Not tracked as separate activities; use care_sessions.notes field
+- **Cascading deletes:** When care_session is deleted, all activities and their details are removed
 - **Timestamps:** All tables have created_at/updated_at for audit trail
 
 ---
@@ -189,7 +189,7 @@ scalar DateTime
 scalar UUID
 
 # Enums
-enum HandoffStatus {
+enum CareSessionStatus {
   IN_PROGRESS
   COMPLETED
 }
@@ -220,18 +220,18 @@ type Caregiver {
   createdAt: DateTime!
 }
 
-type HandoffSession {
+type CareSession {
   id: UUID!
   caregiver: Caregiver!
-  status: HandoffStatus!
+  status: CareSessionStatus!
   startedAt: DateTime!
   completedAt: DateTime
   activities: [Activity!]!
   notes: String
-  summary: HandoffSummary!
+  summary: CareSessionSummary!
 }
 
-type HandoffSummary {
+type CareSessionSummary {
   totalFeeds: Int!
   totalMl: Int!
   totalDiaperChanges: Int!
@@ -243,7 +243,7 @@ type HandoffSummary {
 
 type Activity {
   id: UUID!
-  handoffSessionId: UUID!
+  careSessionId: UUID!
   activityType: ActivityType!
   feedDetails: FeedDetails
   diaperDetails: DiaperDetails
@@ -320,11 +320,11 @@ type Query {
   # Get or create caregiver by device ID
   getCurrentCaregiver(deviceId: String!, deviceName: String): Caregiver!
   
-  # Get recent completed handoffs
-  getRecentHandoffs(limit: Int = 4): [HandoffSession!]!
+  # Get recent completed care sessions
+  getRecentCareSessions(limit: Int = 4): [CareSession!]!
   
   # Get current in-progress session (if any)
-  getCurrentSession: HandoffSession
+  getCurrentSession: CareSession
   
   # Predict next feed time
   predictNextFeed: NextFeedPrediction!
@@ -332,20 +332,20 @@ type Query {
 
 # Mutations
 type Mutation {
-  # Start a new handoff session
-  startHandoffSession: HandoffSession!
+  # Start a new care session
+  startCareSession: CareSession!
   
   # Parse voice and return structured data (for confirmation)
   parseVoiceInput(text: String!): ParsedVoiceResult!
   
   # Add confirmed activities to current session
-  addActivities(activities: [ActivityInput!]!): HandoffSession!
+  addActivities(activities: [ActivityInput!]!): CareSession!
   
   # Combined: parse voice AND add to session (auto-confirm flow)
-  addActivitiesFromVoice(text: String!): HandoffSession!
+  addActivitiesFromVoice(text: String!): CareSession!
   
-  # Complete current handoff session
-  completeHandoffSession(notes: String): HandoffSession!
+  # Complete current care session
+  completeCareSession(notes: String): CareSession!
   
   # Delete an activity
   deleteActivity(activityId: UUID!): Boolean!
@@ -354,22 +354,18 @@ type Mutation {
 
 ### 3.1 Key Design Decisions
 
-**Two-step voice flow (MVP):**
-```graphql
-# Step 1: Parse and show to user
-parseVoiceInput(text: "She fed 60ml...") 
-  → Returns ParsedVoiceResult for UI confirmation
+**Single Active Session:**
+- Only ONE in-progress session allowed at a time
+- Enforced in application logic (not database constraint)
+- `startCareSession` checks for existing in-progress sessions
 
-# Step 2: User confirms via button, add to session
-addActivities(activities: [...])
-  → Stores to database
-```
-
-**Alternative single-step (future):**
+**Voice Input Flow:**
 ```graphql
-# Auto-confirm flow
-addActivitiesFromVoice(text: "She fed 60ml...")
-  → Parse + store in one call
+# Two-step with confirmation (MVP)
+parseVoiceInput(text: "...") → ParsedVoiceResult
+addActivities(activities: [...]) → CareSession
+
+# Voice button auto-starts session if none exists
 ```
 
 ---
@@ -487,34 +483,6 @@ func calculateConfidence(factors PredictionFactors) PredictionConfidence {
 }
 ```
 
-### 4.4 Reasoning Generation
-```go
-func generateReasoning(factors PredictionFactors, interval time.Duration) string {
-    parts := []string{}
-    
-    // Base
-    parts = append(parts, fmt.Sprintf("Based on %dml feed at %s", 
-        factors.LastFeedAmountMl, 
-        factors.LastFeedTime.Format("3:04 PM")))
-    
-    // Pattern
-    avgHours := factors.RecentFeedIntervals.Average().Hours()
-    parts = append(parts, fmt.Sprintf("typically goes %.1f hours between feeds", avgHours))
-    
-    // Adjustments
-    if factors.IsCurrentlySleeping {
-        duration := time.Since(factors.SleepStartTime)
-        parts = append(parts, fmt.Sprintf("but is currently sleeping (%d min)", int(duration.Minutes())))
-    }
-    
-    if factors.TimeOfDay >= 22 || factors.TimeOfDay <= 6 {
-        parts = append(parts, "night feeds tend to have longer intervals")
-    }
-    
-    return strings.Join(parts, ", ")
-}
-```
-
 ---
 
 ## 5. Local Notification System
@@ -522,7 +490,7 @@ func generateReasoning(factors PredictionFactors, interval time.Duration) string
 ### 5.1 Notification Flow
 
 ```
-Event Trigger: Activity added OR handoff completed OR app opened (poll)
+Event Trigger: Activity added OR care session completed OR app opened (poll)
          ↓
     Recalculate prediction
          ↓
@@ -559,24 +527,7 @@ Event Trigger: Activity added OR handoff completed OR app opened (poll)
 }
 ```
 
-### 5.3 Notification Permissions
-
-```typescript
-// Request permissions on app first launch
-async function requestNotificationPermissions() {
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== 'granted') {
-    // Show alert explaining why notifications are important
-    Alert.alert(
-      'Enable Notifications',
-      'Get notified 15 minutes before predicted feed times',
-      [{ text: 'OK' }]
-    );
-  }
-}
-```
-
-### 5.4 Handling Stale Notifications
+### 5.3 Handling Stale Notifications
 
 **Problem:** Device A logs activity at 4pm, Device B hasn't polled yet and still has 5pm notification scheduled.
 
@@ -609,10 +560,10 @@ backend/
 │   ├── domain/
 │   │   ├── models.go              # Domain models
 │   │   ├── caregiver.go
-│   │   ├── handoff.go
+│   │   ├── care_session.go
 │   │   └── activity.go
 │   ├── service/
-│   │   ├── handoff_service.go     # Business logic
+│   │   ├── care_session_service.go # Business logic
 │   │   ├── voice_service.go       # Voice parsing with Claude
 │   │   └── prediction_service.go  # Feed prediction engine
 │   └── ai/
@@ -627,7 +578,46 @@ backend/
 └── Dockerfile
 ```
 
-### 6.2 Voice Parsing with Claude
+### 6.2 Care Session Service - Single Session Enforcement
+
+```go
+// internal/service/care_session_service.go
+type CareSessionService struct {
+    repo   *db.Repository
+    logger *log.Logger
+}
+
+func (s *CareSessionService) StartCareSession(
+    ctx context.Context,
+    caregiverID string,
+) (*domain.CareSession, error) {
+    // Check if there's already an in-progress session
+    existingSession, err := s.repo.GetInProgressSession(ctx)
+    if err != nil && err != sql.ErrNoRows {
+        return nil, fmt.Errorf("failed to check existing session: %w", err)
+    }
+    
+    if existingSession != nil {
+        return nil, errors.New("A care session is already in progress")
+    }
+    
+    // Create new session
+    session := &domain.CareSession{
+        ID:          uuid.New(),
+        CaregiverID: caregiverID,
+        Status:      domain.StatusInProgress,
+        StartedAt:   time.Now(),
+    }
+    
+    if err := s.repo.CreateCareSession(ctx, session); err != nil {
+        return nil, fmt.Errorf("failed to create session: %w", err)
+    }
+    
+    return session, nil
+}
+```
+
+### 6.3 Voice Parsing with Claude
 
 #### Prompt Template
 ```go
@@ -672,50 +662,6 @@ Extract all activities mentioned. Return JSON array:
 If you cannot parse the input, return: {"error": "reason"}`
 ```
 
-#### Service Implementation
-```go
-type VoiceService struct {
-    claudeClient *ai.ClaudeClient
-    logger       *log.Logger
-}
-
-func (s *VoiceService) ParseVoiceInput(
-    ctx context.Context, 
-    text string, 
-    currentTime time.Time,
-) (*ParsedVoiceResult, error) {
-    
-    // Build prompt
-    prompt := buildPrompt(text, currentTime)
-    
-    // Call Claude API
-    response, err := s.claudeClient.SendMessage(ctx, prompt)
-    if err != nil {
-        return nil, fmt.Errorf("claude api error: %w", err)
-    }
-    
-    // Parse JSON response
-    var activities []ActivityInput
-    if err := json.Unmarshal([]byte(response), &activities); err != nil {
-        return nil, fmt.Errorf("failed to parse claude response: %w", err)
-    }
-    
-    // Validate activities
-    if err := s.validateActivities(activities); err != nil {
-        return &ParsedVoiceResult{
-            Success: false,
-            Errors: []string{err.Error()},
-        }, nil
-    }
-    
-    return &ParsedVoiceResult{
-        Success: true,
-        ParsedActivities: activities,
-        RawText: text,
-    }, nil
-}
-```
-
 ---
 
 ## 7. Mobile App Architecture
@@ -725,14 +671,16 @@ func (s *VoiceService) ParseVoiceInput(
 mobile/
 ├── src/
 │   ├── components/
-│   │   ├── HandoffCard.tsx        # Completed handoff display
+│   │   ├── CareSessionCard.tsx    # Completed care session display
 │   │   ├── ActivityItem.tsx       # Single activity display
 │   │   ├── VoiceButton.tsx        # Voice recording UI
 │   │   ├── ConfirmationModal.tsx  # Voice parse confirmation
 │   │   └── PredictionCard.tsx     # Next feed prediction
 │   ├── screens/
-│   │   ├── HomeScreen.tsx         # Main dashboard
-│   │   └── SessionScreen.tsx      # Current session detail
+│   │   ├── HomeScreen.tsx              # Main dashboard (summary cards)
+│   │   ├── PredictionDetailScreen.tsx  # Full prediction reasoning
+│   │   ├── CurrentSessionDetailScreen.tsx # Current session with delete buttons
+│   │   └── SessionDetailScreen.tsx     # Completed session (read-only)
 │   ├── graphql/
 │   │   ├── queries.ts             # GraphQL queries
 │   │   ├── mutations.ts           # GraphQL mutations
@@ -744,7 +692,7 @@ mobile/
 │   │   ├── predictionService.ts   # Client-side prediction
 │   │   └── deviceService.ts       # Device ID extraction
 │   ├── hooks/
-│   │   ├── useHandoffs.ts         # Data fetching
+│   │   ├── useCareSessions.ts     # Data fetching
 │   │   ├── useVoiceInput.ts       # Voice recording
 │   │   ├── usePolling.ts          # Polling logic
 │   │   └── usePrediction.ts       # Prediction + notification
@@ -789,7 +737,7 @@ export const card = {
 };
 ```
 
-### 7.3 Color Palette (Soft, Modern)
+### 7.3 Color Palette
 ```typescript
 // theme/colors.ts
 export const colors = {
@@ -827,297 +775,273 @@ export const colors = {
 
 ## 8. UI Mockups & Components
 
-### 8.1 Home Screen (Dashboard)
+### 8.1 Home Screen (Dashboard) - Summary View
+
+**Header:**
+- App name: "Baby Baton"
+- Profile icon: Shows current caregiver info (name, device name)
+- Read-only, consistent color per caregiver (hash of ID)
 
 ```
-┌─────────────────────────────────────┐
-│  ← Baby Handoff        [Profile]    │  ← SafeArea padding
-├─────────────────────────────────────┤
-│                                     │
-│  🔮 Next Feed Prediction            │
-│  ┌───────────────────────────────┐ │
-│  │  Around 5:15 PM               │ │
-│  │  📊 High confidence            │ │
-│  │                                │ │
-│  │  Based on 70ml at 2:00 PM,   │ │
-│  │  typically 3 hours between    │ │
-│  │  feeds                         │ │
-│  │                                │ │
-│  │  ⏰ Notification in 45 min    │ │
-│  └───────────────────────────────┘ │
-│                                     │
-│  📝 Current Handoff                 │
-│  ┌───────────────────────────────┐ │
-│  │  Started: 2:00 PM by Mom      │ │
-│  │                                │ │
-│  │  🍼 Fed 70ml formula           │ │
-│  │     2:00 PM - 2:20 PM          │ │
-│  │                                │ │
-│  │  💩 Changed diaper             │ │
-│  │     Had poop  2:25 PM          │ │
-│  │                                │ │
-│  │  😴 Sleeping since 2:30 PM     │ │
-│  │     Duration: 2h 45m           │ │
-│  │                                │ │
-│  │  [Complete Handoff]            │ │
-│  └───────────────────────────────┘ │
-│                                     │
-│  📋 Recent Handoffs                 │
-│  ┌───────────────────────────────┐ │
-│  │  11:30 AM - 1:45 PM by Dad    │ │
-│  │  2 feeds • 130ml • 1h sleep   │ │
-│  └───────────────────────────────┘ │
-│  ┌───────────────────────────────┐ │
-│  │  8:00 AM - 11:15 AM by Mom    │ │
-│  │  2 feeds • 140ml • 2h sleep   │ │
-│  └───────────────────────────────┘ │
-│                                     │
-│         (scrollable)                │
-│                                     │
-│  ┌─────────────────────────────┐   │
-│  │   🎤  Add Activity           │   │  ← Fixed bottom
-│  └─────────────────────────────┘   │     60px tall
-└─────────────────────────────────────┘
+┌─────────────────────────────────┐
+│  🍼 Baby Baton      [Profile]   │
+├─────────────────────────────────┤
+│                                 │
+│  🔮 Next Feed Prediction     >  │
+│  ┌─────────────────────────────┐│
+│  │  Upcoming Feed              ││
+│  │  Scheduled for 5:15 PM      ││
+│  │  📊 High confidence          ││
+│  └─────────────────────────────┘│
+│                                 │
+│  📋 Current Care Session     >  │
+│  ┌─────────────────────────────┐│
+│  │  Started: 2:00 PM by Mom    ││
+│  │  Duration: 2h 45m            ││
+│  │                              ││
+│  │  🍼 Fed 70ml formula         ││
+│  │  💩 Changed diaper           ││
+│  │  😴 Sleeping (2h 45m)        ││
+│  │                              ││
+│  │  3 activities total          ││
+│  └─────────────────────────────┘│
+│                                 │
+│  📋 Recent Care Sessions        │
+│  ┌─────────────────────────────┐│
+│  │  11:30 AM - 1:45 PM by Dad >││
+│  │  Duration: 2h 15m            ││
+│  │  2 feeds • 130ml • 1h sleep ││
+│  └─────────────────────────────┘│
+│                                 │
+│  ┌─────────────────────────────┐ │
+│  │   🎤  Add Activity          │ │
+│  └─────────────────────────────┘ │
+└─────────────────────────────────┘
 ```
 
-**Component breakdown:**
-- **PredictionCard**: Shows next feed prediction with confidence and reasoning
-- **CurrentSessionCard**: Displays in-progress activities with "Complete" button
-- **HandoffCard**: Compact view of completed handoffs
-- **VoiceButton**: Large floating button at bottom (thumb zone)
+**Notes:**
+- Current Care Session card hidden when no active session
+- All cards tappable (chevron indicates navigation)
+- Voice button auto-starts session if needed
 
-### 8.2 Voice Input Flow
+### 8.2 Prediction Detail Screen
 
-**Step 1: Recording**
 ```
-┌─────────────────────────────────────┐
-│                                     │
-│         [Wave animation]            │
-│                                     │
-│      🎤 Listening...                │
-│                                     │
-│      Tap to stop recording          │
-│                                     │
-│                                     │
-│  ┌─────────────────────────────┐   │
-│  │       [Stop] 🔴             │   │
-│  └─────────────────────────────┘   │
-│                                     │
-└─────────────────────────────────────┘
-```
-
-**Step 2: Parsing**
-```
-┌─────────────────────────────────────┐
-│                                     │
-│      [Spinner animation]            │
-│                                     │
-│     Parsing your input...           │
-│                                     │
-└─────────────────────────────────────┘
-```
-
-**Step 3: Confirmation Modal**
-```
-┌─────────────────────────────────────┐
-│  Confirm Activities                 │
-├─────────────────────────────────────┤
-│                                     │
-│  You said:                          │
-│  "She fed 60ml formula at 2pm,      │
-│   pooped, and is sleeping now"      │
-│                                     │
-│  ─────────────────────────────────  │
-│                                     │
-│  I understood:                      │
-│                                     │
-│  🍼 Feed                            │
-│     60ml formula                    │
-│     2:00 PM - 2:20 PM               │
-│                                     │
-│  💩 Diaper Change                   │
-│     Had poop                        │
-│     2:25 PM                          │
-│                                     │
-│  😴 Sleep                           │
-│     Started 2:30 PM                 │
-│     (ongoing)                       │
-│                                     │
-├─────────────────────────────────────┤
-│  ┌─────────────────────────────┐   │
-│  │   ✓ Confirm & Save          │   │  ← 60px, green
-│  └─────────────────────────────┘   │
-│  ┌─────────────────────────────┐   │
-│  │   ↻ Re-record               │   │  ← 60px, gray
-│  └─────────────────────────────┘   │
-│  ┌─────────────────────────────┐   │
-│  │   ✕ Cancel                  │   │  ← 50px, light
-│  └─────────────────────────────┘   │
-└─────────────────────────────────────┘
+┌─────────────────────────────────┐
+│  ← Prediction Details           │
+├─────────────────────────────────┤
+│                                 │
+│  🔮 Upcoming Feed               │
+│  Scheduled for 5:15 PM          │
+│  📊 High confidence              │
+│                                 │
+│  ─────────────────────────────  │
+│                                 │
+│  Reasoning:                     │
+│  Based on 70ml feed at 2:00 PM,│
+│  typically goes 3 hours between │
+│  feeds, but is currently        │
+│  sleeping (2h 15m)              │
+│                                 │
+│  ─────────────────────────────  │
+│                                 │
+│  Prediction Factors:            │
+│  • Avg interval: 3.2 hours      │
+│  • Last amount: Above average   │
+│  • Currently sleeping: Yes      │
+│  • Time of day: Afternoon       │
+│  • Confidence: High             │
+│                                 │
+└─────────────────────────────────┘
 ```
 
-### 8.3 Activity Display Components
+### 8.3 Current Session Detail Screen
 
-**Feed Activity**
+```
+┌─────────────────────────────────┐
+│  ← Current Care Session         │
+├─────────────────────────────────┤
+│                                 │
+│  👤 Mom                         │
+│  Started: 2:00 PM               │
+│  Duration: 2h 45m               │
+│                                 │
+│  ─────────────────────────────  │
+│                                 │
+│  Activities (3):                │
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │ 🍼 Fed 70ml formula         ││
+│  │    2:00 PM - 2:20 PM        ││
+│  │    Duration: 20 minutes     ││
+│  │    [Delete Activity]         ││
+│  └─────────────────────────────┘│
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │ 💩 Changed diaper           ││
+│  │    2:25 PM                  ││
+│  │    Had poop ✓               ││
+│  │    [Delete Activity]         ││
+│  └─────────────────────────────┘│
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │ 😴 Sleeping                 ││
+│  │    Started: 2:30 PM         ││
+│  │    Duration: 2h 15m (LIVE)  ││
+│  │    [Mark as Awake]          ││
+│  └─────────────────────────────┘│
+│                                 │
+│  Session Summary:               │
+│  • Total feeds: 1 (70ml)        │
+│  • Diaper changes: 1            │
+│  • Sleep time: 2h 15m (ongoing) │
+│                                 │
+│  ┌─────────────────────────────┐ │
+│  │  Complete Care Session      │ │
+│  └─────────────────────────────┘ │
+└─────────────────────────────────┘
+```
+
+### 8.4 Recent Session Detail Screen
+
+```
+┌─────────────────────────────────┐
+│  ← Care Session Details         │
+├─────────────────────────────────┤
+│                                 │
+│  👤 Dad                         │
+│  11:30 AM - 1:45 PM             │
+│  Duration: 2h 15m               │
+│                                 │
+│  ─────────────────────────────  │
+│                                 │
+│  Activities (5):                │
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │ 🍼 Fed 60ml formula         ││
+│  │    11:30 AM - 11:50 AM      ││
+│  │    Duration: 20 minutes     ││
+│  └─────────────────────────────┘│
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │ 💩 Changed diaper           ││
+│  │    12:00 PM                 ││
+│  │    Had pee ✓                ││
+│  └─────────────────────────────┘│
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │ 😴 Napped                   ││
+│  │    12:15 PM - 1:15 PM       ││
+│  │    Duration: 1h             ││
+│  └─────────────────────────────┘│
+│                                 │
+│  Session Summary:               │
+│  • Total feeds: 2 (130ml)       │
+│  • Diaper changes: 2            │
+│  • Sleep time: 1h               │
+│                                 │
+│  Notes:                         │
+│  She was fussy, might be        │
+│  teething. Played for 10 min    │
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Note:** Read-only, no action buttons on activities
+
+### 8.5 Voice Input Flow
+
+**Recording → Parsing → Confirmation Modal**
+
+```
+Confirmation Modal:
+┌─────────────────────────────────┐
+│  Confirm Activities             │
+├─────────────────────────────────┤
+│                                 │
+│  You said:                      │
+│  "She fed 60ml formula at 2pm,  │
+│   pooped, and is sleeping now"  │
+│                                 │
+│  I understood:                  │
+│                                 │
+│  🍼 Feed - 60ml formula         │
+│     2:00 PM - 2:20 PM           │
+│                                 │
+│  💩 Diaper Change - Had poop    │
+│     2:25 PM                     │
+│                                 │
+│  😴 Sleep - Started 2:30 PM     │
+│     (ongoing)                   │
+│                                 │
+│  [✓ Confirm & Save]             │
+│  [↻ Re-record]                  │
+│  [✕ Cancel]                     │
+└─────────────────────────────────┘
+```
+
+### 8.6 Complete Session Modal
+
+```
+┌─────────────────────────────────┐
+│  Complete Care Session          │
+├─────────────────────────────────┤
+│                                 │
+│  Add notes (optional):          │
+│  ┌─────────────────────────────┐│
+│  │ Notes text area...          ││
+│  └─────────────────────────────┘│
+│                                 │
+│  Session Summary:               │
+│  • 3 feeds (210ml total)        │
+│  • 4 diaper changes             │
+│  • 4.5 hours sleep              │
+│  • Duration: 6h 30m             │
+│                                 │
+│  [✓ Complete]                   │
+│  [✕ Cancel]                     │
+└─────────────────────────────────┘
+```
+
+### 8.7 Navigation Structure
+
+```
+HomeScreen
+├─→ Tap Prediction Card → PredictionDetailScreen
+├─→ Tap Current Session → CurrentSessionDetailScreen
+│                         └─→ Complete → CompletionModal → HomeScreen
+├─→ Tap Recent Session → SessionDetailScreen (read-only)
+└─→ Tap Voice Button → VoiceModal → ConfirmationModal → HomeScreen
+```
+
+### 8.8 Profile Color Mapping
+
 ```typescript
-<View style={styles.activityCard}>
-  <View style={styles.activityHeader}>
-    <Text style={styles.icon}>🍼</Text>
-    <Text style={styles.title}>Fed 70ml formula</Text>
-  </View>
-  <Text style={styles.timestamp}>2:00 PM - 2:20 PM</Text>
-  <Text style={styles.duration}>Duration: 20 minutes</Text>
-  <TouchableOpacity style={styles.deleteButton}>
-    <Text>🗑️ Delete</Text>
-  </TouchableOpacity>
-</View>
-```
+// utils/caregiverColors.ts
+const CAREGIVER_COLORS = [
+  { bg: '#E8D5F2', text: '#7B2CBF' },  // Purple
+  { bg: '#CFE2FF', text: '#0D6EFD' },  // Blue
+  { bg: '#FFE5D9', text: '#D85A2B' },  // Orange
+  { bg: '#D5F4E6', text: '#2A9D8F' },  // Teal
+  { bg: '#FFE0E6', text: '#D84A70' },  // Pink
+];
 
-**Diaper Activity**
-```typescript
-<View style={styles.activityCard}>
-  <View style={styles.activityHeader}>
-    <Text style={styles.icon}>💩</Text>
-    <Text style={styles.title}>Changed diaper</Text>
-  </View>
-  <Text style={styles.timestamp}>2:25 PM</Text>
-  <View style={styles.badges}>
-    <Text style={styles.badge}>Poop ✓</Text>
-    <Text style={styles.badge}>Pee ✓</Text>
-  </View>
-</View>
-```
-
-**Sleep Activity (Active)**
-```typescript
-<View style={[styles.activityCard, styles.activeCard]}>
-  <View style={styles.activityHeader}>
-    <Text style={styles.icon}>😴</Text>
-    <Text style={styles.title}>Sleeping</Text>
-    <Text style={styles.liveBadge}>LIVE</Text>
-  </View>
-  <Text style={styles.timestamp}>Started 2:30 PM</Text>
-  <Text style={styles.duration}>Duration: 2h 45m</Text>
-  <Text style={styles.hint}>Tap to mark as awake</Text>
-</View>
-```
-
-### 8.4 Complete Handoff Flow
-
-**Complete Handoff Button**
-```
-┌─────────────────────────────────────┐
-│  Current Handoff                    │
-│  Started 2:00 PM                    │
-│                                     │
-│  [Activities listed above]          │
-│                                     │
-│  ┌─────────────────────────────┐   │
-│  │  Complete Handoff           │   │
-│  └─────────────────────────────┘   │
-└─────────────────────────────────────┘
-```
-
-**Notes Input Modal**
-```
-┌─────────────────────────────────────┐
-│  Complete Handoff                   │
-├─────────────────────────────────────┤
-│                                     │
-│  Add notes (optional):              │
-│                                     │
-│  ┌─────────────────────────────┐   │
-│  │ She was fussy, might be     │   │
-│  │ teething. Played for 10 min │   │
-│  │                             │   │
-│  └─────────────────────────────┘   │
-│                                     │
-│  Summary:                           │
-│  • 3 feeds (210ml total)           │
-│  • 4 diaper changes                │
-│  • 4.5 hours sleep                 │
-│                                     │
-├─────────────────────────────────────┤
-│  ┌─────────────────────────────┐   │
-│  │   ✓ Complete                │   │
-│  └─────────────────────────────┘   │
-│  ┌─────────────────────────────┐   │
-│  │   ✕ Cancel                  │   │
-│  └─────────────────────────────┘   │
-└─────────────────────────────────────┘
-```
-
-### 8.5 Responsive Button Specs
-
-```typescript
-// components/Button.tsx
-import { StyleSheet, TouchableOpacity, Text, Dimensions } from 'react-native';
-
-const { width, height } = Dimensions.get('window');
-
-export const Button = ({ type, onPress, children }) => {
-  const buttonStyles = {
-    confirm: {
-      backgroundColor: colors.success,
-      minHeight: Math.max(60, height * 0.08),
-    },
-    rerecord: {
-      backgroundColor: colors.textSecondary,
-      minHeight: Math.max(60, height * 0.08),
-    },
-    cancel: {
-      backgroundColor: colors.border,
-      minHeight: 50,
-    },
-    voice: {
-      backgroundColor: colors.primary,
-      minHeight: Math.max(70, height * 0.09),
-      borderRadius: 35,
-    }
-  };
-
-  return (
-    <TouchableOpacity 
-      style={[styles.button, buttonStyles[type]]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <Text style={styles.buttonText}>{children}</Text>
-    </TouchableOpacity>
-  );
+export const getCaregiverColor = (caregiverId: string) => {
+  const hash = caregiverId.split('').reduce((acc, char) => {
+    return char.charCodeAt(0) + ((acc << 5) - acc);
+  }, 0);
+  
+  const index = Math.abs(hash) % CAREGIVER_COLORS.length;
+  return CAREGIVER_COLORS[index];
 };
-
-const styles = StyleSheet.create({
-  button: {
-    width: width * 0.9,
-    alignSelf: 'center',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 12,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  buttonText: {
-    fontSize: Math.max(16, width * 0.045),
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-});
 ```
 
-### 8.6 Screen Size Testing Matrix
+### 8.9 Key UI Decisions
 
-| Device | Width | Height | Button Height | Font Size |
-|--------|-------|--------|---------------|-----------|
-| iPhone SE | 375 | 667 | 60px (min) | 16px |
-| iPhone 14 | 390 | 844 | 67px | 17px |
-| iPhone 14 Pro Max | 430 | 932 | 74px | 19px |
-| Galaxy S21 | 360 | 800 | 64px | 16px |
-| Pixel 6 | 412 | 915 | 73px | 18px |
+**Navigation:** Cards are tappable (chevron indicator), tap navigates to detail screen
+**Actions:** Voice button (primary), Complete Session (in detail), Delete Activity (in detail)
+**Session State:** Only one active session, voice button auto-starts if needed
+**Empty States:** Clear messaging when no data, helpful prompts for next action
 
 ---
 
@@ -1139,7 +1063,6 @@ class VoiceService {
     onError: (error: string) => void
   ) {
     try {
-      // Set up event listeners
       Voice.onSpeechStart = () => {
         this.isRecording = true;
         this.transcript = '';
@@ -1163,7 +1086,6 @@ class VoiceService {
         onError(e.error?.message || 'Speech recognition error');
       };
 
-      // Start recognition
       await Voice.start('en-US');
     } catch (error) {
       onError(error.message);
@@ -1200,7 +1122,7 @@ export default new VoiceService();
 import { useState } from 'react';
 import { useMutation } from '@apollo/client';
 import voiceService from '../services/voiceService';
-import { PARSE_VOICE_INPUT } from '../graphql/mutations';
+import { PARSE_VOICE_INPUT, START_CARE_SESSION } from '../graphql/mutations';
 
 export const useVoiceInput = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -1209,9 +1131,15 @@ export const useVoiceInput = () => {
   const [parsedResult, setParsedResult] = useState(null);
 
   const [parseVoice] = useMutation(PARSE_VOICE_INPUT);
+  const [startSession] = useMutation(START_CARE_SESSION);
 
-  const startRecording = async () => {
+  const startRecording = async (currentSession) => {
     try {
+      // Auto-start session if none exists
+      if (!currentSession) {
+        await startSession();
+      }
+
       setIsRecording(true);
       await voiceService.startRecording(
         (partial) => setTranscript(partial),
@@ -1305,7 +1233,6 @@ class NotificationService {
       requestPermissions: Platform.OS === 'ios',
     });
 
-    // Create Android channel
     if (Platform.OS === 'android') {
       PushNotification.createChannel(
         {
@@ -1324,14 +1251,11 @@ class NotificationService {
     predictedTime: Date,
     feedDetails: string
   ) {
-    // Cancel any existing feed notifications
     await this.cancelFeedNotifications();
 
-    // Calculate notification time (15 minutes before)
     const notificationTime = new Date(predictedTime);
     notificationTime.setMinutes(notificationTime.getMinutes() - 15);
 
-    // Don't schedule if in the past
     if (notificationTime <= new Date()) {
       return;
     }
@@ -1355,8 +1279,6 @@ class NotificationService {
         predictedTime: predictedTime.toISOString(),
       },
     });
-
-    console.log(`Scheduled notification for ${notificationTime.toISOString()}`);
   }
 
   async cancelFeedNotifications() {
@@ -1372,46 +1294,11 @@ class NotificationService {
       });
       return permissions.alert === 1;
     }
-    return true; // Android permissions handled in configure
+    return true;
   }
 }
 
 export default new NotificationService();
-```
-
-### 10.2 Prediction Hook with Notifications
-
-```typescript
-// hooks/usePrediction.ts
-import { useEffect } from 'react';
-import { useQuery } from '@apollo/client';
-import notificationService from '../services/notificationService';
-import { PREDICT_NEXT_FEED } from '../graphql/queries';
-
-export const usePrediction = () => {
-  const { data, loading, refetch } = useQuery(PREDICT_NEXT_FEED, {
-    fetchPolicy: 'network-only',
-  });
-
-  useEffect(() => {
-    if (data?.predictNextFeed) {
-      const prediction = data.predictNextFeed;
-      const predictedTime = new Date(prediction.predictedTime);
-
-      // Schedule notification
-      notificationService.scheduleNextFeedNotification(
-        predictedTime,
-        prediction.reasoning
-      );
-    }
-  }, [data]);
-
-  return {
-    prediction: data?.predictNextFeed,
-    loading,
-    refetch,
-  };
-};
 ```
 
 ---
@@ -1439,20 +1326,16 @@ export const usePolling = (query, options = {}) => {
   );
 
   useEffect(() => {
-    // Start polling when component mounts
     startPolling(pollInterval);
 
-    // Handle app state changes
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        // App came to foreground - refetch immediately
         refetch();
         startPolling(pollInterval);
       } else if (nextAppState.match(/inactive|background/)) {
-        // App went to background - stop polling to save battery
         stopPolling();
       }
       appState.current = nextAppState;
@@ -1471,19 +1354,17 @@ export const usePolling = (query, options = {}) => {
 ### 11.2 Dashboard Data Hook
 
 ```typescript
-// hooks/useHandoffs.ts
+// hooks/useCareSessions.ts
 import { usePolling } from './usePolling';
 import { usePrediction } from './usePrediction';
 import { GET_DASHBOARD_DATA } from '../graphql/queries';
 
-export const useHandoffs = () => {
-  // Poll for handoff data every 5 minutes
+export const useCareSessions = () => {
   const { data, loading, refetch } = usePolling(GET_DASHBOARD_DATA, {
     pollInterval: 300000,
     fetchPolicy: 'network-only',
   });
 
-  // Get prediction (also polls)
   const { prediction, refetch: refetchPrediction } = usePrediction();
 
   const refresh = async () => {
@@ -1492,7 +1373,7 @@ export const useHandoffs = () => {
 
   return {
     currentSession: data?.getCurrentSession,
-    recentHandoffs: data?.getRecentHandoffs || [],
+    recentCareSessions: data?.getRecentCareSessions || [],
     prediction,
     loading,
     refresh,
@@ -1513,9 +1394,9 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: baby-handoff-db
+    container_name: baby-baton-db
     environment:
-      POSTGRES_DB: baby_handoff
+      POSTGRES_DB: baby_baton
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -1533,9 +1414,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: baby-handoff-api
+    container_name: baby-baton-api
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/baby_handoff?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/baby_baton?sslmode=disable
       CLAUDE_API_KEY: ${CLAUDE_API_KEY}
       PORT: 8080
       GIN_MODE: debug
@@ -1552,48 +1433,12 @@ volumes:
   postgres_data:
 ```
 
-### 12.2 Backend Dockerfile
-
-```dockerfile
-# backend/Dockerfile
-FROM golang:1.21-alpine AS builder
-
-WORKDIR /app
-
-# Install dependencies
-RUN apk add --no-cache git
-
-# Copy go mod files
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy source
-COPY . .
-
-# Build
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server cmd/server/main.go
-
-# Final stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
-
-WORKDIR /root/
-
-COPY --from=builder /app/server .
-COPY --from=builder /app/internal/db/migrations ./migrations
-
-EXPOSE 8080
-
-CMD ["./server"]
-```
-
-### 12.3 Environment Variables
+### 12.2 Environment Variables
 
 ```bash
 # .env.example
 # Database
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/baby_handoff?sslmode=disable
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/baby_baton?sslmode=disable
 
 # Claude API
 CLAUDE_API_KEY=sk-ant-api03-your-key-here
@@ -1606,147 +1451,35 @@ GIN_MODE=debug
 API_URL=http://192.168.1.100:8080/graphql
 ```
 
-### 12.4 Mobile App Configuration
-
-```typescript
-// mobile/src/config/index.ts
-import { Platform } from 'react-native';
-
-const getApiUrl = () => {
-  if (__DEV__) {
-    // Development - use your MacBook's local IP
-    // Find it with: ipconfig getifaddr en0 (Mac) or ifconfig (Linux)
-    return Platform.select({
-      ios: 'http://localhost:8080/graphql',
-      android: 'http://10.0.2.2:8080/graphql', // Android emulator
-      // For real device, use your machine's IP:
-      // android: 'http://192.168.1.100:8080/graphql',
-    });
-  }
-  // Production - use your k8s domain
-  return 'https://api.babyhandoff.yourdomain.com/graphql';
-};
-
-export const config = {
-  apiUrl: getApiUrl(),
-  pollInterval: 300000, // 5 minutes
-  notificationLeadTime: 15, // minutes before feed
-};
-```
-
 ---
 
 ## 13. Getting Claude API Key
 
-### 13.1 Step-by-Step Setup
+### 13.1 Setup Steps
 
-1. **Go to Anthropic Console**
-   - Visit: https://console.anthropic.com
+1. Visit: https://console.anthropic.com
+2. Create account / Sign in
+3. Navigate to API Keys
+4. Click "Create Key" → Name it "Baby Baton App"
+5. Copy the key (starts with `sk-ant-api03-...`)
+6. Add to `backend/.env`: `CLAUDE_API_KEY=sk-ant-api03-your-actual-key-here`
 
-2. **Create Account / Sign In**
-   - Use email or Google sign-in
-
-3. **Navigate to API Keys**
-   - Click on "API Keys" in left sidebar
-   - Or go directly to: https://console.anthropic.com/settings/keys
-
-4. **Create New Key**
-   - Click "Create Key"
-   - Give it a name: "Baby Handoff App"
-   - Copy the key (starts with `sk-ant-api03-...`)
-   - **Important:** Save it immediately - you can't see it again!
-
-5. **Add to Environment**
-   ```bash
-   # backend/.env
-   CLAUDE_API_KEY=sk-ant-api03-your-actual-key-here
-   ```
-
-6. **Billing Setup**
-   - Add payment method in console
-   - Set spending limits if desired
-   - Typical usage for this app: <$5/month
-
-### 13.2 API Cost Estimate
+### 13.2 Cost Estimate
 
 **Voice parsing usage:**
 - Average parse: ~200 tokens input, ~500 tokens output
-- Claude Sonnet 4 pricing: $3/million input tokens, $15/million output tokens
+- Claude Sonnet 4 pricing: $3/M input tokens, $15/M output tokens
 - Cost per parse: ~$0.0081
 - 100 parses/month: ~$0.81
 - 500 parses/month: ~$4.05
-
-**Very affordable for household use!**
 
 ---
 
 ## 14. Testing Strategy
 
-### 14.1 Backend Testing
-
-```go
-// internal/service/voice_service_test.go
-func TestVoiceParsingBasicFeed(t *testing.T) {
-    service := NewVoiceService(mockClaudeClient)
-    
-    result, err := service.ParseVoiceInput(
-        context.Background(),
-        "She fed 60ml formula at 2pm",
-        time.Date(2024, 1, 15, 14, 30, 0, 0, time.UTC),
-    )
-    
-    assert.NoError(t, err)
-    assert.True(t, result.Success)
-    assert.Len(t, result.ParsedActivities, 1)
-    
-    activity := result.ParsedActivities[0]
-    assert.Equal(t, "FEED", activity.ActivityType)
-    assert.Equal(t, 60, activity.FeedDetails.AmountMl)
-}
-
-func TestPredictionSimple(t *testing.T) {
-    service := NewPredictionService(mockDB)
-    
-    // Mock: Last feed was 3 hours ago, 70ml
-    prediction, err := service.PredictNextFeed(context.Background())
-    
-    assert.NoError(t, err)
-    assert.NotNil(t, prediction)
-    assert.Equal(t, "HIGH", prediction.Confidence)
-}
-```
-
-### 14.2 Mobile Testing
-
-```typescript
-// __tests__/useVoiceInput.test.ts
-import { renderHook, act } from '@testing-library/react-hooks';
-import { useVoiceInput } from '../hooks/useVoiceInput';
-
-test('voice input flow', async () => {
-  const { result } = renderHook(() => useVoiceInput());
-  
-  // Start recording
-  await act(async () => {
-    await result.current.startRecording();
-  });
-  
-  expect(result.current.isRecording).toBe(true);
-  
-  // Stop and parse
-  await act(async () => {
-    await result.current.stopRecording();
-  });
-  
-  expect(result.current.isParsing).toBe(true);
-  // ... assert parsed result
-});
-```
-
-### 14.3 Voice Parsing Test Cases
+### 14.1 Voice Parsing Test Cases
 
 ```
-Test cases to validate:
 ✓ "She fed 60ml formula from 2:30 to 2:50"
 ✓ "Fed 80ml breast milk, pooped, now sleeping"
 ✓ "Changed diaper, had poop"
@@ -1778,7 +1511,6 @@ Test cases to validate:
 
 ### 16.1 Authentication (Device-Based)
 ```typescript
-// Device ID generation
 import DeviceInfo from 'react-native-device-info';
 
 const getDeviceIdentifier = async () => {
@@ -1800,81 +1532,11 @@ const getDeviceIdentifier = async () => {
 ### 16.3 Data Privacy
 - All data on local server (MacBook)
 - No cloud sync in MVP
-- Optional: encrypted backups to user's iCloud/Google Drive
+- Optional: encrypted backups to iCloud/Google Drive
 
 ---
 
-## 17. Future Enhancements (Post-MVP)
-
-### 17.1 Phase 2 Features
-- Analytics dashboard (trends, charts)
-- Play activity tracking
-- Baby metrics (weight, height, milestones)
-- Photo attachments
-- Export to CSV/PDF
-
-### 17.2 Phase 3 Features
-- ML-based predictions
-- Multi-baby support
-- Cloud push notifications (Firebase)
-- Pediatrician data sharing
-- Calendar integration
-
-### 17.3 Phase 4 Features
-- Apple Health / Google Fit integration
-- Smart watch support
-- Alexa/Google Home voice commands
-- Web dashboard
-
----
-
-## 18. Open Source Preparation
-
-### 18.1 Repository Structure
-```
-baby-handoff/
-├── backend/
-├── mobile/
-├── docs/
-│   ├── setup.md
-│   ├── api.md
-│   └── deployment.md
-├── .github/
-│   ├── workflows/
-│   │   └── ci.yml
-│   └── ISSUE_TEMPLATE/
-├── LICENSE (MIT)
-├── README.md
-├── CONTRIBUTING.md
-├── CODE_OF_CONDUCT.md
-└── docker-compose.yml
-```
-
-### 18.2 README Template
-```markdown
-# Baby Handoff App
-
-Voice-powered baby care tracking for seamless caregiver handoffs.
-
-## Features
-- 🎤 Voice input with AI parsing
-- 📊 Smart feed predictions
-- 🔔 Local notifications
-- 👨‍👩‍👧 Multi-caregiver support
-- 📱 iOS & Android support
-
-## Quick Start
-1. Clone repo
-2. Set up Claude API key
-3. Run `docker-compose up`
-4. Open mobile app
-
-[Detailed setup guide](docs/setup.md)
-```
-
----
-
-## 19. Development Workflow Summary
+## 17. Development Workflow
 
 ### Phase 1: Mobile with Mocks (Week 1-2)
 1. Set up React Native project
@@ -1901,14 +1563,3 @@ Voice-powered baby care tracking for seamless caregiver handoffs.
 2. UI refinements
 3. Documentation
 4. Prepare for open source
-
----
-
-## Next Steps
-
-1. **Review this technical design**
-2. **Create detailed project plan** (separate document)
-3. **Set up development environment**
-4. **Begin Phase 1 with Claude Code**
-
-**Ready to proceed with project plan?**
