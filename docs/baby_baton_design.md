@@ -344,7 +344,10 @@ type Mutation {
   # Combined: parse voice AND add to session (auto-confirm flow)
   addActivitiesFromVoice(text: String!): CareSession!
   
-  # Complete current care session
+  # End an ongoing activity (sleep or feed)
+  endActivity(activityId: UUID!, endTime: DateTime): Activity!
+  
+  # Complete current care session (auto-ends all active activities)
   completeCareSession(notes: String): CareSession!
   
   # Delete an activity
@@ -356,8 +359,31 @@ type Mutation {
 
 **Single Active Session:**
 - Only ONE in-progress session allowed at a time
-- Enforced in application logic (not database constraint)
-- `startCareSession` checks for existing in-progress sessions
+- Enforced in application logic
+- When new session starts: Auto-completes previous session (if exists) with current timestamp
+
+**Activity Recording Rules:**
+- **Feed Activities:**
+  - Required: start_time, amount_ml, feed_type
+  - End time: User-provided OR auto-calculated as `start_time + 45 minutes`
+  - Example: "Fed 60ml at 2pm" → 2:00pm - 2:45pm (default)
+  - Example: "Fed 60ml from 2pm to 2:20pm" → 2:00pm - 2:20pm (user-provided)
+  - No manual editing after creation
+  
+- **Diaper Activities:**
+  - Required: timestamp, had_poop, had_pee
+  - Instant activity, no duration
+  
+- **Sleep Activities:**
+  - Required: start_time
+  - End time: Optional (null = ongoing/active)
+  - Only ONE incomplete sleep allowed per session
+  - Can be ended via `endActivity` mutation (Mark as Awake button)
+  - Auto-ended when session completes
+
+**Session Completion:**
+- Manual: User clicks "Complete Care Session" → Auto-ends any active sleep
+- Automatic: New session starts → Previous session auto-completes → Active sleep auto-ended
 
 **Voice Input Flow:**
 ```graphql
@@ -367,6 +393,15 @@ addActivities(activities: [...]) → CareSession
 
 # Voice button auto-starts session if none exists
 ```
+
+**Activity Lifecycle:**
+- **Instant activities** (diaper): Created with timestamp, no end time needed
+- **Duration activities** (feed, sleep): Created with start time, end time optional
+  - If end time provided in voice input: Activity is complete
+  - If end time null: Activity is "active" (ongoing)
+  - User can end via `endActivity` mutation (triggered by UI button)
+- **Completing session**: `completeCareSession` automatically ends all active activities with `endTime = now`
+- **Multiple activities**: Fully supported - can have multiple feeds, multiple naps per session
 
 ---
 
@@ -597,8 +632,23 @@ func (s *CareSessionService) StartCareSession(
         return nil, fmt.Errorf("failed to check existing session: %w", err)
     }
     
+    // Auto-complete previous session if exists
     if existingSession != nil {
-        return nil, errors.New("A care session is already in progress")
+        now := time.Now()
+        
+        // End any active sleep activities
+        if err := s.endActiveSleepActivities(ctx, existingSession.ID, now); err != nil {
+            return nil, fmt.Errorf("failed to end active sleep: %w", err)
+        }
+        
+        // Complete the session
+        existingSession.Status = domain.StatusCompleted
+        existingSession.CompletedAt = now
+        if err := s.repo.UpdateCareSession(ctx, existingSession); err != nil {
+            return nil, fmt.Errorf("failed to complete existing session: %w", err)
+        }
+        
+        s.logger.Printf("Auto-completed previous session %s", existingSession.ID)
     }
     
     // Create new session
@@ -614,6 +664,59 @@ func (s *CareSessionService) StartCareSession(
     }
     
     return session, nil
+}
+
+func (s *CareSessionService) CompleteCareSession(
+    ctx context.Context,
+    notes string,
+) (*domain.CareSession, error) {
+    session, err := s.repo.GetInProgressSession(ctx)
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return nil, errors.New("No active care session to complete")
+        }
+        return nil, fmt.Errorf("failed to get session: %w", err)
+    }
+    
+    now := time.Now()
+    
+    // End any active sleep activities
+    if err := s.endActiveSleepActivities(ctx, session.ID, now); err != nil {
+        return nil, fmt.Errorf("failed to end active sleep: %w", err)
+    }
+    
+    // Complete session
+    session.Status = domain.StatusCompleted
+    session.CompletedAt = now
+    session.Notes = notes
+    
+    if err := s.repo.UpdateCareSession(ctx, session); err != nil {
+        return nil, fmt.Errorf("failed to complete session: %w", err)
+    }
+    
+    return session, nil
+}
+
+func (s *CareSessionService) endActiveSleepActivities(
+    ctx context.Context,
+    sessionID string,
+    endTime time.Time,
+) error {
+    // Get all sleep activities for session without end_time
+    sleepActivities, err := s.repo.GetActiveSleepActivities(ctx, sessionID)
+    if err != nil {
+        return err
+    }
+    
+    for _, activity := range sleepActivities {
+        activity.SleepDetails.EndTime = endTime
+        activity.SleepDetails.DurationMinutes = int(endTime.Sub(activity.SleepDetails.StartTime).Minutes())
+        if err := s.repo.UpdateSleepActivity(ctx, activity); err != nil {
+            return err
+        }
+    }
+    
+    return nil
 }
 ```
 
@@ -631,10 +734,29 @@ Voice input: "{{.VoiceText}}"
 Rules:
 1. "now" or "right now" = current time
 2. Relative times like "at 2:30" are absolute within today
-3. "for 20 minutes" means duration from start time
-4. Default feed type to "formula" if not specified
-5. "pooped" means had_poop=true for diaper change
-6. If sleep has no end time and text says "sleeping now", it's still active
+3. Default feed type to "formula" if not specified
+4. "pooped" means had_poop=true for diaper change
+
+FEED ACTIVITIES:
+- MUST have: start_time, amount_ml, feed_type
+- If end_time provided: use it
+- If end_time NOT provided: set to null (will auto-calculate as start_time + 45 minutes)
+- Examples:
+  * "Fed 60ml at 2pm" → start: 2pm, end: null
+  * "Fed 60ml from 2pm to 2:20pm" → start: 2pm, end: 2:20pm
+
+SLEEP ACTIVITIES:
+- MUST have: start_time
+- If end_time provided: use it (completed nap)
+- If end_time NOT provided: set to null (ongoing/active sleep)
+- Examples:
+  * "Napped from 2pm to 3pm" → start: 2pm, end: 3pm
+  * "Started napping at 2pm" → start: 2pm, end: null
+  * "She's sleeping now" → start: current_time, end: null
+
+DIAPER ACTIVITIES:
+- MUST have: changed_at timestamp
+- Extract had_poop and had_pee from context
 
 Extract all activities mentioned. Return JSON array:
 
@@ -643,7 +765,7 @@ Extract all activities mentioned. Return JSON array:
     "activity_type": "FEED|DIAPER|SLEEP",
     "feed_details": {
       "start_time": "2024-01-15T14:30:00Z",
-      "end_time": "2024-01-15T14:50:00Z",
+      "end_time": null,
       "amount_ml": 60,
       "feed_type": "FORMULA"
     },
@@ -868,7 +990,7 @@ export const colors = {
 │                                 │
 │  ─────────────────────────────  │
 │                                 │
-│  Activities (3):                │
+│  Activities (4):                │
 │                                 │
 │  ┌─────────────────────────────┐│
 │  │ 🍼 Fed 70ml formula         ││
@@ -885,22 +1007,36 @@ export const colors = {
 │  └─────────────────────────────┘│
 │                                 │
 │  ┌─────────────────────────────┐│
-│  │ 😴 Sleeping                 ││
+│  │ 😴 Nap #1                   ││
+│  │    10:30 AM - 11:30 AM      ││
+│  │    Duration: 1h             ││
+│  │    [Delete Activity]         ││
+│  └─────────────────────────────┘│
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │ 😴 Nap #2 (Active)          ││
 │  │    Started: 2:30 PM         ││
 │  │    Duration: 2h 15m (LIVE)  ││
-│  │    [Mark as Awake]          ││
+│  │    [Mark as Awake]          ││  ← Calls endActivity mutation
 │  └─────────────────────────────┘│
 │                                 │
 │  Session Summary:               │
 │  • Total feeds: 1 (70ml)        │
 │  • Diaper changes: 1            │
-│  • Sleep time: 2h 15m (ongoing) │
+│  • Total sleep: 3h 15m          │
+│  • Currently sleeping: Yes      │
 │                                 │
 │  ┌─────────────────────────────┐ │
-│  │  Complete Care Session      │ │
+│  │  Complete Care Session      │ │  ← Auto-ends active nap
 │  └─────────────────────────────┘ │
 └─────────────────────────────────┘
 ```
+
+**Activity States:**
+- **Completed activities**: Show full time range, have [Delete] button
+- **Active activities** (sleep/feed with no end time): Show "LIVE" indicator, duration updates in real-time, have [Mark as Awake] or [End Feed] button
+- **Multiple naps**: Numbered (#1, #2, etc.) for clarity
+- **Complete Session**: Automatically ends all active activities with current timestamp
 
 ### 8.4 Recent Session Detail Screen
 
@@ -1480,14 +1616,29 @@ API_URL=http://192.168.1.100:8080/graphql
 ### 14.1 Voice Parsing Test Cases
 
 ```
+# Activities with explicit end times
 ✓ "She fed 60ml formula from 2:30 to 2:50"
+✓ "She napped from 10am to 11am, then napped again from 2pm to 3pm"
 ✓ "Fed 80ml breast milk, pooped, now sleeping"
+
+# Ongoing activities (no end time)
+✓ "She's feeding now" (creates feed with end_time=null)
+✓ "Started napping at 2pm" (creates sleep with end_time=null)
+✓ "She's been sleeping since 3pm" (creates sleep with end_time=null)
+
+# Ending activities
+✓ "She woke up" (should end most recent active sleep)
+✓ "Finished eating" (should end most recent active feed)
+✓ "She woke up from her nap at 4:15pm" (end sleep with specific time)
+
+# Multiple naps
+✓ "She napped 10-11am, fed 60ml at noon, napped again 2-3pm"
+
+# Instant activities
 ✓ "Changed diaper, had poop"
-✓ "She's been sleeping since 3pm"
-✓ "Fed 70ml formula at 2am" (overnight)
-✓ "Fed breast milk for 20 minutes"
 ✓ "Pooped and changed diaper at 10:30"
-✓ "Woke up from nap at 4:15"
+
+# Error cases
 ✗ "She's smiling" (should return error - no trackable activity)
 ✗ "Give her medicine" (should return error - out of scope)
 ```
