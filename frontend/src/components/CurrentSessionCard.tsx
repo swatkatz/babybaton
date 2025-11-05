@@ -2,13 +2,13 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
-import { CareSession } from '../types/careSession';
 import { ChevronRight } from 'lucide-react-native';
 import { ActivityItem } from './ActivityItem';
 import { formatDuration, formatTime } from '../utils/time';
+import { GetCurrentSessionQuery } from '../generated/graphql';
 
 interface CurrentSessionCardProps {
-  session: CareSession;
+  session: NonNullable<GetCurrentSessionQuery['getCurrentSession']>;
   onPress: () => void;
 }
 export function CurrentSessionCard({
@@ -16,7 +16,7 @@ export function CurrentSessionCard({
   onPress,
 }: CurrentSessionCardProps) {
   const caregiverColor = getCaregiverColor(session.caregiver.id);
-  const duration = formatDuration(session.startedAt);
+  const duration = formatDuration(new Date(session.startedAt));
 
   return (
     <TouchableOpacity onPress={onPress}>
@@ -44,7 +44,8 @@ export function CurrentSessionCard({
 
           {/* Session Info */}
           <Text style={styles.sessionInfo}>
-            Started: {formatTime(session.startedAt)} • Duration: {duration}
+            Started: {formatTime(new Date(session.startedAt))} • Duration:{' '}
+            {duration}
           </Text>
         </View>
 

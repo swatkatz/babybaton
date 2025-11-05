@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
-import { CareSession } from '../types/careSession';
+import { GetRecentSessionsQuery } from '../generated/graphql';
 import {
   formatDuration,
   formatMinutesToDuration,
@@ -16,7 +16,7 @@ import {
  */
 
 interface RecentSessionCardProps {
-  session: CareSession;
+  session: NonNullable<GetRecentSessionsQuery['getRecentCareSessions']>[number];
   onPress: () => void;
 }
 
@@ -26,7 +26,7 @@ export function RecentSessionCard({
 }: RecentSessionCardProps) {
   const caregiverColor = getCaregiverColor(session.caregiver.id);
   const duration = session.completedAt
-    ? formatDuration(session.startedAt, session.completedAt)
+    ? formatDuration(new Date(session.startedAt), new Date(session.completedAt))
     : '';
   // Format sleep time using imported function
   const sleepTime = formatMinutesToDuration(session.summary.totalSleepMinutes);
@@ -53,8 +53,8 @@ export function RecentSessionCard({
 
         {/* Time range and duration */}
         <Text style={styles.timeText}>
-          {formatTime(session.startedAt)} -{' '}
-          {session.completedAt && formatTime(session.completedAt)} • {duration}
+          {formatTime(new Date(session.startedAt))} -{' '}
+          {session.completedAt && formatTime(new Date(session.completedAt))} • {duration}
         </Text>
 
         {/* Summary line */}

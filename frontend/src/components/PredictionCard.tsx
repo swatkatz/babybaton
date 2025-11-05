@@ -3,7 +3,7 @@ import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
-import { Prediction } from '../types/prediction';
+import { GetPredictionQuery } from '../generated/graphql';
 
 /**
  * Props for PredictionCard component
@@ -11,16 +11,19 @@ import { Prediction } from '../types/prediction';
  * Matches the NextFeedPrediction type from GraphQL schema
  */
 interface PredictionCardProps {
-  prediction: Prediction;
+  prediction: GetPredictionQuery['predictNextFeed'];
   onPress: () => void;
 }
 
 export function PredictionCard({ prediction, onPress }: PredictionCardProps) {
   // Format time as "5:15 PM"
-  const formattedTime = prediction.predictedTime.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  const formattedTime = new Date(prediction.predictedTime).toLocaleTimeString(
+    'en-US',
+    {
+      hour: 'numeric',
+      minute: '2-digit',
+    }
+  );
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.container}>

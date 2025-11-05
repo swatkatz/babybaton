@@ -3,18 +3,21 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, Text } from 'react-native';
 import { PredictionCard } from '../components/PredictionCard';
-import { mockPrediction } from '../graphql/predictionMock';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { CurrentSessionCard } from '../components/CurrentSessionCard';
-import { mockCurrentSession, mockRecentSessions } from '../graphql/sessionMock';
 import { RecentSessionCard } from '../components/RecentSessionCard';
+import {
+  useGetPredictionQuery,
+  useGetCurrentSessionQuery,
+  useGetRecentSessionsQuery,
+} from '../generated/graphql';
 
 /**
  * Dashboard Screen - Main overview screen showing:
  * - Next feed prediction
- * - Current care session (TODO)
- * - Recent care sessions (TODO)
+ * - Current care session
+ * - Recent care sessions
  */
 export function DashboardScreen() {
   const handlePredictionPress = () => {
@@ -31,23 +34,56 @@ export function DashboardScreen() {
     console.log('Recent session pressed:', sessionId);
   };
 
+  const {
+    data: predictionData,
+    loading: predictionLoading,
+    error: predictionError,
+  } = useGetPredictionQuery();
+
+  const {
+    data: sessionData,
+    loading: sessionLoading,
+    error: sessionError,
+  } = useGetCurrentSessionQuery();
+
+  const {
+    data: recentSessionsData,
+    loading: recentSessionsLoading,
+    error: recentSessionsError,
+  } = useGetRecentSessionsQuery({
+    variables: { limit: 3 },
+  });
+
+  const currentSession = sessionData?.getCurrentSession;
+  const recentSessions = recentSessionsData?.getRecentCareSessions ?? [];
+
+  // Convert the prediction (DateTime string -> Date)
+  const prediction = predictionData?.predictNextFeed;
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* Next Feed Prediction */}
-        <PredictionCard
-          prediction={mockPrediction}
-          onPress={handlePredictionPress}
-        />
+        {predictionLoading && <Text>Loading prediction...</Text>}
+        {predictionError && <Text>Error loading prediction</Text>}
+        {prediction && (
+          <PredictionCard
+            prediction={prediction}
+            onPress={handlePredictionPress}
+          />
+        )}
 
         {/* Spacing between cards */}
         <View style={{ height: spacing.md }} />
 
         {/* Current Care Session */}
-        <CurrentSessionCard
-          session={mockCurrentSession}
-          onPress={handleSessionPress}
-        />
+        {sessionLoading && <Text>Loading session...</Text>}
+        {sessionError && <Text>Error loading session</Text>}
+        {currentSession && (
+          <CurrentSessionCard
+            session={currentSession}
+            onPress={handleSessionPress}
+          />
+        )}
 
         {/* Spacing */}
         <View style={{ height: spacing.md }} />
@@ -56,7 +92,9 @@ export function DashboardScreen() {
         <Text style={styles.sectionTitle}>📋 Recent Care Sessions</Text>
 
         {/* Recent Sessions List */}
-        {mockRecentSessions.map((session) => (
+        {recentSessionsLoading && <Text>Loading recent sessions...</Text>}
+        {recentSessionsError && <Text>Error loading recent sessions</Text>}
+        {recentSessions.map((session) => (
           <View key={session.id}>
             <RecentSessionCard
               session={session}

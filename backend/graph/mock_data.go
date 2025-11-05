@@ -143,7 +143,7 @@ func GetMockRecentSessions() []*model.CareSession {
 			ID: "session-3",
 			Caregiver: &model.Caregiver{
 				ID:         "caregiver-3",
-				Name:       "Nani",
+				Name:       "Nana",
 				DeviceID:   "device-667",
 				DeviceName: stringPtr("Pixel 7"),
 			},

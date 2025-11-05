@@ -4,6 +4,7 @@ go 1.25.3
 
 require (
 	github.com/99designs/gqlgen v0.17.81
+	github.com/rs/cors v1.11.1
 	github.com/vektah/gqlparser/v2 v2.5.30
 )
 
