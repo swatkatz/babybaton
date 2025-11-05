@@ -1,0 +1,116 @@
+scalar DateTime
+
+# Enums
+enum CareSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ActivityType {
+  FEED
+  DIAPER
+  SLEEP
+}
+
+enum FeedType {
+  BREAST_MILK
+  FORMULA
+}
+
+enum PredictionConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+# Types
+type Caregiver {
+  id: ID!
+  name: String!
+  deviceId: String!
+  deviceName: String
+}
+
+type CareSession {
+  id: ID!
+  caregiver: Caregiver!
+  status: CareSessionStatus!
+  startedAt: DateTime!
+  completedAt: DateTime
+  activities: [Activity!]!
+  notes: String
+  summary: CareSessionSummary!
+}
+
+type CareSessionSummary {
+  totalFeeds: Int!
+  totalMl: Int!
+  totalDiaperChanges: Int!
+  totalSleepMinutes: Int!
+  lastFeedTime: DateTime
+  lastSleepTime: DateTime
+  currentlyAsleep: Boolean!
+}
+
+union Activity = FeedActivity | DiaperActivity | SleepActivity
+
+type FeedDetails {
+  startTime: DateTime!
+  endTime: DateTime
+  amountMl: Int
+  feedType: FeedType
+  durationMinutes: Int
+}
+
+type DiaperDetails {
+  changedAt: DateTime!
+  hadPoop: Boolean!
+  hadPee: Boolean!
+}
+
+type SleepDetails {
+  startTime: DateTime!
+  endTime: DateTime
+  durationMinutes: Int
+  isActive: Boolean!
+}
+
+type FeedActivity {
+  id: ID!
+  activityType: ActivityType!
+  createdAt: DateTime!
+  feedDetails: FeedDetails
+}
+
+type DiaperActivity {
+  id: ID!
+  activityType: ActivityType!
+  createdAt: DateTime!
+  diaperDetails: DiaperDetails
+}
+
+type SleepActivity {
+  id: ID!
+  activityType: ActivityType!
+  createdAt: DateTime!
+  sleepDetails: SleepDetails
+}
+
+type NextFeedPrediction {
+  predictedTime: DateTime!
+  confidence: PredictionConfidence!
+  reasoning: String
+  minutesUntilFeed: Int!
+}
+
+# Queries - Only what Dashboard needs
+type Query {
+  # Get next feed prediction
+  predictNextFeed: NextFeedPrediction!
+
+  # Get current in-progress session (if any)
+  getCurrentSession: CareSession
+
+  # Get recent completed care sessions
+  getRecentCareSessions(limit: Int): [CareSession!]!
+}
