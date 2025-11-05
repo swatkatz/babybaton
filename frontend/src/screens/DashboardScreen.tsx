@@ -115,6 +115,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.md,
+    width: '100%',
   },
   sectionTitle: {
     fontSize: 16,
