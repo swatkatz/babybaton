@@ -1,5 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Platform,
+} from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Utensils, Droplets, Moon } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
@@ -14,9 +22,15 @@ type Activity = CurrentSession['activities'][number];
 
 interface ActivityItemProps {
   activity: Activity;
+  onDelete?: (activityId: string) => void;
+  onMarkAwake?: (activityId: string) => void;
 }
 
-export function ActivityItem({ activity }: ActivityItemProps) {
+export function ActivityItem({
+  activity,
+  onDelete,
+  onMarkAwake,
+}: ActivityItemProps) {
   const getActivityIcon = () => {
     switch (activity.__typename) {
       case 'FeedActivity':
@@ -98,12 +112,50 @@ export function ActivityItem({ activity }: ActivityItemProps) {
               {activity.sleepDetails?.endTime &&
                 ` - ${formatTime(new Date(activity.sleepDetails.endTime))}`}
             </Text>
+            {isActive && onMarkAwake && (
+              <TouchableOpacity
+                style={styles.markAwakeButton}
+                onPress={() => onMarkAwake(activity.id)}
+              >
+                <Text style={styles.markAwakeButtonText}>☀️ Mark as Awake</Text>
+              </TouchableOpacity>
+            )}
           </View>
         );
     }
   };
 
-  return (
+  // Render delete action when swiped left
+  const renderRightActions = (
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>
+  ) => {
+    const trans = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [0, 100],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.deleteAction,
+          {
+            transform: [{ translateX: trans }],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => onDelete?.(activity.id)}
+        >
+          <Text style={styles.deleteButtonText}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const cardContent = (
     <View style={styles.container}>
       <View style={styles.horizontalLayout}>
         <View
@@ -118,6 +170,22 @@ export function ActivityItem({ activity }: ActivityItemProps) {
       </View>
     </View>
   );
+
+  // Only wrap with Swipeable if onDelete is provided
+  if (onDelete) {
+    return (
+      <Swipeable
+        renderRightActions={renderRightActions}
+        friction={2}
+        rightThreshold={40}
+        useNativeAnimations={Platform.OS !== 'web'}
+      >
+        {cardContent}
+      </Swipeable>
+    );
+  }
+
+  return cardContent;
 }
 
 const styles = StyleSheet.create({
@@ -159,5 +227,35 @@ const styles = StyleSheet.create({
   liveIndicator: {
     fontWeight: '700',
     color: colors.error,
+  },
+  markAwakeButton: {
+    backgroundColor: '#7BC96F',
+    borderRadius: layout.radiusSmall,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+    alignItems: 'center',
+  },
+  markAwakeButtonText: {
+    fontSize: typography.sm,
+    fontWeight: '600',
+    color: colors.surface,
+  },
+  deleteAction: {
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    borderRadius: layout.radiusMedium,
+    marginBottom: spacing.sm,
+  },
+  deleteButton: {
+    width: 100,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    fontSize: typography.sm,
+    fontWeight: '600',
+    color: colors.surface,
   },
 });

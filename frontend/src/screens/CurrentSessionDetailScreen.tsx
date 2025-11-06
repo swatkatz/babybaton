@@ -24,9 +24,9 @@ export function CurrentSessionDetailScreen({ route }: Props) {
     // TODO: Implement delete mutation
   };
 
-  const handleMarkAsAwake = () => {
-    console.log('Mark baby as awake');
-    // TODO: Implement mark as awake mutation
+  const handleMarkAwake = (activityId: string) => {
+    console.log('Mark as awake, activity:', activityId);
+    // TODO: Implement mark awake mutation
   };
 
   const handleCompleteSession = () => {
@@ -86,16 +86,6 @@ export function CurrentSessionDetailScreen({ route }: Props) {
           <Text style={styles.durationText}>Duration: {duration}</Text>
         </View>
 
-        {/* Mark as Awake Button (if baby is currently sleeping) */}
-        {session.summary.currentlyAsleep && (
-          <TouchableOpacity
-            style={styles.awakeButton}
-            onPress={handleMarkAsAwake}
-          >
-            <Text style={styles.awakeButtonText}>👁️ Mark as Awake</Text>
-          </TouchableOpacity>
-        )}
-
         {/* Activities */}
         <Text style={styles.sectionTitle}>
           Activities ({session.activities.length}):
@@ -110,17 +100,12 @@ export function CurrentSessionDetailScreen({ route }: Props) {
         ) : (
           <View style={styles.activitiesList}>
             {session.activities.map((activity) => (
-              <View key={activity.id} style={styles.activityRow}>
-                <View style={styles.activityContent}>
-                  <ActivityItem activity={activity} />
-                </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDeleteActivity(activity.id)}
-                >
-                  <Text style={styles.deleteButtonText}>🗑️</Text>
-                </TouchableOpacity>
-              </View>
+              <ActivityItem
+                key={activity.id}
+                activity={activity}
+                onDelete={handleDeleteActivity}
+                onMarkAwake={handleMarkAwake}
+              />
             ))}
           </View>
         )}
@@ -219,18 +204,6 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     color: colors.textSecondary,
   },
-  awakeButton: {
-    backgroundColor: colors.warning,
-    borderRadius: layout.radiusMedium,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    alignItems: 'center',
-  },
-  awakeButtonText: {
-    fontSize: typography.base,
-    fontWeight: '600',
-    color: colors.surface,
-  },
   sectionTitle: {
     fontSize: typography.base,
     fontWeight: '600',
@@ -251,25 +224,6 @@ const styles = StyleSheet.create({
   },
   activitiesList: {
     gap: spacing.sm,
-  },
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  deleteButton: {
-    backgroundColor: colors.error,
-    borderRadius: layout.radiusSmall,
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteButtonText: {
-    fontSize: 20,
   },
   summary: {
     backgroundColor: colors.surface,
