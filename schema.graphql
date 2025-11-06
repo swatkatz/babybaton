@@ -113,4 +113,7 @@ type Query {
 
   # Get recent completed care sessions
   getRecentCareSessions(limit: Int): [CareSession!]!
+
+  # Get care session by id
+  getCareSession(id: ID!): CareSession
 }

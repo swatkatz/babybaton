@@ -7,6 +7,8 @@ import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { CurrentSessionCard } from '../components/CurrentSessionCard';
 import { RecentSessionCard } from '../components/RecentSessionCard';
+import { StackScreenProps } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import {
   useGetPredictionQuery,
   useGetCurrentSessionQuery,
@@ -19,21 +21,9 @@ import {
  * - Current care session
  * - Recent care sessions
  */
-export function DashboardScreen() {
-  const handlePredictionPress = () => {
-    console.log('Prediction card pressed!');
-    // TODO: Navigate to PredictionDetailScreen
-  };
+type Props = StackScreenProps<RootStackParamList, 'Dashboard'>;
 
-  const handleSessionPress = () => {
-    console.log('Current session card pressed!');
-    // TODO: Navigate to HandleDetailScreen
-  };
-
-  const handleRecentSessionPress = (sessionId: string) => {
-    console.log('Recent session pressed:', sessionId);
-  };
-
+export function DashboardScreen({ navigation }: Props) {
   const {
     data: predictionData,
     loading: predictionLoading,
@@ -53,6 +43,22 @@ export function DashboardScreen() {
   } = useGetRecentSessionsQuery({
     variables: { limit: 3 },
   });
+
+  const handlePredictionPress = () => {
+    const prediction = predictionData?.predictNextFeed;
+    if (prediction) {
+      navigation.navigate('PredictionDetail', { prediction });
+    }
+  };
+
+  const handleSessionPress = () => {
+    navigation.navigate('CurrentSessionDetail');
+  };
+
+  const handleRecentSessionPress = (sessionId: string) => {
+    console.log('Navigating to session:', sessionId);
+    navigation.navigate('SessionDetail', { sessionId });
+  };
 
   const currentSession = sessionData?.getCurrentSession;
   const recentSessions = recentSessionsData?.getRecentCareSessions ?? [];

@@ -116,9 +116,15 @@ export enum PredictionConfidence {
 
 export type Query = {
   __typename?: 'Query';
+  getCareSession?: Maybe<CareSession>;
   getCurrentSession?: Maybe<CareSession>;
   getRecentCareSessions: Array<CareSession>;
   predictNextFeed: NextFeedPrediction;
+};
+
+
+export type QueryGetCareSessionArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -161,9 +167,83 @@ export type GetRecentSessionsQueryVariables = Exact<{
 }>;
 
 
-export type GetRecentSessionsQuery = { __typename?: 'Query', getRecentCareSessions: Array<{ __typename?: 'CareSession', id: string, status: CareSessionStatus, startedAt: string, completedAt?: string | null, caregiver: { __typename?: 'Caregiver', id: string, name: string }, summary: { __typename?: 'CareSessionSummary', totalFeeds: number, totalMl: number, totalDiaperChanges: number, totalSleepMinutes: number, lastFeedTime?: string | null, lastSleepTime?: string | null, currentlyAsleep: boolean } }> };
+export type GetRecentSessionsQuery = { __typename?: 'Query', getRecentCareSessions: Array<{ __typename?: 'CareSession', id: string, status: CareSessionStatus, startedAt: string, completedAt?: string | null, caregiver: { __typename?: 'Caregiver', id: string, name: string }, activities: Array<
+      | { __typename?: 'DiaperActivity', id: string, activityType: ActivityType, createdAt: string, diaperDetails?: { __typename?: 'DiaperDetails', changedAt: string, hadPoop: boolean, hadPee: boolean } | null }
+      | { __typename?: 'FeedActivity', id: string, activityType: ActivityType, createdAt: string, feedDetails?: { __typename?: 'FeedDetails', startTime: string, endTime?: string | null, amountMl?: number | null, feedType?: FeedType | null, durationMinutes?: number | null } | null }
+      | { __typename?: 'SleepActivity', id: string, activityType: ActivityType, createdAt: string, sleepDetails?: { __typename?: 'SleepDetails', startTime: string, endTime?: string | null, durationMinutes?: number | null, isActive: boolean } | null }
+    >, summary: { __typename?: 'CareSessionSummary', totalFeeds: number, totalMl: number, totalDiaperChanges: number, totalSleepMinutes: number, lastFeedTime?: string | null, lastSleepTime?: string | null, currentlyAsleep: boolean } }> };
+
+export type CareSessionDetailFragment = { __typename?: 'CareSession', id: string, status: CareSessionStatus, startedAt: string, completedAt?: string | null, notes?: string | null, caregiver: { __typename?: 'Caregiver', id: string, name: string }, activities: Array<
+    | { __typename?: 'DiaperActivity', id: string, activityType: ActivityType, createdAt: string, diaperDetails?: { __typename?: 'DiaperDetails', changedAt: string, hadPoop: boolean, hadPee: boolean } | null }
+    | { __typename?: 'FeedActivity', id: string, activityType: ActivityType, createdAt: string, feedDetails?: { __typename?: 'FeedDetails', startTime: string, endTime?: string | null, amountMl?: number | null, feedType?: FeedType | null, durationMinutes?: number | null } | null }
+    | { __typename?: 'SleepActivity', id: string, activityType: ActivityType, createdAt: string, sleepDetails?: { __typename?: 'SleepDetails', startTime: string, endTime?: string | null, durationMinutes?: number | null, isActive: boolean } | null }
+  >, summary: { __typename?: 'CareSessionSummary', totalFeeds: number, totalMl: number, totalDiaperChanges: number, totalSleepMinutes: number } };
+
+export type GetCareSessionQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
 
 
+export type GetCareSessionQuery = { __typename?: 'Query', getCareSession?: { __typename?: 'CareSession', id: string, status: CareSessionStatus, startedAt: string, completedAt?: string | null, notes?: string | null, caregiver: { __typename?: 'Caregiver', id: string, name: string }, activities: Array<
+      | { __typename?: 'DiaperActivity', id: string, activityType: ActivityType, createdAt: string, diaperDetails?: { __typename?: 'DiaperDetails', changedAt: string, hadPoop: boolean, hadPee: boolean } | null }
+      | { __typename?: 'FeedActivity', id: string, activityType: ActivityType, createdAt: string, feedDetails?: { __typename?: 'FeedDetails', startTime: string, endTime?: string | null, amountMl?: number | null, feedType?: FeedType | null, durationMinutes?: number | null } | null }
+      | { __typename?: 'SleepActivity', id: string, activityType: ActivityType, createdAt: string, sleepDetails?: { __typename?: 'SleepDetails', startTime: string, endTime?: string | null, durationMinutes?: number | null, isActive: boolean } | null }
+    >, summary: { __typename?: 'CareSessionSummary', totalFeeds: number, totalMl: number, totalDiaperChanges: number, totalSleepMinutes: number } } | null };
+
+export const CareSessionDetailFragmentDoc = gql`
+    fragment CareSessionDetail on CareSession {
+  id
+  status
+  startedAt
+  completedAt
+  caregiver {
+    id
+    name
+  }
+  activities {
+    ... on FeedActivity {
+      id
+      activityType
+      createdAt
+      feedDetails {
+        startTime
+        endTime
+        amountMl
+        feedType
+        durationMinutes
+      }
+    }
+    ... on DiaperActivity {
+      id
+      activityType
+      createdAt
+      diaperDetails {
+        changedAt
+        hadPoop
+        hadPee
+      }
+    }
+    ... on SleepActivity {
+      id
+      activityType
+      createdAt
+      sleepDetails {
+        startTime
+        endTime
+        durationMinutes
+        isActive
+      }
+    }
+  }
+  summary {
+    totalFeeds
+    totalMl
+    totalDiaperChanges
+    totalSleepMinutes
+  }
+  notes
+}
+    `;
 export const GetPredictionDocument = gql`
     query GetPrediction {
   predictNextFeed {
@@ -310,6 +390,41 @@ export const GetRecentSessionsDocument = gql`
       id
       name
     }
+    activities {
+      ... on FeedActivity {
+        id
+        activityType
+        createdAt
+        feedDetails {
+          startTime
+          endTime
+          amountMl
+          feedType
+          durationMinutes
+        }
+      }
+      ... on DiaperActivity {
+        id
+        activityType
+        createdAt
+        diaperDetails {
+          changedAt
+          hadPoop
+          hadPee
+        }
+      }
+      ... on SleepActivity {
+        id
+        activityType
+        createdAt
+        sleepDetails {
+          startTime
+          endTime
+          durationMinutes
+          isActive
+        }
+      }
+    }
     summary {
       totalFeeds
       totalMl
@@ -355,3 +470,43 @@ export type GetRecentSessionsQueryHookResult = ReturnType<typeof useGetRecentSes
 export type GetRecentSessionsLazyQueryHookResult = ReturnType<typeof useGetRecentSessionsLazyQuery>;
 export type GetRecentSessionsSuspenseQueryHookResult = ReturnType<typeof useGetRecentSessionsSuspenseQuery>;
 export type GetRecentSessionsQueryResult = ApolloReactCommon.QueryResult<GetRecentSessionsQuery, GetRecentSessionsQueryVariables>;
+export const GetCareSessionDocument = gql`
+    query GetCareSession($id: ID!) {
+  getCareSession(id: $id) {
+    ...CareSessionDetail
+  }
+}
+    ${CareSessionDetailFragmentDoc}`;
+
+/**
+ * __useGetCareSessionQuery__
+ *
+ * To run a query within a React component, call `useGetCareSessionQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetCareSessionQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetCareSessionQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetCareSessionQuery(baseOptions: ApolloReactHooks.QueryHookOptions<GetCareSessionQuery, GetCareSessionQueryVariables> & ({ variables: GetCareSessionQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<GetCareSessionQuery, GetCareSessionQueryVariables>(GetCareSessionDocument, options);
+      }
+export function useGetCareSessionLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<GetCareSessionQuery, GetCareSessionQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<GetCareSessionQuery, GetCareSessionQueryVariables>(GetCareSessionDocument, options);
+        }
+export function useGetCareSessionSuspenseQuery(baseOptions?: ApolloReactHooks.SkipToken | ApolloReactHooks.SuspenseQueryHookOptions<GetCareSessionQuery, GetCareSessionQueryVariables>) {
+          const options = baseOptions === ApolloReactHooks.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useSuspenseQuery<GetCareSessionQuery, GetCareSessionQueryVariables>(GetCareSessionDocument, options);
+        }
+export type GetCareSessionQueryHookResult = ReturnType<typeof useGetCareSessionQuery>;
+export type GetCareSessionLazyQueryHookResult = ReturnType<typeof useGetCareSessionLazyQuery>;
+export type GetCareSessionSuspenseQueryHookResult = ReturnType<typeof useGetCareSessionSuspenseQuery>;
+export type GetCareSessionQueryResult = ApolloReactCommon.QueryResult<GetCareSessionQuery, GetCareSessionQueryVariables>;

@@ -1,32 +1,26 @@
 // App.tsx
 
 import React from 'react';
-import { StatusBar, StyleSheet } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { DashboardScreen } from './src/screens/DashboardScreen';
+import { StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ApolloProvider } from '@apollo/client/react';
+import { NavigationContainer } from '@react-navigation/native';
+import { AppNavigator } from './src/navigation/AppNavigator'; // ← Add this
 import { colors } from './src/theme/colors';
 import { client } from './src/graphql/client';
-import { ApolloProvider } from '@apollo/client/react';
 
 export default function App() {
   return (
     <ApolloProvider client={client}>
       <SafeAreaProvider>
-        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <NavigationContainer>
           <StatusBar
             barStyle="dark-content"
             backgroundColor={colors.background}
           />
-          <DashboardScreen />
-        </SafeAreaView>
+          <AppNavigator />{' '}
+        </NavigationContainer>
       </SafeAreaProvider>
     </ApolloProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-});

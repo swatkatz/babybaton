@@ -110,6 +110,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		GetCareSession        func(childComplexity int, id string) int
 		GetCurrentSession     func(childComplexity int) int
 		GetRecentCareSessions func(childComplexity int, limit *int32) int
 		PredictNextFeed       func(childComplexity int) int
@@ -134,6 +135,7 @@ type QueryResolver interface {
 	PredictNextFeed(ctx context.Context) (*model.NextFeedPrediction, error)
 	GetCurrentSession(ctx context.Context) (*model.CareSession, error)
 	GetRecentCareSessions(ctx context.Context, limit *int32) ([]*model.CareSession, error)
+	GetCareSession(ctx context.Context, id string) (*model.CareSession, error)
 }
 
 type executableSchema struct {
@@ -397,6 +399,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.NextFeedPrediction.Reasoning(childComplexity), true
 
+	case "Query.getCareSession":
+		if e.complexity.Query.GetCareSession == nil {
+			break
+		}
+
+		args, err := ec.field_Query_getCareSession_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.GetCareSession(childComplexity, args["id"].(string)), true
 	case "Query.getCurrentSession":
 		if e.complexity.Query.GetCurrentSession == nil {
 			break
@@ -675,6 +688,9 @@ type Query {
 
   # Get recent completed care sessions
   getRecentCareSessions(limit: Int): [CareSession!]!
+
+  # Get care session by id
+  getCareSession(id: ID!): CareSession
 }
 `, BuiltIn: false},
 }
@@ -692,6 +708,17 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_getCareSession_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -2074,6 +2101,65 @@ func (ec *executionContext) fieldContext_Query_getRecentCareSessions(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_getRecentCareSessions_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_getCareSession(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_getCareSession,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().GetCareSession(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		ec.marshalOCareSession2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSession,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_getCareSession(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_CareSession_id(ctx, field)
+			case "caregiver":
+				return ec.fieldContext_CareSession_caregiver(ctx, field)
+			case "status":
+				return ec.fieldContext_CareSession_status(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_CareSession_startedAt(ctx, field)
+			case "completedAt":
+				return ec.fieldContext_CareSession_completedAt(ctx, field)
+			case "activities":
+				return ec.fieldContext_CareSession_activities(ctx, field)
+			case "notes":
+				return ec.fieldContext_CareSession_notes(ctx, field)
+			case "summary":
+				return ec.fieldContext_CareSession_summary(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CareSession", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_getCareSession_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4418,6 +4504,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getCareSession":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getCareSession(ctx, field)
 				return res
 			}
 

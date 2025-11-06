@@ -6,6 +6,7 @@ package graph
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/swatkatz/babybaton/backend/graph/model"
 )
@@ -23,6 +24,26 @@ func (r *queryResolver) GetCurrentSession(ctx context.Context) (*model.CareSessi
 // GetRecentCareSessions is the resolver for the getRecentCareSessions field.
 func (r *queryResolver) GetRecentCareSessions(ctx context.Context, limit *int32) ([]*model.CareSession, error) {
 	return GetMockRecentSessions(), nil
+}
+
+// GetCareSession is the resolver for the getCareSession field.
+func (r *queryResolver) GetCareSession(ctx context.Context, id string) (*model.CareSession, error) {
+	sessions := GetMockRecentSessions()
+	currentSession := GetMockCurrentSession()
+	
+	// Check current session
+	if currentSession.ID == id {
+		return currentSession, nil
+	}
+	
+	// Check recent sessions
+	for _, session := range sessions {
+		if session.ID == id {
+			return session, nil
+		}
+	}
+	
+	return nil, fmt.Errorf("session not found: %s", id)
 }
 
 // Query returns QueryResolver implementation.
