@@ -24,16 +24,27 @@ enum PredictionConfidence {
 }
 
 # Types
+type Family {
+  id: ID!
+  name: String!
+  babyName: String!
+  caregivers: [Caregiver!]!
+  createdAt: DateTime!
+}
+
 type Caregiver {
   id: ID!
+  familyId: ID!
   name: String!
   deviceId: String!
   deviceName: String
+  createdAt: DateTime!
 }
 
 type CareSession {
   id: ID!
   caregiver: Caregiver!
+  familyId: ID!
   status: CareSessionStatus!
   startedAt: DateTime!
   completedAt: DateTime
@@ -103,17 +114,98 @@ type NextFeedPrediction {
   minutesUntilFeed: Int!
 }
 
-# Queries - Only what Dashboard needs
+type ParsedVoiceResult {
+  success: Boolean!
+  parsedActivities: [ActivityInput!]!
+  errors: [String!]
+  rawText: String!
+}
+
+type AuthResult {
+  success: Boolean!
+  family: Family
+  caregiver: Caregiver
+  error: String
+}
+
+# Inputs
+input ActivityInput {
+  activityType: ActivityType!
+  feedDetails: FeedDetailsInput
+  diaperDetails: DiaperDetailsInput
+  sleepDetails: SleepDetailsInput
+}
+
+input FeedDetailsInput {
+  startTime: DateTime!
+  endTime: DateTime
+  amountMl: Int
+  feedType: FeedType
+}
+
+input DiaperDetailsInput {
+  changedAt: DateTime!
+  hadPoop: Boolean!
+  hadPee: Boolean
+}
+
+input SleepDetailsInput {
+  startTime: DateTime!
+  endTime: DateTime
+}
+
+# Queries
 type Query {
-  # Get next feed prediction
-  predictNextFeed: NextFeedPrediction!
+  # Family & Auth
+  checkFamilyNameAvailable(name: String!): Boolean!
+  getMyFamily: Family
+  getMyCaregiver: Caregiver
 
-  # Get current in-progress session (if any)
-  getCurrentSession: CareSession
-
-  # Get recent completed care sessions
+  # Care Sessions (automatically scoped to authenticated caregiver's family)
   getRecentCareSessions(limit: Int): [CareSession!]!
-
-  # Get care session by id
+  getCurrentSession: CareSession
   getCareSession(id: ID!): CareSession
+
+  # Predictions
+  predictNextFeed: NextFeedPrediction!
+}
+
+# Mutations
+type Mutation {
+  # Family Management
+  createFamily(
+    familyName: String!
+    password: String!
+    babyName: String!
+    caregiverName: String!
+    deviceId: String!
+    deviceName: String
+  ): AuthResult!
+
+  joinFamily(
+    familyName: String!
+    password: String!
+    caregiverName: String!
+    deviceId: String!
+    deviceName: String
+  ): AuthResult!
+
+  updateBabyName(babyName: String!): Family!
+
+  leaveFamily: Boolean!
+
+  # Care Session Management
+  startCareSession: CareSession!
+
+  parseVoiceInput(text: String!): ParsedVoiceResult!
+
+  addActivities(activities: [ActivityInput!]!): CareSession!
+
+  addActivitiesFromVoice(text: String!): CareSession!
+
+  endActivity(activityId: ID!, endTime: DateTime): Activity!
+
+  completeCareSession(notes: String): CareSession!
+
+  deleteActivity(activityId: ID!): Boolean!
 }

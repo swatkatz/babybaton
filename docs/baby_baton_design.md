@@ -3,10 +3,19 @@
 ## 1. System Overview
 
 ### 1.1 Purpose
+
 A multi-caregiver baby tracking system with voice input for seamless care transitions, smart feed predictions, and local notifications. The app is called "Baby Baton" - representing the passing of care responsibility between caregivers.
 
+Baby Baton supports multiple families, where each family has one baby and multiple caregivers who can track care activities together.
+
 ### 1.2 MVP Scope
+
 **In Scope:**
+
+- Multi-family support with password-based access
+- Family creation and joining with unique family names
+- Single baby per family with customizable name
+- Caregiver management (all caregivers have equal permissions)
 - Care session management (start, add activities, complete)
 - Voice input with button confirmation
 - Track: Feeds, Diaper changes, Sleep
@@ -14,17 +23,25 @@ A multi-caregiver baby tracking system with voice input for seamless care transi
 - Smart rule-based feed predictions
 - Local push notifications (15 min before predicted feed)
 - Delete activities
+- Leave family functionality
+- Family settings (view password, caregiver list, edit baby name)
 - Responsive UI for all phone sizes
 
 **Out of Scope (Post-MVP):**
+
 - Analytics/trends dashboard
 - Play activity tracking (use notes field instead)
 - Baby metrics (weight, height, milestones)
 - ML-based predictions
 - Cloud push notifications
-- Multi-baby support
+- Multi-baby support (only one baby per family)
+- Caregiver roles/permissions (all caregivers are admins)
+- QR code family joining
+- Email/cloud authentication
+- Multi-device per caregiver (one device = one family membership)
 
 ### 1.3 Architecture Diagram
+
 ```
 ┌─────────────────┐         ┌─────────────────┐
 │   iOS Device    │         │ Android Device  │
@@ -33,6 +50,7 @@ A multi-caregiver baby tracking system with voice input for seamless care transi
 │  • Voice Input  │         │  • Voice Input  │
 │  • Local Notif  │         │  • Local Notif  │
 │  • Predictions  │         │  • Predictions  │
+│  • Family Auth  │         │  • Family Auth  │
 └────────┬────────┘         └────────┬────────┘
          │                           │
          │    GraphQL over HTTPS     │
@@ -46,6 +64,7 @@ A multi-caregiver baby tracking system with voice input for seamless care transi
                     │
          ┌──────────▼──────────┐
          │   Business Logic    │
+         │   - Family Auth     │
          │   - Session Mgmt    │
          │   - Voice Parsing   │
          │   - Predictions     │
@@ -63,6 +82,7 @@ A multi-caregiver baby tracking system with voice input for seamless care transi
 ```
 
 ### 1.4 Technology Stack
+
 - **Backend:** Go 1.21+
 - **API:** GraphQL (gqlgen)
 - **Database:** PostgreSQL 15+
@@ -70,6 +90,7 @@ A multi-caregiver baby tracking system with voice input for seamless care transi
 - **GraphQL Client:** Apollo Client
 - **Voice:** Device speech-to-text → Claude API for parsing
 - **Notifications:** Local notifications (react-native-push-notification)
+- **Password Hashing:** bcrypt
 - **Containerization:** Docker + Docker Compose
 - **Repository:** GitHub (monorepo)
 
@@ -79,25 +100,50 @@ A multi-caregiver baby tracking system with voice input for seamless care transi
 
 ### 2.1 Tables (MVP)
 
+#### `families`
+
+```sql
+CREATE TABLE families (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    baby_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT families_name_unique UNIQUE (name)
+);
+
+-- Case-insensitive lookup for family names
+CREATE UNIQUE INDEX idx_families_name_lower ON families(LOWER(name));
+```
+
 #### `caregivers`
+
 ```sql
 CREATE TABLE caregivers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    family_id UUID NOT NULL REFERENCES families(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
-    device_id VARCHAR(255) UNIQUE NOT NULL,
+    device_id VARCHAR(255) NOT NULL,
     device_name VARCHAR(100),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_caregivers_device_id ON caregivers(device_id);
+-- Device can only belong to one family at a time
+CREATE UNIQUE INDEX idx_caregivers_device_id ON caregivers(device_id);
+
+-- Index for family lookups
+CREATE INDEX idx_caregivers_family_id ON caregivers(family_id);
 ```
 
 #### `care_sessions`
+
 ```sql
 CREATE TABLE care_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     caregiver_id UUID NOT NULL REFERENCES caregivers(id),
+    family_id UUID NOT NULL REFERENCES families(id),
     status VARCHAR(20) NOT NULL CHECK (status IN ('in_progress', 'completed')),
     started_at TIMESTAMP NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMP,
@@ -108,10 +154,13 @@ CREATE TABLE care_sessions (
 
 CREATE INDEX idx_care_sessions_status ON care_sessions(status);
 CREATE INDEX idx_care_sessions_caregiver ON care_sessions(caregiver_id);
+CREATE INDEX idx_care_sessions_family ON care_sessions(family_id);
 CREATE INDEX idx_care_sessions_started_at ON care_sessions(started_at DESC);
+CREATE INDEX idx_care_sessions_family_status ON care_sessions(family_id, status);
 ```
 
 #### `activities`
+
 ```sql
 CREATE TABLE activities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,6 +176,7 @@ CREATE INDEX idx_activities_created_at ON activities(created_at DESC);
 ```
 
 #### `feed_details`
+
 ```sql
 CREATE TABLE feed_details (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -144,6 +194,7 @@ CREATE INDEX idx_feed_details_start_time ON feed_details(start_time DESC);
 ```
 
 #### `diaper_details`
+
 ```sql
 CREATE TABLE diaper_details (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -160,6 +211,7 @@ CREATE INDEX idx_diaper_details_changed_at ON diaper_details(changed_at DESC);
 ```
 
 #### `sleep_details`
+
 ```sql
 CREATE TABLE sleep_details (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -176,8 +228,14 @@ CREATE INDEX idx_sleep_details_start_time ON sleep_details(start_time DESC);
 ```
 
 ### 2.2 Notes on Schema
-- **Play activities:** Not tracked as separate activities; use care_sessions.notes field
-- **Cascading deletes:** When care_session is deleted, all activities and their details are removed
+
+- **Family Isolation:** All data is scoped to family_id for data isolation
+- **Cascading Deletes:**
+  - When family is deleted: All caregivers, sessions, and activities are removed
+  - When caregiver leaves (deleted): Their sessions remain but are orphaned (acceptable for MVP)
+  - When care_session is deleted: All activities and their details are removed
+- **Device Uniqueness:** One device can only be in one family at a time
+- **Family Name:** Case-insensitive unique constraint for easy joining
 - **Timestamps:** All tables have created_at/updated_at for audit trail
 
 ---
@@ -212,8 +270,17 @@ enum PredictionConfidence {
 }
 
 # Types
+type Family {
+  id: UUID!
+  name: String!
+  babyName: String!
+  caregivers: [Caregiver!]!
+  createdAt: DateTime!
+}
+
 type Caregiver {
   id: UUID!
+  familyId: UUID!
   name: String!
   deviceId: String!
   deviceName: String
@@ -223,6 +290,7 @@ type Caregiver {
 type CareSession {
   id: UUID!
   caregiver: Caregiver!
+  familyId: UUID!
   status: CareSessionStatus!
   startedAt: DateTime!
   completedAt: DateTime
@@ -241,18 +309,9 @@ type CareSessionSummary {
   currentlyAsleep: Boolean!
 }
 
-type Activity {
-  id: UUID!
-  careSessionId: UUID!
-  activityType: ActivityType!
-  feedDetails: FeedDetails
-  diaperDetails: DiaperDetails
-  sleepDetails: SleepDetails
-  createdAt: DateTime!
-}
+union Activity = FeedActivity | DiaperActivity | SleepActivity
 
 type FeedDetails {
-  id: UUID!
   startTime: DateTime!
   endTime: DateTime
   amountMl: Int
@@ -261,24 +320,43 @@ type FeedDetails {
 }
 
 type DiaperDetails {
-  id: UUID!
   changedAt: DateTime!
   hadPoop: Boolean!
   hadPee: Boolean!
 }
 
 type SleepDetails {
-  id: UUID!
   startTime: DateTime!
   endTime: DateTime
   durationMinutes: Int
-  isActive: Boolean!  # Currently sleeping
+  isActive: Boolean!
+}
+
+type FeedActivity {
+  id: UUID!
+  activityType: ActivityType!
+  createdAt: DateTime!
+  feedDetails: FeedDetails
+}
+
+type DiaperActivity {
+  id: UUID!
+  activityType: ActivityType!
+  createdAt: DateTime!
+  diaperDetails: DiaperDetails
+}
+
+type SleepActivity {
+  id: UUID!
+  activityType: ActivityType!
+  createdAt: DateTime!
+  sleepDetails: SleepDetails
 }
 
 type NextFeedPrediction {
   predictedTime: DateTime!
   confidence: PredictionConfidence!
-  reasoning: String!
+  reasoning: String
   minutesUntilFeed: Int!
 }
 
@@ -287,6 +365,13 @@ type ParsedVoiceResult {
   parsedActivities: [ActivityInput!]!
   errors: [String!]
   rawText: String!
+}
+
+type AuthResult {
+  success: Boolean!
+  family: Family
+  caregiver: Caregiver
+  error: String
 }
 
 # Inputs
@@ -317,63 +402,93 @@ input SleepDetailsInput {
 
 # Queries
 type Query {
-  # Get or create caregiver by device ID
-  getCurrentCaregiver(deviceId: String!, deviceName: String): Caregiver!
-  
-  # Get recent completed care sessions
+  # Family & Auth
+  checkFamilyNameAvailable(name: String!): Boolean!
+  getMyFamily: Family
+  getMyCaregiver: Caregiver
+
+  # Care Sessions
   getRecentCareSessions(limit: Int = 4): [CareSession!]!
-  
-  # Get current in-progress session (if any)
   getCurrentSession: CareSession
-  
-  # Predict next feed time
+  getCareSession(id: UUID!): CareSession
+
+  # Predictions
   predictNextFeed: NextFeedPrediction!
 }
 
 # Mutations
 type Mutation {
-  # Start a new care session
+  # Family Management
+  createFamily(
+    familyName: String!
+    password: String!
+    babyName: String!
+    caregiverName: String!
+    deviceId: String!
+    deviceName: String
+  ): AuthResult!
+
+  joinFamily(
+    familyName: String!
+    password: String!
+    caregiverName: String!
+    deviceId: String!
+    deviceName: String
+  ): AuthResult!
+
+  updateBabyName(babyName: String!): Family!
+
+  leaveFamily: Boolean!
+
+  # Care Session Management
   startCareSession: CareSession!
-  
-  # Parse voice and return structured data (for confirmation)
+
   parseVoiceInput(text: String!): ParsedVoiceResult!
-  
-  # Add confirmed activities to current session
+
   addActivities(activities: [ActivityInput!]!): CareSession!
-  
-  # Combined: parse voice AND add to session (auto-confirm flow)
+
   addActivitiesFromVoice(text: String!): CareSession!
-  
-  # End an ongoing activity (sleep or feed)
+
   endActivity(activityId: UUID!, endTime: DateTime): Activity!
-  
-  # Complete current care session (auto-ends all active activities)
+
   completeCareSession(notes: String): CareSession!
-  
-  # Delete an activity
+
   deleteActivity(activityId: UUID!): Boolean!
 }
 ```
 
 ### 3.1 Key Design Decisions
 
+**Family Isolation:**
+
+- All queries automatically scope to the caregiver's family
+- No cross-family data access possible
+- Family membership required for all operations
+
+**Authentication Flow:**
+
+- Device-based authentication (deviceId stored after family join/create)
+- Password hashed with bcrypt
+- Family name is case-insensitive
+- Password shown in plain text in settings (for easy sharing)
+
 **Single Active Session:**
-- Only ONE in-progress session allowed at a time
+
+- Only ONE in-progress session allowed per family at a time
 - Enforced in application logic
 - When new session starts: Auto-completes previous session (if exists) with current timestamp
 
 **Activity Recording Rules:**
+
 - **Feed Activities:**
   - Required: start_time, amount_ml, feed_type
   - End time: User-provided OR auto-calculated as `start_time + 45 minutes`
   - Example: "Fed 60ml at 2pm" → 2:00pm - 2:45pm (default)
   - Example: "Fed 60ml from 2pm to 2:20pm" → 2:00pm - 2:20pm (user-provided)
   - No manual editing after creation
-  
 - **Diaper Activities:**
   - Required: timestamp, had_poop, had_pee
   - Instant activity, no duration
-  
 - **Sleep Activities:**
   - Required: start_time
   - End time: Optional (null = ongoing/active)
@@ -382,26 +497,15 @@ type Mutation {
   - Auto-ended when session completes
 
 **Session Completion:**
+
 - Manual: User clicks "Complete Care Session" → Auto-ends any active sleep
 - Automatic: New session starts → Previous session auto-completes → Active sleep auto-ended
 
-**Voice Input Flow:**
-```graphql
-# Two-step with confirmation (MVP)
-parseVoiceInput(text: "...") → ParsedVoiceResult
-addActivities(activities: [...]) → CareSession
+**Leave Family:**
 
-# Voice button auto-starts session if none exists
-```
-
-**Activity Lifecycle:**
-- **Instant activities** (diaper): Created with timestamp, no end time needed
-- **Duration activities** (feed, sleep): Created with start time, end time optional
-  - If end time provided in voice input: Activity is complete
-  - If end time null: Activity is "active" (ongoing)
-  - User can end via `endActivity` mutation (triggered by UI button)
-- **Completing session**: `completeCareSession` automatically ends all active activities with `endTime = now`
-- **Multiple activities**: Fully supported - can have multiple feeds, multiple naps per session
+- Deletes caregiver record
+- Device becomes available to join another family
+- Sessions created by that caregiver remain (orphaned but visible)
 
 ---
 
@@ -422,28 +526,28 @@ type PredictionFactors struct {
 func PredictNextFeed(factors PredictionFactors) NextFeedPrediction {
     // 1. Calculate base interval from recent history
     avgInterval := calculateAverageInterval(factors.RecentFeedIntervals)
-    
+
     // 2. Adjust for amount consumed
     amountAdjustment := calculateAmountAdjustment(factors.LastFeedAmountMl)
-    
+
     // 3. Adjust for time of day
     timeOfDayAdjustment := calculateTimeOfDayAdjustment(factors.TimeOfDay)
-    
+
     // 4. Adjust for sleep state
     sleepAdjustment := calculateSleepAdjustment(
-        factors.IsCurrentlySleeping, 
+        factors.IsCurrentlySleeping,
         factors.SleepStartTime
     )
-    
+
     // 5. Combine adjustments
     finalInterval := avgInterval + amountAdjustment + timeOfDayAdjustment + sleepAdjustment
-    
+
     // 6. Calculate confidence
     confidence := calculateConfidence(factors)
-    
+
     // 7. Generate reasoning
     reasoning := generateReasoning(factors, finalInterval)
-    
+
     return NextFeedPrediction{
         PredictedTime: factors.LastFeedTime.Add(finalInterval),
         Confidence: confidence,
@@ -455,6 +559,7 @@ func PredictNextFeed(factors PredictionFactors) NextFeedPrediction {
 ### 4.2 Adjustment Rules
 
 #### Amount-Based Adjustment
+
 ```
 < 50ml  → -30 minutes (hungry sooner)
 50-70ml → -15 minutes
@@ -463,10 +568,11 @@ func PredictNextFeed(factors PredictionFactors) NextFeedPrediction {
 ```
 
 #### Time-of-Day Adjustment
+
 ```
 Daytime (6am - 10pm):
   - Standard 3-hour baseline
-  
+
 Night (10pm - 6am):
   - First night feed: +1 hour (cluster feed pattern)
   - After midnight: +2 hours (longer stretch)
@@ -474,44 +580,46 @@ Night (10pm - 6am):
 ```
 
 #### Sleep-State Adjustment
+
 ```
 If currently sleeping:
   - Sleep < 1 hour: no adjustment
   - Sleep 1-3 hours: +30 minutes
   - Sleep 3-6 hours: +1 hour
   - Sleep > 6 hours: don't adjust (will wake when ready)
-  
+
 If just woke up (< 15 min ago):
   - -15 minutes (hungry after nap)
 ```
 
 ### 4.3 Confidence Calculation
+
 ```go
 func calculateConfidence(factors PredictionFactors) PredictionConfidence {
     score := 100
-    
+
     // Reduce confidence if:
     // - Less than 5 recent feeds
     if len(factors.RecentFeedIntervals) < 5 {
         score -= 20
     }
-    
+
     // - High variance in intervals
     variance := calculateVariance(factors.RecentFeedIntervals)
     if variance > 30*time.Minute {
         score -= 20
     }
-    
+
     // - Currently sleeping (unpredictable wake time)
     if factors.IsCurrentlySleeping {
         score -= 15
     }
-    
+
     // - Unusual feed amount
     if factors.LastFeedAmountMl < 40 || factors.LastFeedAmountMl > 120 {
         score -= 10
     }
-    
+
     if score >= 80 { return HIGH }
     if score >= 60 { return MEDIUM }
     return LOW
@@ -545,7 +653,7 @@ Event Trigger: Activity added OR care session completed OR app opened (poll)
 ```typescript
 {
   title: "Feed time approaching",
-  body: "Baby might be ready to feed around 5:15 PM",
+  body: "Emma might be ready to feed around 5:15 PM",
   data: {
     type: "feed_prediction",
     predictedTime: "2024-01-15T17:15:00Z"
@@ -566,7 +674,8 @@ Event Trigger: Activity added OR care session completed OR app opened (poll)
 
 **Problem:** Device A logs activity at 4pm, Device B hasn't polled yet and still has 5pm notification scheduled.
 
-**Solution:** 
+**Solution:**
+
 - Device B polls every 5 minutes
 - On poll, if new data found, recalculate and reschedule
 - Max staleness: 5 minutes (acceptable for MVP)
@@ -576,6 +685,7 @@ Event Trigger: Activity added OR care session completed OR app opened (poll)
 ## 6. Backend Architecture
 
 ### 6.1 Project Structure
+
 ```
 backend/
 ├── cmd/
@@ -590,30 +700,181 @@ backend/
 │   │   ├── postgres.go            # DB connection & queries
 │   │   ├── migrations/            # SQL migration files
 │   │   │   ├── 001_init.sql
-│   │   │   └── 002_indexes.sql
+│   │   │   └── 002_add_families.sql
 │   │   └── repository.go          # Data access layer
 │   ├── domain/
 │   │   ├── models.go              # Domain models
+│   │   ├── family.go
 │   │   ├── caregiver.go
 │   │   ├── care_session.go
 │   │   └── activity.go
 │   ├── service/
+│   │   ├── family_service.go      # Family & auth logic
 │   │   ├── care_session_service.go # Business logic
 │   │   ├── voice_service.go       # Voice parsing with Claude
 │   │   └── prediction_service.go  # Feed prediction engine
+│   ├── auth/
+│   │   └── device_auth.go         # Device-based authentication
 │   └── ai/
 │       └── claude_client.go       # Claude API client
 ├── pkg/
 │   └── utils/
 │       ├── time.go                # Time utilities
-│       └── errors.go              # Error handling
+│       ├── errors.go              # Error handling
+│       └── password.go            # bcrypt helpers
 ├── go.mod
 ├── go.sum
 ├── .env.example
 └── Dockerfile
 ```
 
-### 6.2 Care Session Service - Single Session Enforcement
+### 6.2 Family Service - Authentication
+
+```go
+// internal/service/family_service.go
+type FamilyService struct {
+    repo   *db.Repository
+    logger *log.Logger
+}
+
+func (s *FamilyService) CreateFamily(
+    ctx context.Context,
+    familyName string,
+    password string,
+    babyName string,
+    caregiverName string,
+    deviceID string,
+    deviceName *string,
+) (*domain.Family, *domain.Caregiver, error) {
+    // Check family name availability (case-insensitive)
+    exists, err := s.repo.FamilyNameExists(ctx, familyName)
+    if err != nil {
+        return nil, nil, fmt.Errorf("failed to check family name: %w", err)
+    }
+    if exists {
+        return nil, nil, errors.New("Family name already taken")
+    }
+
+    // Validate password length
+    if len(password) < 6 {
+        return nil, nil, errors.New("Password must be at least 6 characters")
+    }
+
+    // Hash password
+    passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+    if err != nil {
+        return nil, nil, fmt.Errorf("failed to hash password: %w", err)
+    }
+
+    // Create family
+    family := &domain.Family{
+        ID:           uuid.New(),
+        Name:         familyName,
+        PasswordHash: string(passwordHash),
+        BabyName:     babyName,
+    }
+
+    if err := s.repo.CreateFamily(ctx, family); err != nil {
+        return nil, nil, fmt.Errorf("failed to create family: %w", err)
+    }
+
+    // Create caregiver
+    caregiver := &domain.Caregiver{
+        ID:         uuid.New(),
+        FamilyID:   family.ID,
+        Name:       caregiverName,
+        DeviceID:   deviceID,
+        DeviceName: deviceName,
+    }
+
+    if err := s.repo.CreateCaregiver(ctx, caregiver); err != nil {
+        return nil, nil, fmt.Errorf("failed to create caregiver: %w", err)
+    }
+
+    return family, caregiver, nil
+}
+
+func (s *FamilyService) JoinFamily(
+    ctx context.Context,
+    familyName string,
+    password string,
+    caregiverName string,
+    deviceID string,
+    deviceName *string,
+) (*domain.Family, *domain.Caregiver, error) {
+    // Find family (case-insensitive)
+    family, err := s.repo.GetFamilyByName(ctx, familyName)
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return nil, nil, errors.New("Family not found")
+        }
+        return nil, nil, fmt.Errorf("failed to find family: %w", err)
+    }
+
+    // Verify password
+    if err := bcrypt.CompareHashAndPassword([]byte(family.PasswordHash), []byte(password)); err != nil {
+        return nil, nil, errors.New("Incorrect password")
+    }
+
+    // Check if device already in a family
+    existingCaregiver, err := s.repo.GetCaregiverByDeviceID(ctx, deviceID)
+    if err != nil && err != sql.ErrNoRows {
+        return nil, nil, fmt.Errorf("failed to check device: %w", err)
+    }
+    if existingCaregiver != nil {
+        return nil, nil, errors.New("Device already belongs to a family. Leave current family first.")
+    }
+
+    // Create caregiver
+    caregiver := &domain.Caregiver{
+        ID:         uuid.New(),
+        FamilyID:   family.ID,
+        Name:       caregiverName,
+        DeviceID:   deviceID,
+        DeviceName: deviceName,
+    }
+
+    if err := s.repo.CreateCaregiver(ctx, caregiver); err != nil {
+        return nil, nil, fmt.Errorf("failed to create caregiver: %w", err)
+    }
+
+    return family, caregiver, nil
+}
+
+func (s *FamilyService) LeaveFamily(
+    ctx context.Context,
+    caregiverID string,
+) error {
+    // Simply delete the caregiver
+    // Sessions remain but are orphaned (acceptable for MVP)
+    if err := s.repo.DeleteCaregiver(ctx, caregiverID); err != nil {
+        return fmt.Errorf("failed to leave family: %w", err)
+    }
+
+    return nil
+}
+
+func (s *FamilyService) UpdateBabyName(
+    ctx context.Context,
+    familyID string,
+    babyName string,
+) (*domain.Family, error) {
+    family, err := s.repo.GetFamilyByID(ctx, familyID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get family: %w", err)
+    }
+
+    family.BabyName = babyName
+
+    if err := s.repo.UpdateFamily(ctx, family); err != nil {
+        return nil, fmt.Errorf("failed to update baby name: %w", err)
+    }
+
+    return family, nil
+}
+```
+
+### 6.3 Care Session Service - Family Scoping
 
 ```go
 // internal/service/care_session_service.go
@@ -625,45 +886,63 @@ type CareSessionService struct {
 func (s *CareSessionService) StartCareSession(
     ctx context.Context,
     caregiverID string,
+    familyID string,
 ) (*domain.CareSession, error) {
-    // Check if there's already an in-progress session
-    existingSession, err := s.repo.GetInProgressSession(ctx)
+    // Check if there's already an in-progress session FOR THIS FAMILY
+    existingSession, err := s.repo.GetInProgressSessionForFamily(ctx, familyID)
     if err != nil && err != sql.ErrNoRows {
         return nil, fmt.Errorf("failed to check existing session: %w", err)
     }
-    
+
     // Auto-complete previous session if exists
     if existingSession != nil {
         now := time.Now()
-        
+
         // End any active sleep activities
         if err := s.endActiveSleepActivities(ctx, existingSession.ID, now); err != nil {
             return nil, fmt.Errorf("failed to end active sleep: %w", err)
         }
-        
+
         // Complete the session
         existingSession.Status = domain.StatusCompleted
         existingSession.CompletedAt = now
         if err := s.repo.UpdateCareSession(ctx, existingSession); err != nil {
             return nil, fmt.Errorf("failed to complete existing session: %w", err)
         }
-        
+
         s.logger.Printf("Auto-completed previous session %s", existingSession.ID)
     }
-    
+
     // Create new session
     session := &domain.CareSession{
         ID:          uuid.New(),
         CaregiverID: caregiverID,
+        FamilyID:    familyID,
         Status:      domain.StatusInProgress,
         StartedAt:   time.Now(),
     }
-    
+
     if err := s.repo.CreateCareSession(ctx, session); err != nil {
         return nil, fmt.Errorf("failed to create session: %w", err)
     }
-    
+
     return session, nil
+}
+
+// All other methods remain similar but always scope by familyID
+func (s *CareSessionService) GetRecentCareSessions(
+    ctx context.Context,
+    familyID string,
+    limit int,
+) ([]*domain.CareSession, error) {
+    return s.repo.GetRecentCareSessionsForFamily(ctx, familyID, limit)
+}
+
+func (s *CareSessionService) GetCurrentSession(
+    ctx context.Context,
+    familyID string,
+) (*domain.CareSession, error) {
+    return s.repo.GetInProgressSessionForFamily(ctx, familyID)
 }
 
 func (s *CareSessionService) CompleteCareSession(
@@ -677,23 +956,23 @@ func (s *CareSessionService) CompleteCareSession(
         }
         return nil, fmt.Errorf("failed to get session: %w", err)
     }
-    
+
     now := time.Now()
-    
+
     // End any active sleep activities
     if err := s.endActiveSleepActivities(ctx, session.ID, now); err != nil {
         return nil, fmt.Errorf("failed to end active sleep: %w", err)
     }
-    
+
     // Complete session
     session.Status = domain.StatusCompleted
     session.CompletedAt = now
     session.Notes = notes
-    
+
     if err := s.repo.UpdateCareSession(ctx, session); err != nil {
         return nil, fmt.Errorf("failed to complete session: %w", err)
     }
-    
+
     return session, nil
 }
 
@@ -707,7 +986,7 @@ func (s *CareSessionService) endActiveSleepActivities(
     if err != nil {
         return err
     }
-    
+
     for _, activity := range sleepActivities {
         activity.SleepDetails.EndTime = endTime
         activity.SleepDetails.DurationMinutes = int(endTime.Sub(activity.SleepDetails.StartTime).Minutes())
@@ -715,14 +994,15 @@ func (s *CareSessionService) endActiveSleepActivities(
             return err
         }
     }
-    
+
     return nil
 }
 ```
 
-### 6.3 Voice Parsing with Claude
+### 6.4 Voice Parsing with Claude
 
 #### Prompt Template
+
 ```go
 const voiceParsingPrompt = `You are parsing baby care voice input into structured activities.
 
@@ -789,6 +1069,7 @@ If you cannot parse the input, return: {"error": "reason"}`
 ## 7. Mobile App Architecture
 
 ### 7.1 Project Structure
+
 ```
 mobile/
 ├── src/
@@ -797,27 +1078,32 @@ mobile/
 │   │   ├── ActivityItem.tsx       # Single activity display
 │   │   ├── VoiceButton.tsx        # Voice recording UI
 │   │   ├── ConfirmationModal.tsx  # Voice parse confirmation
-│   │   └── PredictionCard.tsx     # Next feed prediction
+│   │   ├── PredictionCard.tsx     # Next feed prediction
+│   │   └── FamilyAvatar.tsx       # Header avatar with baby name
 │   ├── screens/
-│   │   ├── HomeScreen.tsx              # Main dashboard (summary cards)
+│   │   ├── WelcomeScreen.tsx           # Family create/join
+│   │   ├── HomeScreen.tsx              # Main dashboard
+│   │   ├── SettingsScreen.tsx          # Family settings
 │   │   ├── PredictionDetailScreen.tsx  # Full prediction reasoning
-│   │   ├── CurrentSessionDetailScreen.tsx # Current session with delete buttons
+│   │   ├── CurrentSessionDetailScreen.tsx # Current session with delete
 │   │   └── SessionDetailScreen.tsx     # Completed session (read-only)
 │   ├── graphql/
 │   │   ├── queries.ts             # GraphQL queries
 │   │   ├── mutations.ts           # GraphQL mutations
 │   │   ├── client.ts              # Apollo client setup
-│   │   └── mocks.ts               # Mock data for Phase 1
+│   │   └── mocks.ts               # Mock data for testing
 │   ├── services/
 │   │   ├── voiceService.ts        # Speech-to-text
 │   │   ├── notificationService.ts # Local notifications
 │   │   ├── predictionService.ts   # Client-side prediction
-│   │   └── deviceService.ts       # Device ID extraction
+│   │   ├── deviceService.ts       # Device ID extraction
+│   │   └── authService.ts         # Family auth & device storage
 │   ├── hooks/
 │   │   ├── useCareSessions.ts     # Data fetching
 │   │   ├── useVoiceInput.ts       # Voice recording
 │   │   ├── usePolling.ts          # Polling logic
-│   │   └── usePrediction.ts       # Prediction + notification
+│   │   ├── usePrediction.ts       # Prediction + notification
+│   │   └── useAuth.ts             # Authentication state
 │   ├── navigation/
 │   │   └── AppNavigator.tsx       # React Navigation
 │   ├── theme/
@@ -836,60 +1122,61 @@ mobile/
 
 ```typescript
 // theme/spacing.ts
-import { Dimensions } from 'react-native';
+import { Dimensions } from "react-native";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 export const spacing = {
-  xs: width * 0.02,   // 8px on 375w
-  sm: width * 0.04,   // 16px
-  md: width * 0.06,   // 24px
-  lg: width * 0.08,   // 32px
-  xl: width * 0.12,   // 48px
+  xs: width * 0.02, // 8px on 375w
+  sm: width * 0.04, // 16px
+  md: width * 0.06, // 24px
+  lg: width * 0.08, // 32px
+  xl: width * 0.12, // 48px
 };
 
 export const button = {
-  minHeight: Math.max(60, height * 0.08),  // 8% of screen, min 60px
-  fontSize: Math.max(16, width * 0.045),   // Scale with screen
+  minHeight: Math.max(60, height * 0.08), // 8% of screen, min 60px
+  fontSize: Math.max(16, width * 0.045), // Scale with screen
 };
 
 export const card = {
-  width: width * 0.9,  // 90% of screen width
-  maxWidth: 500,       // Cap for tablets
+  width: width * 0.9, // 90% of screen width
+  maxWidth: 500, // Cap for tablets
 };
 ```
 
 ### 7.3 Color Palette
+
 ```typescript
 // theme/colors.ts
 export const colors = {
   // Primary (soft blue/teal for calm baby app)
-  primary: '#5B9BD5',
-  primaryLight: '#A8D5F2',
-  primaryDark: '#2E6FA8',
-  
+  primary: "#5B9BD5",
+  primaryLight: "#A8D5F2",
+  primaryDark: "#2E6FA8",
+
   // Accent (warm peach/coral)
-  accent: '#FFB6A3',
-  
+  accent: "#FFB6A3",
+
   // Functional
-  success: '#7BC96F',    // Green for confirm
-  warning: '#FFD93D',    // Yellow for attention
-  error: '#FF6B6B',      // Red for delete
-  
+  success: "#7BC96F", // Green for confirm
+  warning: "#FFD93D", // Yellow for attention
+  error: "#FF6B6B", // Red for delete
+
   // Neutrals
-  background: '#F8F9FA',
-  surface: '#FFFFFF',
-  border: '#E1E8ED',
-  
+  background: "#F8F9FA",
+  surface: "#FFFFFF",
+  border: "#E1E8ED",
+
   // Text
-  textPrimary: '#2C3E50',
-  textSecondary: '#7F8C9A',
-  textLight: '#A8B4C0',
-  
+  textPrimary: "#2C3E50",
+  textSecondary: "#7F8C9A",
+  textLight: "#A8B4C0",
+
   // Activity colors
-  feed: '#5B9BD5',
-  diaper: '#FFB6A3',
-  sleep: '#B19CD9',
+  feed: "#5B9BD5",
+  diaper: "#FFB6A3",
+  sleep: "#B19CD9",
 };
 ```
 
@@ -897,16 +1184,104 @@ export const colors = {
 
 ## 8. UI Mockups & Components
 
-### 8.1 Home Screen (Dashboard) - Summary View
-
-**Header:**
-- App name: "Baby Baton"
-- Profile icon: Shows current caregiver info (name, device name)
-- Read-only, consistent color per caregiver (hash of ID)
+### 8.1 Welcome Screen (First Launch)
 
 ```
 ┌─────────────────────────────────┐
-│  🍼 Baby Baton      [Profile]   │
+│                                 │
+│         🍼 Baby Baton          │
+│                                 │
+│   Track baby care together      │
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │   Create New Family         ││
+│  └─────────────────────────────┘│
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │   Join Existing Family      ││
+│  └─────────────────────────────┘│
+│                                 │
+└─────────────────────────────────┘
+```
+
+### 8.2 Create Family Screen
+
+```
+┌─────────────────────────────────┐
+│  ← Create Your Family           │
+├─────────────────────────────────┤
+│                                 │
+│  Family Name                    │
+│  ┌─────────────────────────────┐│
+│  │ Smith Family                ││
+│  └─────────────────────────────┘│
+│  Choose a unique name           │
+│                                 │
+│  Baby's Name                    │
+│  ┌─────────────────────────────┐│
+│  │ Emma                        ││
+│  └─────────────────────────────┘│
+│                                 │
+│  Set Password (min 6 chars)     │
+│  ┌─────────────────────────────┐│
+│  │ ••••••                      ││
+│  └─────────────────────────────┘│
+│  Share this with family members │
+│                                 │
+│  Your Name                      │
+│  ┌─────────────────────────────┐│
+│  │ Mom                         ││
+│  └─────────────────────────────┘│
+│  Quick: [Mom] [Dad] [Grandma]   │
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │     Create Family           ││
+│  └─────────────────────────────┘│
+└─────────────────────────────────┘
+```
+
+### 8.3 Join Family Screen
+
+```
+┌─────────────────────────────────┐
+│  ← Join Family                  │
+├─────────────────────────────────┤
+│                                 │
+│  Family Name                    │
+│  ┌─────────────────────────────┐│
+│  │ Smith Family                ││
+│  └─────────────────────────────┘│
+│                                 │
+│  Password                       │
+│  ┌─────────────────────────────┐│
+│  │ ••••••                      ││
+│  └─────────────────────────────┘│
+│                                 │
+│  Your Name                      │
+│  ┌─────────────────────────────┐│
+│  │ Dad                         ││
+│  └─────────────────────────────┘│
+│  Quick: [Mom] [Dad] [Grandma]   │
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │      Join Family            ││
+│  └─────────────────────────────┘│
+│                                 │
+│  Ask a family member for the    │
+│  family name and password       │
+└─────────────────────────────────┘
+```
+
+### 8.4 Home Screen (Dashboard) - Summary View
+
+**Header:**
+
+- Baby name + avatar (tappable → Settings)
+- App name: "Baby Baton"
+
+```
+┌─────────────────────────────────┐
+│  🍼 Baby Baton    [👶 Emma] →   │
 ├─────────────────────────────────┤
 │                                 │
 │  🔮 Next Feed Prediction     >  │
@@ -941,19 +1316,60 @@ export const colors = {
 └─────────────────────────────────┘
 ```
 
-**Notes:**
-- Current Care Session card hidden when no active session
-- All cards tappable (chevron indicates navigation)
-- Voice button auto-starts session if needed
+### 8.5 Settings Screen
 
-### 8.2 Prediction Detail Screen
+```
+┌─────────────────────────────────┐
+│  ← Family Settings              │
+├─────────────────────────────────┤
+│                                 │
+│  Family Information             │
+│  ┌─────────────────────────────┐│
+│  │ Family: Smith Family        ││
+│  │                             ││
+│  │ Baby Name                   ││
+│  │ ┌───────────────────────┐   ││
+│  │ │ Emma                  │   ││
+│  │ └───────────────────────┘   ││
+│  │ [Update Baby Name]          ││
+│  └─────────────────────────────┘│
+│                                 │
+│  ─────────────────────────────  │
+│                                 │
+│  Share Access                   │
+│  ┌─────────────────────────────┐│
+│  │ To invite family members:   ││
+│  │                             ││
+│  │ Family Name: Smith Family   ││
+│  │ [Copy]                      ││
+│  │                             ││
+│  │ Password: baby123           ││
+│  │ [Copy]                      ││
+│  └─────────────────────────────┘│
+│                                 │
+│  ─────────────────────────────  │
+│                                 │
+│  Caregivers (3)                 │
+│  • Mom (iPhone 12)              │
+│  • Dad (Pixel 7)                │
+│  • Nana (iPad)                  │
+│                                 │
+│  ─────────────────────────────  │
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │     Leave Family            ││
+│  └─────────────────────────────┘│
+└─────────────────────────────────┘
+```
+
+### 8.6 Prediction Detail Screen
 
 ```
 ┌─────────────────────────────────┐
 │  ← Prediction Details           │
 ├─────────────────────────────────┤
 │                                 │
-│  🔮 Upcoming Feed               │
+│  🔮 Upcoming Feed for Emma      │
 │  Scheduled for 5:15 PM          │
 │  📊 High confidence              │
 │                                 │
@@ -977,7 +1393,7 @@ export const colors = {
 └─────────────────────────────────┘
 ```
 
-### 8.3 Current Session Detail Screen
+### 8.7 Current Session Detail Screen
 
 ```
 ┌─────────────────────────────────┐
@@ -1017,7 +1433,7 @@ export const colors = {
 │  │ 😴 Nap #2 (Active)          ││
 │  │    Started: 2:30 PM         ││
 │  │    Duration: 2h 15m (LIVE)  ││
-│  │    [Mark as Awake]          ││  ← Calls endActivity mutation
+│  │    [Mark as Awake]          ││
 │  └─────────────────────────────┘│
 │                                 │
 │  Session Summary:               │
@@ -1027,67 +1443,12 @@ export const colors = {
 │  • Currently sleeping: Yes      │
 │                                 │
 │  ┌─────────────────────────────┐ │
-│  │  Complete Care Session      │ │  ← Auto-ends active nap
+│  │  Complete Care Session      │ │
 │  └─────────────────────────────┘ │
 └─────────────────────────────────┘
 ```
 
-**Activity States:**
-- **Completed activities**: Show full time range, have [Delete] button
-- **Active activities** (sleep/feed with no end time): Show "LIVE" indicator, duration updates in real-time, have [Mark as Awake] or [End Feed] button
-- **Multiple naps**: Numbered (#1, #2, etc.) for clarity
-- **Complete Session**: Automatically ends all active activities with current timestamp
-
-### 8.4 Recent Session Detail Screen
-
-```
-┌─────────────────────────────────┐
-│  ← Care Session Details         │
-├─────────────────────────────────┤
-│                                 │
-│  👤 Dad                         │
-│  11:30 AM - 1:45 PM             │
-│  Duration: 2h 15m               │
-│                                 │
-│  ─────────────────────────────  │
-│                                 │
-│  Activities (5):                │
-│                                 │
-│  ┌─────────────────────────────┐│
-│  │ 🍼 Fed 60ml formula         ││
-│  │    11:30 AM - 11:50 AM      ││
-│  │    Duration: 20 minutes     ││
-│  └─────────────────────────────┘│
-│                                 │
-│  ┌─────────────────────────────┐│
-│  │ 💩 Changed diaper           ││
-│  │    12:00 PM                 ││
-│  │    Had pee ✓                ││
-│  └─────────────────────────────┘│
-│                                 │
-│  ┌─────────────────────────────┐│
-│  │ 😴 Napped                   ││
-│  │    12:15 PM - 1:15 PM       ││
-│  │    Duration: 1h             ││
-│  └─────────────────────────────┘│
-│                                 │
-│  Session Summary:               │
-│  • Total feeds: 2 (130ml)       │
-│  • Diaper changes: 2            │
-│  • Sleep time: 1h               │
-│                                 │
-│  Notes:                         │
-│  She was fussy, might be        │
-│  teething. Played for 10 min    │
-│                                 │
-└─────────────────────────────────┘
-```
-
-**Note:** Read-only, no action buttons on activities
-
-### 8.5 Voice Input Flow
-
-**Recording → Parsing → Confirmation Modal**
+### 8.8 Voice Input Flow
 
 ```
 Confirmation Modal:
@@ -1102,7 +1463,7 @@ Confirmation Modal:
 │  I understood:                  │
 │                                 │
 │  🍼 Feed - 60ml formula         │
-│     2:00 PM - 2:20 PM           │
+│     2:00 PM - 2:45 PM           │
 │                                 │
 │  💩 Diaper Change - Had poop    │
 │     2:25 PM                     │
@@ -1116,416 +1477,273 @@ Confirmation Modal:
 └─────────────────────────────────┘
 ```
 
-### 8.6 Complete Session Modal
+### 8.9 Navigation Structure
 
 ```
-┌─────────────────────────────────┐
-│  Complete Care Session          │
-├─────────────────────────────────┤
-│                                 │
-│  Add notes (optional):          │
-│  ┌─────────────────────────────┐│
-│  │ Notes text area...          ││
-│  └─────────────────────────────┘│
-│                                 │
-│  Session Summary:               │
-│  • 3 feeds (210ml total)        │
-│  • 4 diaper changes             │
-│  • 4.5 hours sleep              │
-│  • Duration: 6h 30m             │
-│                                 │
-│  [✓ Complete]                   │
-│  [✕ Cancel]                     │
-└─────────────────────────────────┘
+App Launch → Check device auth
+├─→ No auth → WelcomeScreen
+│   ├─→ Create Family → HomeScreen
+│   └─→ Join Family → HomeScreen
+└─→ Has auth → HomeScreen
+    ├─→ Tap Baby Avatar → SettingsScreen
+    │   ├─→ Leave Family → WelcomeScreen
+    │   └─→ Update Baby Name → HomeScreen
+    ├─→ Tap Prediction Card → PredictionDetailScreen
+    ├─→ Tap Current Session → CurrentSessionDetailScreen
+    │   └─→ Complete → CompletionModal → HomeScreen
+    ├─→ Tap Recent Session → SessionDetailScreen (read-only)
+    └─→ Tap Voice Button → VoiceModal → ConfirmationModal → HomeScreen
 ```
 
-### 8.7 Navigation Structure
-
-```
-HomeScreen
-├─→ Tap Prediction Card → PredictionDetailScreen
-├─→ Tap Current Session → CurrentSessionDetailScreen
-│                         └─→ Complete → CompletionModal → HomeScreen
-├─→ Tap Recent Session → SessionDetailScreen (read-only)
-└─→ Tap Voice Button → VoiceModal → ConfirmationModal → HomeScreen
-```
-
-### 8.8 Profile Color Mapping
+### 8.10 Avatar Design
 
 ```typescript
-// utils/caregiverColors.ts
-const CAREGIVER_COLORS = [
-  { bg: '#E8D5F2', text: '#7B2CBF' },  // Purple
-  { bg: '#CFE2FF', text: '#0D6EFD' },  // Blue
-  { bg: '#FFE5D9', text: '#D85A2B' },  // Orange
-  { bg: '#D5F4E6', text: '#2A9D8F' },  // Teal
-  { bg: '#FFE0E6', text: '#D84A70' },  // Pink
-];
-
-export const getCaregiverColor = (caregiverId: string) => {
-  const hash = caregiverId.split('').reduce((acc, char) => {
-    return char.charCodeAt(0) + ((acc << 5) - acc);
-  }, 0);
-  
-  const index = Math.abs(hash) % CAREGIVER_COLORS.length;
-  return CAREGIVER_COLORS[index];
-};
+// components/FamilyAvatar.tsx
+// Displays baby name with icon, taps to settings
+<TouchableOpacity onPress={() => navigate("Settings")}>
+  <View style={styles.avatar}>
+    <Baby size={20} />
+    <Text>{babyName}</Text>
+  </View>
+</TouchableOpacity>
 ```
-
-### 8.9 Key UI Decisions
-
-**Navigation:** Cards are tappable (chevron indicator), tap navigates to detail screen
-**Actions:** Voice button (primary), Complete Session (in detail), Delete Activity (in detail)
-**Session State:** Only one active session, voice button auto-starts if needed
-**Empty States:** Clear messaging when no data, helpful prompts for next action
 
 ---
 
-## 9. Voice Service Implementation
+## 9. Authentication & Storage
 
-### 9.1 React Native Voice Recording
+### 9.1 Device Storage (AsyncStorage)
 
 ```typescript
-// services/voiceService.ts
-import Voice from '@react-native-voice/voice';
+// services/authService.ts
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-class VoiceService {
-  private isRecording = false;
-  private transcript = '';
+const KEYS = {
+  DEVICE_ID: "@baby_baton:device_id",
+  FAMILY_ID: "@baby_baton:family_id",
+  CAREGIVER_ID: "@baby_baton:caregiver_id",
+  FAMILY_NAME: "@baby_baton:family_name",
+  BABY_NAME: "@baby_baton:baby_name",
+};
 
-  async startRecording(
-    onPartialResult: (text: string) => void,
-    onFinalResult: (text: string) => void,
-    onError: (error: string) => void
-  ) {
-    try {
-      Voice.onSpeechStart = () => {
-        this.isRecording = true;
-        this.transcript = '';
-      };
-
-      Voice.onSpeechPartialResults = (e) => {
-        if (e.value && e.value[0]) {
-          this.transcript = e.value[0];
-          onPartialResult(this.transcript);
-        }
-      };
-
-      Voice.onSpeechResults = (e) => {
-        if (e.value && e.value[0]) {
-          this.transcript = e.value[0];
-          onFinalResult(this.transcript);
-        }
-      };
-
-      Voice.onSpeechError = (e) => {
-        onError(e.error?.message || 'Speech recognition error');
-      };
-
-      await Voice.start('en-US');
-    } catch (error) {
-      onError(error.message);
-    }
+class AuthService {
+  async saveAuth(data: {
+    familyId: string;
+    caregiverId: string;
+    familyName: string;
+    babyName: string;
+  }) {
+    await AsyncStorage.multiSet([
+      [KEYS.FAMILY_ID, data.familyId],
+      [KEYS.CAREGIVER_ID, data.caregiverId],
+      [KEYS.FAMILY_NAME, data.familyName],
+      [KEYS.BABY_NAME, data.babyName],
+    ]);
   }
 
-  async stopRecording(): Promise<string> {
-    try {
-      await Voice.stop();
-      this.isRecording = false;
-      return this.transcript;
-    } catch (error) {
-      throw new Error('Failed to stop recording');
-    }
+  async getAuth() {
+    const keys = await AsyncStorage.multiGet([
+      KEYS.FAMILY_ID,
+      KEYS.CAREGIVER_ID,
+      KEYS.FAMILY_NAME,
+      KEYS.BABY_NAME,
+    ]);
+
+    const [familyId, caregiverId, familyName, babyName] = keys.map((k) => k[1]);
+
+    if (!familyId || !caregiverId) return null;
+
+    return { familyId, caregiverId, familyName, babyName };
   }
 
-  async destroy() {
-    try {
-      await Voice.destroy();
-      Voice.removeAllListeners();
-    } catch (error) {
-      console.error('Failed to destroy voice service', error);
+  async clearAuth() {
+    await AsyncStorage.multiRemove([
+      KEYS.FAMILY_ID,
+      KEYS.CAREGIVER_ID,
+      KEYS.FAMILY_NAME,
+      KEYS.BABY_NAME,
+    ]);
+  }
+
+  async getDeviceId(): Promise<string> {
+    let deviceId = await AsyncStorage.getItem(KEYS.DEVICE_ID);
+    if (!deviceId) {
+      deviceId = await DeviceInfo.getUniqueId();
+      await AsyncStorage.setItem(KEYS.DEVICE_ID, deviceId);
     }
+    return deviceId;
   }
 }
 
-export default new VoiceService();
+export default new AuthService();
 ```
 
-### 9.2 Voice Input Hook
+### 9.2 Authentication Flow
 
 ```typescript
-// hooks/useVoiceInput.ts
-import { useState } from 'react';
-import { useMutation } from '@apollo/client';
-import voiceService from '../services/voiceService';
-import { PARSE_VOICE_INPUT, START_CARE_SESSION } from '../graphql/mutations';
+// hooks/useAuth.ts
+import { useState, useEffect } from "react";
+import authService from "../services/authService";
 
-export const useVoiceInput = () => {
-  const [isRecording, setIsRecording] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [isParsing, setIsParsing] = useState(false);
-  const [parsedResult, setParsedResult] = useState(null);
-
-  const [parseVoice] = useMutation(PARSE_VOICE_INPUT);
-  const [startSession] = useMutation(START_CARE_SESSION);
-
-  const startRecording = async (currentSession) => {
-    try {
-      // Auto-start session if none exists
-      if (!currentSession) {
-        await startSession();
-      }
-
-      setIsRecording(true);
-      await voiceService.startRecording(
-        (partial) => setTranscript(partial),
-        async (final) => {
-          setTranscript(final);
-          setIsRecording(false);
-          await handleParse(final);
-        },
-        (error) => {
-          setIsRecording(false);
-          alert(`Voice error: ${error}`);
-        }
-      );
-    } catch (error) {
-      setIsRecording(false);
-      alert('Failed to start recording');
-    }
-  };
-
-  const stopRecording = async () => {
-    try {
-      const final = await voiceService.stopRecording();
-      setIsRecording(false);
-      await handleParse(final);
-    } catch (error) {
-      alert('Failed to stop recording');
-    }
-  };
-
-  const handleParse = async (text: string) => {
-    setIsParsing(true);
-    try {
-      const result = await parseVoice({
-        variables: { text }
-      });
-      setParsedResult(result.data.parseVoiceInput);
-    } catch (error) {
-      alert('Failed to parse voice input');
-    } finally {
-      setIsParsing(false);
-    }
-  };
-
-  const reset = () => {
-    setTranscript('');
-    setParsedResult(null);
-  };
-
-  return {
-    isRecording,
-    transcript,
-    isParsing,
-    parsedResult,
-    startRecording,
-    stopRecording,
-    reset
-  };
-};
-```
-
----
-
-## 10. Notification Service Implementation
-
-### 10.1 Local Notification Manager
-
-```typescript
-// services/notificationService.ts
-import PushNotification from 'react-native-push-notification';
-import PushNotificationIOS from '@react-native-community/push-notification-ios';
-import { Platform } from 'react-native';
-
-class NotificationService {
-  constructor() {
-    this.configure();
-  }
-
-  configure() {
-    PushNotification.configure({
-      onNotification: (notification) => {
-        if (Platform.OS === 'ios') {
-          notification.finish(PushNotificationIOS.FetchResult.NoData);
-        }
-      },
-      permissions: {
-        alert: true,
-        badge: true,
-        sound: true,
-      },
-      popInitialNotification: true,
-      requestPermissions: Platform.OS === 'ios',
-    });
-
-    if (Platform.OS === 'android') {
-      PushNotification.createChannel(
-        {
-          channelId: 'feed-predictions',
-          channelName: 'Feed Predictions',
-          channelDescription: 'Notifications for predicted feed times',
-          importance: 4,
-          vibrate: true,
-        },
-        (created) => console.log(`Channel created: ${created}`)
-      );
-    }
-  }
-
-  async scheduleNextFeedNotification(
-    predictedTime: Date,
-    feedDetails: string
-  ) {
-    await this.cancelFeedNotifications();
-
-    const notificationTime = new Date(predictedTime);
-    notificationTime.setMinutes(notificationTime.getMinutes() - 15);
-
-    if (notificationTime <= new Date()) {
-      return;
-    }
-
-    const formattedTime = predictedTime.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-
-    PushNotification.localNotificationSchedule({
-      channelId: 'feed-predictions',
-      id: 'next-feed',
-      title: 'Feed time approaching',
-      message: `Baby might be ready to feed around ${formattedTime}`,
-      date: notificationTime,
-      allowWhileIdle: true,
-      playSound: true,
-      soundName: 'default',
-      userInfo: {
-        type: 'feed_prediction',
-        predictedTime: predictedTime.toISOString(),
-      },
-    });
-  }
-
-  async cancelFeedNotifications() {
-    PushNotification.cancelLocalNotification('next-feed');
-  }
-
-  async requestPermissions(): Promise<boolean> {
-    if (Platform.OS === 'ios') {
-      const permissions = await PushNotificationIOS.requestPermissions({
-        alert: true,
-        badge: true,
-        sound: true,
-      });
-      return permissions.alert === 1;
-    }
-    return true;
-  }
-}
-
-export default new NotificationService();
-```
-
----
-
-## 11. Polling Strategy
-
-### 11.1 Polling Hook
-
-```typescript
-// hooks/usePolling.ts
-import { useEffect, useRef } from 'react';
-import { useQuery } from '@apollo/client';
-import { AppState } from 'react-native';
-
-export const usePolling = (query, options = {}) => {
-  const { pollInterval = 300000, ...restOptions } = options; // 5 min default
-  const appState = useRef(AppState.currentState);
-
-  const { data, loading, refetch, startPolling, stopPolling } = useQuery(
-    query,
-    {
-      ...restOptions,
-      notifyOnNetworkStatusChange: true,
-    }
-  );
+export const useAuth = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [auth, setAuth] = useState(null);
 
   useEffect(() => {
-    startPolling(pollInterval);
+    loadAuth();
+  }, []);
 
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        refetch();
-        startPolling(pollInterval);
-      } else if (nextAppState.match(/inactive|background/)) {
-        stopPolling();
-      }
-      appState.current = nextAppState;
-    });
+  const loadAuth = async () => {
+    const savedAuth = await authService.getAuth();
+    setAuth(savedAuth);
+    setIsLoading(false);
+  };
 
-    return () => {
-      stopPolling();
-      subscription.remove();
-    };
-  }, [pollInterval, startPolling, stopPolling, refetch]);
+  const login = async (familyId, caregiverId, familyName, babyName) => {
+    await authService.saveAuth({ familyId, caregiverId, familyName, babyName });
+    setAuth({ familyId, caregiverId, familyName, babyName });
+  };
 
-  return { data, loading, refetch };
-};
-```
-
-### 11.2 Dashboard Data Hook
-
-```typescript
-// hooks/useCareSessions.ts
-import { usePolling } from './usePolling';
-import { usePrediction } from './usePrediction';
-import { GET_DASHBOARD_DATA } from '../graphql/queries';
-
-export const useCareSessions = () => {
-  const { data, loading, refetch } = usePolling(GET_DASHBOARD_DATA, {
-    pollInterval: 300000,
-    fetchPolicy: 'network-only',
-  });
-
-  const { prediction, refetch: refetchPrediction } = usePrediction();
-
-  const refresh = async () => {
-    await Promise.all([refetch(), refetchPrediction()]);
+  const logout = async () => {
+    await authService.clearAuth();
+    setAuth(null);
   };
 
   return {
-    currentSession: data?.getCurrentSession,
-    recentCareSessions: data?.getRecentCareSessions || [],
-    prediction,
-    loading,
-    refresh,
+    isLoading,
+    isAuthenticated: !!auth,
+    familyId: auth?.familyId,
+    caregiverId: auth?.caregiverId,
+    familyName: auth?.familyName,
+    babyName: auth?.babyName,
+    login,
+    logout,
   };
 };
 ```
 
 ---
 
-## 12. Deployment Configuration
+## 10. Testing Strategy
 
-### 12.1 Docker Compose (Local Development)
+### 10.1 Voice Parsing Test Cases
+
+```
+# Activities with explicit end times
+✓ "She fed 60ml formula from 2:30 to 2:50"
+✓ "She napped from 10am to 11am, then napped again from 2pm to 3pm"
+✓ "Fed 80ml breast milk, pooped, now sleeping"
+
+# Ongoing activities (no end time)
+✓ "She's feeding now" (creates feed with end_time=null)
+✓ "Started napping at 2pm" (creates sleep with end_time=null)
+✓ "She's been sleeping since 3pm" (creates sleep with end_time=null)
+
+# Multiple naps
+✓ "She napped 10-11am, fed 60ml at noon, napped again 2-3pm"
+
+# Instant activities
+✓ "Changed diaper, had poop"
+✓ "Pooped and changed diaper at 10:30"
+
+# Error cases
+✗ "She's smiling" (should return error - no trackable activity)
+✗ "Give her medicine" (should return error - out of scope)
+```
+
+### 10.2 Family Authentication Test Cases
+
+```
+# Create family
+✓ Create family with unique name
+✗ Create family with duplicate name (case-insensitive)
+✗ Create family with password < 6 characters
+
+# Join family
+✓ Join existing family with correct password
+✗ Join non-existent family
+✗ Join with incorrect password
+✗ Join when device already in a family
+
+# Leave family
+✓ Leave family (caregiver deleted, sessions remain)
+✓ After leaving, device can join another family
+
+# Update baby name
+✓ Any caregiver can update baby name
+✓ Baby name updated shows immediately for all devices
+```
+
+---
+
+## 11. Performance Requirements
+
+| Metric                  | Target      | Notes                                 |
+| ----------------------- | ----------- | ------------------------------------- |
+| Voice parse latency     | < 5 seconds | Speech-to-text + Claude API + DB save |
+| GraphQL query response  | < 500ms     | Dashboard query with joins            |
+| Poll interval           | 5 minutes   | Configurable                          |
+| Notification scheduling | < 1 second  | Local notification                    |
+| App cold start          | < 2 seconds | To interactive state                  |
+| Memory usage            | < 150MB     | React Native baseline                 |
+| Family auth check       | < 100ms     | Cached in AsyncStorage                |
+
+---
+
+## 12. Security Considerations
+
+### 12.1 Authentication (Family-Based)
+
+```typescript
+import DeviceInfo from "react-native-device-info";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const getDeviceAuth = async () => {
+  const deviceId = await DeviceInfo.getUniqueId();
+  const auth = await AsyncStorage.getItem("@baby_baton:auth");
+
+  return {
+    deviceId,
+    familyId: auth?.familyId,
+    caregiverId: auth?.caregiverId,
+  };
+};
+```
+
+### 12.2 Password Security
+
+- Passwords hashed with bcrypt (cost 10)
+- Plain text displayed in settings for sharing
+- Min 6 characters (family-friendly, not high security)
+- No password recovery (intentional - ask family member)
+
+### 12.3 Data Isolation
+
+- All queries automatically scoped to family_id
+- No cross-family data access possible
+- Family deletion cascades to all related data
+
+### 12.4 API Security
+
+- Local network only (MVP)
+- No JWT tokens yet (device-based auth via deviceId)
+- Future: JWT tokens scoping to family
+
+### 12.5 Data Privacy
+
+- All data on local server (MacBook)
+- No cloud sync in MVP
+- Optional: encrypted backups to iCloud/Google Drive
+
+---
+
+## 13. Deployment Configuration
+
+### 13.1 Docker Compose (Local Development)
 
 ```yaml
 # docker-compose.yml
-version: '3.8'
+version: "3.8"
 
 services:
   postgres:
@@ -1539,7 +1757,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/internal/db/migrations:/docker-entrypoint-initdb.d
+      - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -1569,7 +1787,7 @@ volumes:
   postgres_data:
 ```
 
-### 12.2 Environment Variables
+### 13.2 Environment Variables
 
 ```bash
 # .env.example
@@ -1589,9 +1807,9 @@ API_URL=http://192.168.1.100:8080/graphql
 
 ---
 
-## 13. Getting Claude API Key
+## 14. Getting Claude API Key
 
-### 13.1 Setup Steps
+### 14.1 Setup Steps
 
 1. Visit: https://console.anthropic.com
 2. Create account / Sign in
@@ -1600,9 +1818,10 @@ API_URL=http://192.168.1.100:8080/graphql
 5. Copy the key (starts with `sk-ant-api03-...`)
 6. Add to `backend/.env`: `CLAUDE_API_KEY=sk-ant-api03-your-actual-key-here`
 
-### 13.2 Cost Estimate
+### 14.2 Cost Estimate
 
 **Voice parsing usage:**
+
 - Average parse: ~200 tokens input, ~500 tokens output
 - Claude Sonnet 4 pricing: $3/M input tokens, $15/M output tokens
 - Cost per parse: ~$0.0081
@@ -1611,106 +1830,207 @@ API_URL=http://192.168.1.100:8080/graphql
 
 ---
 
-## 14. Testing Strategy
+## 15. Development Workflow
 
-### 14.1 Voice Parsing Test Cases
+### Phase 1: Database & Backend Foundation (Week 1-2)
 
-```
-# Activities with explicit end times
-✓ "She fed 60ml formula from 2:30 to 2:50"
-✓ "She napped from 10am to 11am, then napped again from 2pm to 3pm"
-✓ "Fed 80ml breast milk, pooped, now sleeping"
-
-# Ongoing activities (no end time)
-✓ "She's feeding now" (creates feed with end_time=null)
-✓ "Started napping at 2pm" (creates sleep with end_time=null)
-✓ "She's been sleeping since 3pm" (creates sleep with end_time=null)
-
-# Ending activities
-✓ "She woke up" (should end most recent active sleep)
-✓ "Finished eating" (should end most recent active feed)
-✓ "She woke up from her nap at 4:15pm" (end sleep with specific time)
-
-# Multiple naps
-✓ "She napped 10-11am, fed 60ml at noon, napped again 2-3pm"
-
-# Instant activities
-✓ "Changed diaper, had poop"
-✓ "Pooped and changed diaper at 10:30"
-
-# Error cases
-✗ "She's smiling" (should return error - no trackable activity)
-✗ "Give her medicine" (should return error - out of scope)
-```
-
----
-
-## 15. Performance Requirements
-
-| Metric | Target | Notes |
-|--------|--------|-------|
-| Voice parse latency | < 5 seconds | Speech-to-text + Claude API + DB save |
-| GraphQL query response | < 500ms | Dashboard query with joins |
-| Poll interval | 5 minutes | Configurable |
-| Notification scheduling | < 1 second | Local notification |
-| App cold start | < 2 seconds | To interactive state |
-| Memory usage | < 150MB | React Native baseline |
-
----
-
-## 16. Security Considerations
-
-### 16.1 Authentication (Device-Based)
-```typescript
-import DeviceInfo from 'react-native-device-info';
-
-const getDeviceIdentifier = async () => {
-  const uniqueId = await DeviceInfo.getUniqueId();
-  const deviceName = await DeviceInfo.getDeviceName();
-  
-  return {
-    deviceId: uniqueId,
-    deviceName: deviceName || 'Unknown Device'
-  };
-};
-```
-
-### 16.2 API Security
-- Local network only (MVP)
-- No authentication required (trusted household network)
-- Future: JWT tokens, rate limiting
-
-### 16.3 Data Privacy
-- All data on local server (MacBook)
-- No cloud sync in MVP
-- Optional: encrypted backups to iCloud/Google Drive
-
----
-
-## 17. Development Workflow
-
-### Phase 1: Mobile with Mocks (Week 1-2)
-1. Set up React Native project
-2. Build UI components (responsive)
-3. Implement voice recording
-4. Create mock GraphQL responses
-5. Test on real devices
-
-### Phase 2: Backend (Week 3-4)
 1. Set up Go project structure
-2. Implement PostgreSQL schema
-3. Build GraphQL resolvers
-4. Integrate Claude API
-5. Test prediction algorithm
+2. Implement PostgreSQL schema with family tables
+3. Build family authentication service
+4. Create GraphQL resolvers for family operations
+5. Test family create/join/leave flows
 
-### Phase 3: Integration (Week 5)
-1. Connect mobile to real API
-2. End-to-end testing
-3. Deploy to local MacBook
-4. Test with family members
+### Phase 2: Core Backend Features (Week 2-3)
 
-### Phase 4: Polish (Week 6)
-1. Bug fixes
-2. UI refinements
+1. Implement care session management
+2. Build activity tracking with family scoping
+3. Integrate Claude API for voice parsing
+4. Implement prediction algorithm
+5. Test with curl/Postman
+
+### Phase 3: Mobile Foundation (Week 3-4)
+
+1. Set up React Native project
+2. Build welcome & authentication screens
+3. Implement device auth with AsyncStorage
+4. Create family create/join flows
+5. Build settings screen
+6. Test on real devices
+
+### Phase 4: Mobile Core Features (Week 4-5)
+
+1. Build home dashboard
+2. Implement voice recording
+3. Create care session screens
+4. Add activity management
+5. Connect to real backend API
+6. Implement local notifications
+
+### Phase 5: Integration & Testing (Week 5-6)
+
+1. End-to-end testing
+2. Multi-device testing
+3. Family switching scenarios
+4. Voice parsing accuracy
+5. Notification reliability
+
+### Phase 6: Polish & Launch (Week 6)
+
+1. UI/UX refinements
+2. Bug fixes
 3. Documentation
-4. Prepare for open source
+4. Deploy to local MacBook
+5. Test with real family members
+6. Prepare for open source
+
+---
+
+## 16. Known Limitations & Future Improvements
+
+### MVP Limitations:
+
+- **One baby per family** - No multi-baby support
+- **No roles/permissions** - All caregivers are equal admins
+- **No QR code joining** - Manual name + password entry
+- **Orphaned sessions** - When caregiver leaves, their sessions remain
+- **Device-based auth** - No proper user accounts
+- **Local only** - No cloud backup or sync
+
+### Post-MVP Improvements:
+
+- Multi-baby support within a family
+- Caregiver roles (admin, viewer, etc.)
+- QR code for easy family joining
+- Proper user accounts with email
+- Cloud backup and cross-device sync
+- Analytics and trends dashboard
+- Export data (PDF reports)
+- Play activity tracking
+- Baby milestones and growth tracking
+- Multiple language support
+
+---
+
+## 17. Appendix: GraphQL Example Queries
+
+### Create Family
+
+```graphql
+mutation CreateFamily {
+  createFamily(
+    familyName: "Smith Family"
+    password: "baby123"
+    babyName: "Emma"
+    caregiverName: "Mom"
+    deviceId: "abc-123-def"
+    deviceName: "iPhone 12"
+  ) {
+    success
+    family {
+      id
+      name
+      babyName
+    }
+    caregiver {
+      id
+      name
+    }
+    error
+  }
+}
+```
+
+### Join Family
+
+```graphql
+mutation JoinFamily {
+  joinFamily(
+    familyName: "Smith Family"
+    password: "baby123"
+    caregiverName: "Dad"
+    deviceId: "xyz-789-ghi"
+    deviceName: "Pixel 7"
+  ) {
+    success
+    family {
+      id
+      name
+      babyName
+    }
+    caregiver {
+      id
+      name
+    }
+    error
+  }
+}
+```
+
+### Get Dashboard Data
+
+```graphql
+query GetDashboard {
+  getMyFamily {
+    name
+    babyName
+    caregivers {
+      name
+      deviceName
+    }
+  }
+
+  getCurrentSession {
+    id
+    caregiver {
+      name
+    }
+    startedAt
+    activities {
+      ... on FeedActivity {
+        feedDetails {
+          amountMl
+          feedType
+        }
+      }
+      ... on SleepActivity {
+        sleepDetails {
+          isActive
+        }
+      }
+    }
+    summary {
+      totalFeeds
+      totalMl
+      currentlyAsleep
+    }
+  }
+
+  getRecentCareSessions(limit: 3) {
+    id
+    caregiver {
+      name
+    }
+    startedAt
+    completedAt
+    summary {
+      totalFeeds
+      totalMl
+      totalSleepMinutes
+    }
+  }
+
+  predictNextFeed {
+    predictedTime
+    confidence
+    reasoning
+  }
+}
+```
+
+### Leave Family
+
+```graphql
+mutation LeaveFamily {
+  leaveFamily
+}
+```
