@@ -1,4 +1,4 @@
-# BabyBaton 🍼
+# BabyBaton 👶
 
 Voice-powered baby care tracking for seamless caregiver handoffs.
 
