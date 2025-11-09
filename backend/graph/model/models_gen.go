@@ -14,9 +14,24 @@ type Activity interface {
 	IsActivity()
 }
 
+type ActivityInput struct {
+	ActivityType  ActivityType        `json:"activityType"`
+	FeedDetails   *FeedDetailsInput   `json:"feedDetails,omitempty"`
+	DiaperDetails *DiaperDetailsInput `json:"diaperDetails,omitempty"`
+	SleepDetails  *SleepDetailsInput  `json:"sleepDetails,omitempty"`
+}
+
+type AuthResult struct {
+	Success   bool       `json:"success"`
+	Family    *Family    `json:"family,omitempty"`
+	Caregiver *Caregiver `json:"caregiver,omitempty"`
+	Error     *string    `json:"error,omitempty"`
+}
+
 type CareSession struct {
 	ID          string              `json:"id"`
 	Caregiver   *Caregiver          `json:"caregiver"`
+	FamilyID    string              `json:"familyId"`
 	Status      CareSessionStatus   `json:"status"`
 	StartedAt   time.Time           `json:"startedAt"`
 	CompletedAt *time.Time          `json:"completedAt,omitempty"`
@@ -36,10 +51,12 @@ type CareSessionSummary struct {
 }
 
 type Caregiver struct {
-	ID         string  `json:"id"`
-	Name       string  `json:"name"`
-	DeviceID   string  `json:"deviceId"`
-	DeviceName *string `json:"deviceName,omitempty"`
+	ID         string    `json:"id"`
+	FamilyID   string    `json:"familyId"`
+	Name       string    `json:"name"`
+	DeviceID   string    `json:"deviceId"`
+	DeviceName *string   `json:"deviceName,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 type DiaperActivity struct {
@@ -55,6 +72,21 @@ type DiaperDetails struct {
 	ChangedAt time.Time `json:"changedAt"`
 	HadPoop   bool      `json:"hadPoop"`
 	HadPee    bool      `json:"hadPee"`
+}
+
+type DiaperDetailsInput struct {
+	ChangedAt time.Time `json:"changedAt"`
+	HadPoop   bool      `json:"hadPoop"`
+	HadPee    *bool     `json:"hadPee,omitempty"`
+}
+
+type Family struct {
+	ID         string       `json:"id"`
+	Name       string       `json:"name"`
+	BabyName   string       `json:"babyName"`
+	Password   string       `json:"password"`
+	Caregivers []*Caregiver `json:"caregivers"`
+	CreatedAt  time.Time    `json:"createdAt"`
 }
 
 type FeedActivity struct {
@@ -74,11 +106,35 @@ type FeedDetails struct {
 	DurationMinutes *int32     `json:"durationMinutes,omitempty"`
 }
 
+type FeedDetailsInput struct {
+	StartTime time.Time  `json:"startTime"`
+	EndTime   *time.Time `json:"endTime,omitempty"`
+	AmountMl  *int32     `json:"amountMl,omitempty"`
+	FeedType  *FeedType  `json:"feedType,omitempty"`
+}
+
+type Mutation struct {
+}
+
 type NextFeedPrediction struct {
 	PredictedTime    time.Time            `json:"predictedTime"`
 	Confidence       PredictionConfidence `json:"confidence"`
 	Reasoning        *string              `json:"reasoning,omitempty"`
 	MinutesUntilFeed int32                `json:"minutesUntilFeed"`
+}
+
+type ParsedActivity struct {
+	ActivityType  ActivityType   `json:"activityType"`
+	FeedDetails   *FeedDetails   `json:"feedDetails,omitempty"`
+	DiaperDetails *DiaperDetails `json:"diaperDetails,omitempty"`
+	SleepDetails  *SleepDetails  `json:"sleepDetails,omitempty"`
+}
+
+type ParsedVoiceResult struct {
+	Success          bool              `json:"success"`
+	ParsedActivities []*ParsedActivity `json:"parsedActivities"`
+	Errors           []string          `json:"errors,omitempty"`
+	RawText          string            `json:"rawText"`
 }
 
 type Query struct {
@@ -97,7 +153,12 @@ type SleepDetails struct {
 	StartTime       time.Time  `json:"startTime"`
 	EndTime         *time.Time `json:"endTime,omitempty"`
 	DurationMinutes *int32     `json:"durationMinutes,omitempty"`
-	IsActive        bool       `json:"isActive"`
+	IsActive        *bool      `json:"isActive,omitempty"`
+}
+
+type SleepDetailsInput struct {
+	StartTime time.Time  `json:"startTime"`
+	EndTime   *time.Time `json:"endTime,omitempty"`
 }
 
 type ActivityType string

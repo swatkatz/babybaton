@@ -18,6 +18,10 @@ func feedTypePtr(ft model.FeedType) *model.FeedType {
 	return &ft
 }
 
+func boolPtr(b bool) *bool {
+    return &b
+}
+
 // GetMockPrediction returns a mock NextFeedPrediction
 func GetMockPrediction() *model.NextFeedPrediction {
 	now := time.Now()
@@ -85,7 +89,7 @@ func GetMockCurrentSession() *model.CareSession {
 					StartTime:       sleepStartTime,
 					EndTime:         nil,
 					DurationMinutes: nil,
-					IsActive:        true,
+					IsActive:        boolPtr(true),
 				},
 			},
 		},
@@ -174,7 +178,7 @@ func GetMockRecentSessions() []*model.CareSession {
 						StartTime:       sleep2Start,
 						EndTime:         &sleep2End,
 						DurationMinutes: int32Ptr(60),
-						IsActive:        false,
+						IsActive:        boolPtr(false),
 					},
 				},
 				&model.FeedActivity{
@@ -253,7 +257,7 @@ func GetMockRecentSessions() []*model.CareSession {
 						StartTime:       sleep3Start,
 						EndTime:         &sleep3End,
 						DurationMinutes: int32Ptr(60),
-						IsActive:        false,
+						IsActive:        boolPtr(false),
 					},
 				},
 				&model.FeedActivity{

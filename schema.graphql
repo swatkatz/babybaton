@@ -28,6 +28,7 @@ type Family {
   id: ID!
   name: String!
   babyName: String!
+  password: String!
   caregivers: [Caregiver!]!
   createdAt: DateTime!
 }
@@ -83,7 +84,7 @@ type SleepDetails {
   startTime: DateTime!
   endTime: DateTime
   durationMinutes: Int
-  isActive: Boolean!
+  isActive: Boolean
 }
 
 type FeedActivity {
@@ -114,9 +115,17 @@ type NextFeedPrediction {
   minutesUntilFeed: Int!
 }
 
+# Simple wrapper without id/createdAt
+type ParsedActivity {
+  activityType: ActivityType!
+  feedDetails: FeedDetails
+  diaperDetails: DiaperDetails
+  sleepDetails: SleepDetails
+}
+
 type ParsedVoiceResult {
   success: Boolean!
-  parsedActivities: [ActivityInput!]!
+  parsedActivities: [ParsedActivity!]!
   errors: [String!]
   rawText: String!
 }

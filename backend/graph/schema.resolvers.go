@@ -7,18 +7,225 @@ package graph
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/graph/model"
+	"github.com/swatkatz/babybaton/backend/internal/domain"
+	"github.com/swatkatz/babybaton/backend/internal/mapper"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// PredictNextFeed is the resolver for the predictNextFeed field.
-func (r *queryResolver) PredictNextFeed(ctx context.Context) (*model.NextFeedPrediction, error) {
-	return GetMockPrediction(), nil
+// CreateFamily is the resolver for the createFamily field.
+func (r *mutationResolver) CreateFamily(ctx context.Context, familyName string, password string, babyName string, caregiverName string, deviceID string, deviceName *string) (*model.AuthResult, error) {
+	// Validate password length
+	if len(password) < 6 {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr("Password must be at least 6 characters"),
+		}, nil
+	}
+
+	// Check if family name already exists
+	exists, err := r.store.FamilyNameExists(ctx, familyName)
+	if err != nil {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr("Failed to check family name availability"),
+		}, nil
+	}
+	if exists {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr("Family name already taken"),
+		}, nil
+	}
+
+	// Hash password
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr("Failed to hash password"),
+		}, nil
+	}
+
+	// Generate IDs
+	familyID := uuid.New()
+	caregiverID := uuid.New()
+	now := time.Now()
+
+	// Create domain objects
+	family := &domain.Family{
+		ID:           familyID,
+		Name:         familyName,
+		PasswordHash: string(passwordHash),
+		Password: password,
+		BabyName:     babyName,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	caregiver := &domain.Caregiver{
+		ID:         caregiverID,
+		FamilyID:   familyID,
+		Name:       caregiverName,
+		DeviceID:   deviceID,
+		DeviceName: deviceName,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+
+	// Create family and caregiver atomically
+	err = r.store.CreateFamilyWithCaregiver(ctx, family, caregiver)
+	if err != nil {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr(fmt.Sprintf("Failed to create family: %v", err)),
+		}, nil
+	}
+
+	// Convert to GraphQL types
+	return &model.AuthResult{
+		Success:   true,
+		Family:    mapper.FamilyToGraphQL(family),       // ← Use mapper
+		Caregiver: mapper.CaregiverToGraphQL(caregiver), // ← Use mapper
+		Error:     nil,
+	}, nil
 }
 
-// GetCurrentSession is the resolver for the getCurrentSession field.
-func (r *queryResolver) GetCurrentSession(ctx context.Context) (*model.CareSession, error) {
-	return GetMockCurrentSession(), nil
+// JoinFamily is the resolver for the joinFamily field.
+func (r *mutationResolver) JoinFamily(ctx context.Context, familyName string, password string, caregiverName string, deviceID string, deviceName *string) (*model.AuthResult, error) {
+	family, err := r.store.GetFamilyByName(ctx, familyName)
+	if err != nil {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr("Family not found"),
+		}, nil
+	}
+
+	// Verify password
+	err = bcrypt.CompareHashAndPassword([]byte(family.PasswordHash), []byte(password))
+	if err != nil {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr("Incorrect password"),
+		}, nil
+	}
+
+	// Check if device already exists
+	existingCaregiver, err := r.store.GetCaregiverByDeviceID(ctx, deviceID)
+
+	// Case 1: Device exists in THIS family → Re-authentication (allow it!)
+	if err == nil && existingCaregiver != nil && existingCaregiver.FamilyID == family.ID {
+		return &model.AuthResult{
+			Success:   true,
+			Family:    mapper.FamilyToGraphQL(family),
+			Caregiver: mapper.CaregiverToGraphQL(existingCaregiver),
+			Error:     nil,
+		}, nil
+	}
+
+	// Case 2: Device exists in DIFFERENT family → Block it
+	if err == nil && existingCaregiver != nil && existingCaregiver.FamilyID != family.ID {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr("Device already belongs to a different family. Leave that family first."),
+		}, nil
+	}
+
+	// Case 3: Device doesn't exist → Create new caregiver
+	caregiverID := uuid.New()
+	now := time.Now()
+
+	caregiver := &domain.Caregiver{
+		ID:         caregiverID,
+		FamilyID:   family.ID,
+		Name:       caregiverName,
+		DeviceID:   deviceID,
+		DeviceName: deviceName,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+
+	err = r.store.CreateCaregiver(ctx, caregiver)
+	if err != nil {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr(fmt.Sprintf("Failed to join family: %v", err)),
+		}, nil
+	}
+
+	return &model.AuthResult{
+		Success:   true,
+		Family:    mapper.FamilyToGraphQL(family),
+		Caregiver: mapper.CaregiverToGraphQL(caregiver),
+		Error:     nil,
+	}, nil
+}
+
+// UpdateBabyName is the resolver for the updateBabyName field.
+func (r *mutationResolver) UpdateBabyName(ctx context.Context, babyName string) (*model.Family, error) {
+	panic(fmt.Errorf("not implemented: UpdateBabyName - updateBabyName"))
+}
+
+// LeaveFamily is the resolver for the leaveFamily field.
+func (r *mutationResolver) LeaveFamily(ctx context.Context) (bool, error) {
+	panic(fmt.Errorf("not implemented: LeaveFamily - leaveFamily"))
+}
+
+// StartCareSession is the resolver for the startCareSession field.
+func (r *mutationResolver) StartCareSession(ctx context.Context) (*model.CareSession, error) {
+	panic(fmt.Errorf("not implemented: StartCareSession - startCareSession"))
+}
+
+// ParseVoiceInput is the resolver for the parseVoiceInput field.
+func (r *mutationResolver) ParseVoiceInput(ctx context.Context, text string) (*model.ParsedVoiceResult, error) {
+	panic(fmt.Errorf("not implemented: ParseVoiceInput - parseVoiceInput"))
+}
+
+// AddActivities is the resolver for the addActivities field.
+func (r *mutationResolver) AddActivities(ctx context.Context, activities []*model.ActivityInput) (*model.CareSession, error) {
+	panic(fmt.Errorf("not implemented: AddActivities - addActivities"))
+}
+
+// AddActivitiesFromVoice is the resolver for the addActivitiesFromVoice field.
+func (r *mutationResolver) AddActivitiesFromVoice(ctx context.Context, text string) (*model.CareSession, error) {
+	panic(fmt.Errorf("not implemented: AddActivitiesFromVoice - addActivitiesFromVoice"))
+}
+
+// EndActivity is the resolver for the endActivity field.
+func (r *mutationResolver) EndActivity(ctx context.Context, activityID string, endTime *time.Time) (model.Activity, error) {
+	panic(fmt.Errorf("not implemented: EndActivity - endActivity"))
+}
+
+// CompleteCareSession is the resolver for the completeCareSession field.
+func (r *mutationResolver) CompleteCareSession(ctx context.Context, notes *string) (*model.CareSession, error) {
+	panic(fmt.Errorf("not implemented: CompleteCareSession - completeCareSession"))
+}
+
+// DeleteActivity is the resolver for the deleteActivity field.
+func (r *mutationResolver) DeleteActivity(ctx context.Context, activityID string) (bool, error) {
+	panic(fmt.Errorf("not implemented: DeleteActivity - deleteActivity"))
+}
+
+// CheckFamilyNameAvailable is the resolver for the checkFamilyNameAvailable field.
+func (r *queryResolver) CheckFamilyNameAvailable(ctx context.Context, name string) (bool, error) {
+	exists, err := r.store.FamilyNameExists(ctx, name)
+	if err != nil {
+		return false, err
+	}
+	return !exists, nil // Return true if available (not exists)
+}
+
+// GetMyFamily is the resolver for the getMyFamily field.
+func (r *queryResolver) GetMyFamily(ctx context.Context) (*model.Family, error) {
+	panic(fmt.Errorf("not implemented: GetMyFamily - getMyFamily"))
+}
+
+// GetMyCaregiver is the resolver for the getMyCaregiver field.
+func (r *queryResolver) GetMyCaregiver(ctx context.Context) (*model.Caregiver, error) {
+	panic(fmt.Errorf("not implemented: GetMyCaregiver - getMyCaregiver"))
 }
 
 // GetRecentCareSessions is the resolver for the getRecentCareSessions field.
@@ -26,27 +233,41 @@ func (r *queryResolver) GetRecentCareSessions(ctx context.Context, limit *int32)
 	return GetMockRecentSessions(), nil
 }
 
+// GetCurrentSession is the resolver for the getCurrentSession field.
+func (r *queryResolver) GetCurrentSession(ctx context.Context) (*model.CareSession, error) {
+	return GetMockCurrentSession(), nil
+}
+
 // GetCareSession is the resolver for the getCareSession field.
 func (r *queryResolver) GetCareSession(ctx context.Context, id string) (*model.CareSession, error) {
 	sessions := GetMockRecentSessions()
 	currentSession := GetMockCurrentSession()
-	
+
 	// Check current session
 	if currentSession.ID == id {
 		return currentSession, nil
 	}
-	
+
 	// Check recent sessions
 	for _, session := range sessions {
 		if session.ID == id {
 			return session, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("session not found: %s", id)
 }
+
+// PredictNextFeed is the resolver for the predictNextFeed field.
+func (r *queryResolver) PredictNextFeed(ctx context.Context) (*model.NextFeedPrediction, error) {
+	return GetMockPrediction(), nil
+}
+
+// Mutation returns MutationResolver implementation.
+func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
+type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }

@@ -195,3 +195,20 @@ export const GET_CARE_SESSION = gql`
   }
   ${CARE_SESSION_FRAGMENT}
 `;
+
+export const GET_FAMILY_SETTINGS = gql`
+  query GetFamilySettings {
+    getMyFamily {
+      id
+      name
+      babyName
+      password
+      caregivers {
+        id
+        name
+        deviceId
+        deviceName
+      }
+    }
+  }
+`;
