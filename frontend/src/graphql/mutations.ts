@@ -73,3 +73,34 @@ export const CHECK_FAMILY_NAME_AVAILABLE = gql`
     checkFamilyNameAvailable(name: $name)
   }
 `;
+
+export const PARSE_VOICE_INPUT = gql`
+  mutation ParseVoiceInput($text: String!) {
+    parseVoiceInput(text: $text) {
+      success
+      parsedActivities {
+        activityType
+        feedDetails {
+          startTime
+          endTime
+          amountMl
+          feedType
+          durationMinutes
+        }
+        diaperDetails {
+          changedAt
+          hadPoop
+          hadPee
+        }
+        sleepDetails {
+          startTime
+          endTime
+          durationMinutes
+          isActive
+        }
+      }
+      errors
+      rawText
+    }
+  }
+`;

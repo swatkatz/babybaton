@@ -6,11 +6,14 @@ package graph
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/graph/model"
+	"github.com/swatkatz/babybaton/backend/internal/ai"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
 	"github.com/swatkatz/babybaton/backend/internal/mapper"
 	"golang.org/x/crypto/bcrypt"
@@ -181,7 +184,38 @@ func (r *mutationResolver) StartCareSession(ctx context.Context) (*model.CareSes
 
 // ParseVoiceInput is the resolver for the parseVoiceInput field.
 func (r *mutationResolver) ParseVoiceInput(ctx context.Context, text string) (*model.ParsedVoiceResult, error) {
-	panic(fmt.Errorf("not implemented: ParseVoiceInput - parseVoiceInput"))
+	// Initialize Claude client
+	claudeClient := ai.NewClaudeClient(os.Getenv("CLAUDE_API_KEY"))
+
+	// Call Claude API to parse
+	claudeResponse, err := claudeClient.ParseVoiceInput(text, time.Now())
+	if err != nil {
+		return &model.ParsedVoiceResult{
+			Success: false,
+			RawText: text,
+			Errors:  []string{fmt.Sprintf("Failed to parse: %v", err)},
+		}, nil
+	}
+
+	// Parse JSON response
+	var activities []map[string]interface{}
+	if err := json.Unmarshal([]byte(claudeResponse), &activities); err != nil {
+		return &model.ParsedVoiceResult{
+			Success: false,
+			RawText: text,
+			Errors:  []string{"Failed to parse Claude response"},
+		}, nil
+	}
+
+	// Convert to ActivityInput using ai package
+	parsedActivities, errors := ai.ConvertToParsedActivities(activities)
+
+	return &model.ParsedVoiceResult{
+		Success:          len(errors) == 0,
+		ParsedActivities: parsedActivities,
+		Errors:           errors,
+		RawText:          text,
+	}, nil
 }
 
 // AddActivities is the resolver for the addActivities field.
