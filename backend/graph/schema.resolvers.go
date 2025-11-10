@@ -60,7 +60,7 @@ func (r *mutationResolver) CreateFamily(ctx context.Context, familyName string, 
 		ID:           familyID,
 		Name:         familyName,
 		PasswordHash: string(passwordHash),
-		Password: password,
+		Password:     password,
 		BabyName:     babyName,
 		CreatedAt:    now,
 		UpdatedAt:    now,
@@ -189,11 +189,6 @@ func (r *mutationResolver) AddActivities(ctx context.Context, activities []*mode
 	panic(fmt.Errorf("not implemented: AddActivities - addActivities"))
 }
 
-// AddActivitiesFromVoice is the resolver for the addActivitiesFromVoice field.
-func (r *mutationResolver) AddActivitiesFromVoice(ctx context.Context, text string) (*model.CareSession, error) {
-	panic(fmt.Errorf("not implemented: AddActivitiesFromVoice - addActivitiesFromVoice"))
-}
-
 // EndActivity is the resolver for the endActivity field.
 func (r *mutationResolver) EndActivity(ctx context.Context, activityID string, endTime *time.Time) (model.Activity, error) {
 	panic(fmt.Errorf("not implemented: EndActivity - endActivity"))
@@ -271,3 +266,15 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *mutationResolver) AddActivitiesFromVoice(ctx context.Context, text string) (*model.CareSession, error) {
+	panic(fmt.Errorf("not implemented: AddActivitiesFromVoice - addActivitiesFromVoice"))
+}
+*/

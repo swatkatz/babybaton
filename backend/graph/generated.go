@@ -123,17 +123,16 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddActivities          func(childComplexity int, activities []*model.ActivityInput) int
-		AddActivitiesFromVoice func(childComplexity int, text string) int
-		CompleteCareSession    func(childComplexity int, notes *string) int
-		CreateFamily           func(childComplexity int, familyName string, password string, babyName string, caregiverName string, deviceID string, deviceName *string) int
-		DeleteActivity         func(childComplexity int, activityID string) int
-		EndActivity            func(childComplexity int, activityID string, endTime *time.Time) int
-		JoinFamily             func(childComplexity int, familyName string, password string, caregiverName string, deviceID string, deviceName *string) int
-		LeaveFamily            func(childComplexity int) int
-		ParseVoiceInput        func(childComplexity int, text string) int
-		StartCareSession       func(childComplexity int) int
-		UpdateBabyName         func(childComplexity int, babyName string) int
+		AddActivities       func(childComplexity int, activities []*model.ActivityInput) int
+		CompleteCareSession func(childComplexity int, notes *string) int
+		CreateFamily        func(childComplexity int, familyName string, password string, babyName string, caregiverName string, deviceID string, deviceName *string) int
+		DeleteActivity      func(childComplexity int, activityID string) int
+		EndActivity         func(childComplexity int, activityID string, endTime *time.Time) int
+		JoinFamily          func(childComplexity int, familyName string, password string, caregiverName string, deviceID string, deviceName *string) int
+		LeaveFamily         func(childComplexity int) int
+		ParseVoiceInput     func(childComplexity int, text string) int
+		StartCareSession    func(childComplexity int) int
+		UpdateBabyName      func(childComplexity int, babyName string) int
 	}
 
 	NextFeedPrediction struct {
@@ -190,7 +189,6 @@ type MutationResolver interface {
 	StartCareSession(ctx context.Context) (*model.CareSession, error)
 	ParseVoiceInput(ctx context.Context, text string) (*model.ParsedVoiceResult, error)
 	AddActivities(ctx context.Context, activities []*model.ActivityInput) (*model.CareSession, error)
-	AddActivitiesFromVoice(ctx context.Context, text string) (*model.CareSession, error)
 	EndActivity(ctx context.Context, activityID string, endTime *time.Time) (model.Activity, error)
 	CompleteCareSession(ctx context.Context, notes *string) (*model.CareSession, error)
 	DeleteActivity(ctx context.Context, activityID string) (bool, error)
@@ -532,17 +530,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.AddActivities(childComplexity, args["activities"].([]*model.ActivityInput)), true
-	case "Mutation.addActivitiesFromVoice":
-		if e.complexity.Mutation.AddActivitiesFromVoice == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_addActivitiesFromVoice_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.AddActivitiesFromVoice(childComplexity, args["text"].(string)), true
 	case "Mutation.completeCareSession":
 		if e.complexity.Mutation.CompleteCareSession == nil {
 			break
@@ -1137,8 +1124,6 @@ type Mutation {
 
   addActivities(activities: [ActivityInput!]!): CareSession!
 
-  addActivitiesFromVoice(text: String!): CareSession!
-
   endActivity(activityId: ID!, endTime: DateTime): Activity!
 
   completeCareSession(notes: String): CareSession!
@@ -1152,17 +1137,6 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
-
-func (ec *executionContext) field_Mutation_addActivitiesFromVoice_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "text", ec.unmarshalNString2string)
-	if err != nil {
-		return nil, err
-	}
-	args["text"] = arg0
-	return args, nil
-}
 
 func (ec *executionContext) field_Mutation_addActivities_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -3223,67 +3197,6 @@ func (ec *executionContext) fieldContext_Mutation_addActivities(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_addActivities_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_addActivitiesFromVoice(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Mutation_addActivitiesFromVoice,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().AddActivitiesFromVoice(ctx, fc.Args["text"].(string))
-		},
-		nil,
-		ec.marshalNCareSession2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSession,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Mutation_addActivitiesFromVoice(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_CareSession_id(ctx, field)
-			case "caregiver":
-				return ec.fieldContext_CareSession_caregiver(ctx, field)
-			case "familyId":
-				return ec.fieldContext_CareSession_familyId(ctx, field)
-			case "status":
-				return ec.fieldContext_CareSession_status(ctx, field)
-			case "startedAt":
-				return ec.fieldContext_CareSession_startedAt(ctx, field)
-			case "completedAt":
-				return ec.fieldContext_CareSession_completedAt(ctx, field)
-			case "activities":
-				return ec.fieldContext_CareSession_activities(ctx, field)
-			case "notes":
-				return ec.fieldContext_CareSession_notes(ctx, field)
-			case "summary":
-				return ec.fieldContext_CareSession_summary(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type CareSession", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_addActivitiesFromVoice_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6731,13 +6644,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "addActivities":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_addActivities(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "addActivitiesFromVoice":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_addActivitiesFromVoice(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

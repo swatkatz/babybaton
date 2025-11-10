@@ -13,6 +13,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 	"github.com/swatkatz/babybaton/backend/graph"
+	"github.com/swatkatz/babybaton/backend/internal/middleware"
 	"github.com/swatkatz/babybaton/backend/internal/store/postgres"
 	"github.com/vektah/gqlparser/v2/ast"
 )
@@ -58,7 +59,7 @@ func main() {
 		Cache: lru.New[string](100),
 	})
 
-		// Add CORS middleware
+	// Add CORS middleware
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:8081"}, // Expo web origin
 		AllowCredentials: true,
@@ -67,7 +68,7 @@ func main() {
 	})
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/query", c.Handler(srv))
+	http.Handle("/query", c.Handler(middleware.AuthMiddleware(srv)))
 
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))

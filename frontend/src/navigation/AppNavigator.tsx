@@ -18,7 +18,9 @@ export type RootStackParamList = {
   CreateFamily: undefined;
   JoinFamily: undefined;
   Dashboard: undefined;
-  PredictionDetail: { prediction: NonNullable<GetPredictionQuery['predictNextFeed']> };
+  PredictionDetail: {
+    prediction: NonNullable<GetPredictionQuery['predictNextFeed']>;
+  };
   CurrentSessionDetail: undefined;
   SessionDetail: { sessionId: string };
   Settings: undefined;
@@ -29,7 +31,12 @@ const Stack = createStackNavigator<RootStackParamList>();
 export function AppNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  console.log('AppNavigator render: isLoading =', isLoading, 'isAuthenticated =', isAuthenticated);
+  console.log(
+    'AppNavigator render: isLoading =',
+    isLoading,
+    'isAuthenticated =',
+    isAuthenticated
+  );
 
   if (isLoading) {
     console.log('AppNavigator: Showing loading state...');
@@ -37,7 +44,11 @@ export function AppNavigator() {
     return null;
   }
 
-  console.log('AppNavigator: Rendering', isAuthenticated ? 'authenticated' : 'unauthenticated', 'screens');
+  console.log(
+    'AppNavigator: Rendering',
+    isAuthenticated ? 'authenticated' : 'unauthenticated',
+    'screens'
+  );
 
   return (
     <Stack.Navigator
@@ -86,7 +97,7 @@ export function AppNavigator() {
             name="PredictionDetail"
             component={PredictionDetailScreen}
             options={{
-              title: 'Prediction Details',
+              title: '🍼  Prediction Details',
               header: (props) => <CustomHeader {...props} />,
             }}
           />
@@ -95,7 +106,7 @@ export function AppNavigator() {
             name="CurrentSessionDetail"
             component={CurrentSessionDetailScreen}
             options={{
-              title: 'Current Session',
+              title: '🍼  Current Session',
               header: (props) => <CustomHeader {...props} />,
             }}
           />
@@ -104,7 +115,7 @@ export function AppNavigator() {
             name="SessionDetail"
             component={SessionDetailScreen}
             options={{
-              title: 'Session Details',
+              title: '🍼  Session Details',
               header: (props) => <CustomHeader {...props} />,
             }}
           />
@@ -113,7 +124,7 @@ export function AppNavigator() {
             name="Settings"
             component={SettingsScreen}
             options={{
-              title: 'Family Settings',
+              title: '🍼  Family Settings',
               header: (props) => <CustomHeader {...props} />,
             }}
           />

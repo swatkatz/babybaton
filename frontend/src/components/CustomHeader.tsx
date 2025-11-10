@@ -20,9 +20,10 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
   // Get the title from route options or use baby name
   const showBabyName = route.name === 'Dashboard';
   const canGoBack = navigation.canGoBack();
-  const title = showBabyName && authData?.babyName
-    ? `${authData.babyName}'s Care`
-    : (options.title || route.name);
+  const title =
+    showBabyName && authData?.babyName
+      ? `${authData.babyName}'s Baton`
+      : options.title || route.name;
 
   return (
     <View style={styles.header}>
@@ -41,7 +42,7 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
         {/* Title */}
         <View style={styles.titleContainer}>
           <Text style={styles.title}>
-            {showBabyName && '👶 '}
+            {showBabyName && '🍼  '}
             {title}
           </Text>
         </View>

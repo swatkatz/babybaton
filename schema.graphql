@@ -210,8 +210,6 @@ type Mutation {
 
   addActivities(activities: [ActivityInput!]!): CareSession!
 
-  addActivitiesFromVoice(text: String!): CareSession!
-
   endActivity(activityId: ID!, endTime: DateTime): Activity!
 
   completeCareSession(notes: String): CareSession!
