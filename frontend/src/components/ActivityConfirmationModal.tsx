@@ -75,9 +75,9 @@ export function ActivityConfirmationModal({
   const renderActivityCard = (activity: ParsedActivity, index: number) => {
     const { activityType, feedDetails, diaperDetails, sleepDetails } = activity;
 
-    let icon: JSX.Element | null = null;
+    let icon: React.ReactElement | null = null;
     let iconBgColor = '';
-    let content: JSX.Element | null = null;
+    let content: React.ReactElement | null = null;
 
     if (activityType === 'FEED' && feedDetails) {
       icon = <Utensils size={28} color={colors.feed} />;

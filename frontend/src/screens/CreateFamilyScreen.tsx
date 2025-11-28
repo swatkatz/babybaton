@@ -14,10 +14,9 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
 import { spacing, typography, layout } from '../theme/spacing';
-import { useMutation } from '@apollo/client/react';
-import { CREATE_FAMILY } from '../graphql/mutations';
 import deviceService from '../services/deviceService';
 import { useAuth } from '../hooks/useAuth';
+import { useCreateFamilyMutation } from '../generated/graphql';
 
 type Props = StackScreenProps<RootStackParamList, 'CreateFamily'>;
 
@@ -32,7 +31,7 @@ export function CreateFamilyScreen({ navigation }: Props) {
   const [caregiverName, setCaregiverName] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [createFamily, { loading }] = useMutation(CREATE_FAMILY);
+  const [createFamily, { loading }] = useCreateFamilyMutation();
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -74,7 +73,7 @@ export function CreateFamilyScreen({ navigation }: Props) {
         },
       });
 
-      if (data?.createFamily?.success) {
+      if (data?.createFamily?.success && data.createFamily.family && data.createFamily.caregiver) {
         // Save auth data
         await login({
           familyId: data.createFamily.family.id,

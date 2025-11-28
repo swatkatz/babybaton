@@ -14,10 +14,9 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
 import { spacing, typography, layout } from '../theme/spacing';
-import { useMutation } from '@apollo/client/react';
-import { JOIN_FAMILY } from '../graphql/mutations';
 import deviceService from '../services/deviceService';
 import { useAuth } from '../hooks/useAuth';
+import { useJoinFamilyMutation } from '../generated/graphql';
 
 type Props = StackScreenProps<RootStackParamList, 'JoinFamily'>;
 
@@ -31,7 +30,7 @@ export function JoinFamilyScreen({ navigation }: Props) {
   const [caregiverName, setCaregiverName] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [joinFamily, { loading }] = useMutation(JOIN_FAMILY);
+  const [joinFamily, { loading }] = useJoinFamilyMutation();
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -69,7 +68,7 @@ export function JoinFamilyScreen({ navigation }: Props) {
         },
       });
 
-      if (data?.joinFamily?.success) {
+      if (data?.joinFamily?.success && data.joinFamily.family && data.joinFamily.caregiver) {
         // Save auth data
         await login({
           familyId: data.joinFamily.family.id,

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { useGetCareSessionQuery } from '../generated/graphql';
+import { useGetCareSessionQuery, Activity } from '../generated/graphql';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { ActivityItem } from '../components/ActivityItem';
@@ -74,7 +74,7 @@ export function SessionDetailScreen({ route }: Props) {
         <Text style={styles.sectionTitle}>
           Activities ({session.activities.length}):
         </Text>
-        {session.activities.map((activity) => (
+        {session.activities.map((activity: Activity) => (
           <ActivityItem key={activity.id} activity={activity} />
         ))}
 

@@ -13,6 +13,7 @@ type contextKey string
 const (
 	CaregiverIDKey contextKey = "caregiverId"
 	FamilyIDKey    contextKey = "familyId"
+	TimezoneKey    contextKey = "timezone"
 )
 
 // AuthMiddleware extracts caregiver and family IDs from headers
@@ -38,6 +39,13 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
+		// Extract timezone
+		timezone := r.Header.Get("X-Timezone")
+		if timezone == "" {
+			timezone = "UTC" // Default fallback
+		}
+		ctx = context.WithValue(ctx, TimezoneKey, timezone)
+
 		// Pass modified context to next handler
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -53,6 +61,14 @@ func GetCaregiverID(ctx context.Context) (uuid.UUID, bool) {
 func GetFamilyID(ctx context.Context) (uuid.UUID, bool) {
 	familyID, ok := ctx.Value(FamilyIDKey).(uuid.UUID)
 	return familyID, ok
+}
+
+// GetTimezone extracts timezone from context
+func GetTimezone(ctx context.Context) string {
+	if tz, ok := ctx.Value(TimezoneKey).(string); ok {
+		return tz
+	}
+	return "UTC" // Default fallback
 }
 
 // RequireAuth returns error if caregiver/family not in context

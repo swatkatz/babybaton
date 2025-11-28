@@ -13,15 +13,14 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
 import { spacing, typography, layout } from '../theme/spacing';
-import { useQuery } from '@apollo/client/react';
-import { GET_FAMILY_SETTINGS } from '../graphql/queries';
 import { useAuth } from '../hooks/useAuth';
+import { useGetFamilySettingsQuery } from '../generated/graphql';
 
 type Props = StackScreenProps<RootStackParamList, 'Settings'>;
 
 export function SettingsScreen({ navigation }: Props) {
   const { authData, logout } = useAuth();
-  const { data, loading, error } = useQuery(GET_FAMILY_SETTINGS);
+  const { data, loading, error } = useGetFamilySettingsQuery();
 
   const handleCopyPassword = () => {
     if (data?.getMyFamily?.password) {
@@ -121,7 +120,7 @@ export function SettingsScreen({ navigation }: Props) {
             </Text>
 
             <View style={styles.caregiverList}>
-              {family.caregivers.map((caregiver) => (
+              {family.caregivers.map((caregiver: { id: string; name: string; deviceName?: string | null }) => (
                 <View key={caregiver.id} style={styles.caregiverItem}>
                   <Text style={styles.caregiverBullet}>•</Text>
                   <View style={styles.caregiverInfo}>

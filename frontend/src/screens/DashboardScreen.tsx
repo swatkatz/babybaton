@@ -15,6 +15,7 @@ import {
   useGetPredictionQuery,
   useGetCurrentSessionQuery,
   useGetRecentSessionsQuery,
+  CareSession,
 } from '../generated/graphql';
 
 /**
@@ -138,7 +139,7 @@ export function DashboardScreen({ navigation }: Props) {
         {/* Recent Sessions List */}
         {recentSessionsLoading && <Text>Loading recent sessions...</Text>}
         {recentSessionsError && <Text>Error loading recent sessions</Text>}
-        {recentSessions.map((session) => (
+        {recentSessions.map((session: CareSession) => (
           <View key={session.id}>
             <RecentSessionCard
               session={session}

@@ -16,8 +16,7 @@ const config: CodegenConfig = {
           ID: 'string',
         },
         withHooks: true,
-        // Tell codegen to use the React-specific import path for Apollo v4
-        apolloReactCommonImportFrom: '@apollo/client/react',
+        // Import hooks from the react package
         apolloReactHooksImportFrom: '@apollo/client/react',
       },
     },

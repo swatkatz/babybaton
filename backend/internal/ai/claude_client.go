@@ -45,8 +45,8 @@ func NewClaudeClient(apiKey string) *ClaudeClient {
 	}
 }
 
-func (c *ClaudeClient) ParseVoiceInput(text string, currentTime time.Time) (string, error) {
-	prompt := buildVoiceParsingPrompt(text, currentTime)
+func (c *ClaudeClient) ParseVoiceInput(text string, currentTime time.Time, timezone string) (string, error) {
+	prompt := buildVoiceParsingPrompt(text, currentTime, timezone)
 	
 	reqBody := claudeRequest{
 		Model:     "claude-sonnet-4-20250514",
@@ -96,9 +96,7 @@ func (c *ClaudeClient) ParseVoiceInput(text string, currentTime time.Time) (stri
 	return claudeResp.Content[0].Text, nil
 }
 
-func buildVoiceParsingPrompt(voiceText string, currentTime time.Time) string {
-	timezone := "America/Toronto" // You can make this configurable
-	
+func buildVoiceParsingPrompt(voiceText string, currentTime time.Time, timezone string) string {
 	return fmt.Sprintf(`You are parsing baby care voice input into structured activities.
 
 Current time: %s

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { useGetCurrentSessionQuery } from '../generated/graphql';
+import { useGetCurrentSessionQuery, Activity } from '../generated/graphql';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { ActivityItem } from '../components/ActivityItem';
@@ -99,7 +99,7 @@ export function CurrentSessionDetailScreen({ route }: Props) {
           </View>
         ) : (
           <View style={styles.activitiesList}>
-            {session.activities.map((activity) => (
+            {session.activities.map((activity: Activity) => (
               <ActivityItem
                 key={activity.id}
                 activity={activity}

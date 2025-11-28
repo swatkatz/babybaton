@@ -16,6 +16,7 @@ import (
 	"github.com/swatkatz/babybaton/backend/internal/ai"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
 	"github.com/swatkatz/babybaton/backend/internal/mapper"
+	"github.com/swatkatz/babybaton/backend/internal/middleware"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -187,8 +188,11 @@ func (r *mutationResolver) ParseVoiceInput(ctx context.Context, text string) (*m
 	// Initialize Claude client
 	claudeClient := ai.NewClaudeClient(os.Getenv("CLAUDE_API_KEY"))
 
-	// Call Claude API to parse
-	claudeResponse, err := claudeClient.ParseVoiceInput(text, time.Now())
+	// Get timezone from context
+	timezone := middleware.GetTimezone(ctx)
+
+	// Call Claude API to parse with timezone
+	claudeResponse, err := claudeClient.ParseVoiceInput(text, time.Now(), timezone)
 	if err != nil {
 		return &model.ParsedVoiceResult{
 			Success: false,
