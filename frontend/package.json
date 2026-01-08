@@ -18,6 +18,7 @@
     "@react-navigation/stack": "^7.6.2",
     "date-fns": "^4.1.0",
     "expo": "54.0.23",
+    "expo-audio": "^1.1.1",
     "expo-av": "~16.0.7",
     "expo-linear-gradient": "^15.0.7",
     "expo-localization": "~17.0.7",
@@ -36,11 +37,11 @@
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
-    "@graphql-codegen/cli": "^6.0.1",
-    "@graphql-codegen/typed-document-node": "^6.1.0",
-    "@graphql-codegen/typescript": "^5.0.2",
-    "@graphql-codegen/typescript-operations": "^5.0.2",
-    "@graphql-codegen/typescript-react-apollo": "^4.3.3",
+    "@graphql-codegen/cli": "^6.1.0",
+    "@graphql-codegen/typed-document-node": "^6.1.5",
+    "@graphql-codegen/typescript": "^5.0.7",
+    "@graphql-codegen/typescript-operations": "^5.0.7",
+    "@graphql-typed-document-node/core": "^3.2.0",
     "@types/react": "~19.1.0",
     "prettier": "^3.6.2",
     "typescript": "~5.9.2"

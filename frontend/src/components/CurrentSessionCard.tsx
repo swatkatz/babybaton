@@ -5,7 +5,7 @@ import { spacing, layout, typography } from '../theme/spacing';
 import { ChevronRight } from 'lucide-react-native';
 import { ActivityItem } from './ActivityItem';
 import { formatDuration, formatTime } from '../utils/time';
-import { GetCurrentSessionQuery } from '../generated/graphql';
+import { GetCurrentSessionQuery } from '../types/__generated__/graphql';
 
 interface CurrentSessionCardProps {
   session: NonNullable<GetCurrentSessionQuery['getCurrentSession']>;

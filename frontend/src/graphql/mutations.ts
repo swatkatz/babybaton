@@ -75,8 +75,8 @@ export const CHECK_FAMILY_NAME_AVAILABLE = gql`
 `;
 
 export const PARSE_VOICE_INPUT = gql`
-  mutation ParseVoiceInput($text: String!) {
-    parseVoiceInput(text: $text) {
+  mutation ParseVoiceInput($audioFile: Upload!) {
+    parseVoiceInput(audioFile: $audioFile) {
       success
       parsedActivities {
         activityType

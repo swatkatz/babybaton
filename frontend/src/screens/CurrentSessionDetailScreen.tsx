@@ -6,9 +6,10 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
+import { useQuery } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { useGetCurrentSessionQuery, Activity } from '../generated/graphql';
+import { GetCurrentSessionDocument, Activity } from '../types/__generated__/graphql';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { ActivityItem } from '../components/ActivityItem';
@@ -17,7 +18,7 @@ import { formatDuration, formatTime } from '../utils/time';
 type Props = StackScreenProps<RootStackParamList, 'CurrentSessionDetail'>;
 
 export function CurrentSessionDetailScreen({ route }: Props) {
-  const { data, loading, error } = useGetCurrentSessionQuery();
+  const { data, loading, error } = useQuery(GetCurrentSessionDocument);
 
   const handleDeleteActivity = (activityId: string) => {
     console.log('Delete activity:', activityId);

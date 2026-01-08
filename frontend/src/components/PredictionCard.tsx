@@ -3,7 +3,7 @@ import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
-import { GetPredictionQuery } from '../generated/graphql';
+import { GetPredictionQuery } from '../types/__generated__/graphql';
 
 /**
  * Props for PredictionCard component

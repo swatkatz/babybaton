@@ -130,7 +130,7 @@ type ComplexityRoot struct {
 		EndActivity         func(childComplexity int, activityID string, endTime *time.Time) int
 		JoinFamily          func(childComplexity int, familyName string, password string, caregiverName string, deviceID string, deviceName *string) int
 		LeaveFamily         func(childComplexity int) int
-		ParseVoiceInput     func(childComplexity int, text string) int
+		ParseVoiceInput     func(childComplexity int, audioFile graphql.Upload) int
 		StartCareSession    func(childComplexity int) int
 		UpdateBabyName      func(childComplexity int, babyName string) int
 	}
@@ -187,7 +187,7 @@ type MutationResolver interface {
 	UpdateBabyName(ctx context.Context, babyName string) (*model.Family, error)
 	LeaveFamily(ctx context.Context) (bool, error)
 	StartCareSession(ctx context.Context) (*model.CareSession, error)
-	ParseVoiceInput(ctx context.Context, text string) (*model.ParsedVoiceResult, error)
+	ParseVoiceInput(ctx context.Context, audioFile graphql.Upload) (*model.ParsedVoiceResult, error)
 	AddActivities(ctx context.Context, activities []*model.ActivityInput) (*model.CareSession, error)
 	EndActivity(ctx context.Context, activityID string, endTime *time.Time) (model.Activity, error)
 	CompleteCareSession(ctx context.Context, notes *string) (*model.CareSession, error)
@@ -601,7 +601,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ParseVoiceInput(childComplexity, args["text"].(string)), true
+		return e.complexity.Mutation.ParseVoiceInput(childComplexity, args["audioFile"].(graphql.Upload)), true
 	case "Mutation.startCareSession":
 		if e.complexity.Mutation.StartCareSession == nil {
 			break
@@ -913,6 +913,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 
 var sources = []*ast.Source{
 	{Name: "../../schema.graphql", Input: `scalar DateTime
+scalar Upload
 
 # Enums
 enum CareSessionStatus {
@@ -1120,7 +1121,7 @@ type Mutation {
   # Care Session Management
   startCareSession: CareSession!
 
-  parseVoiceInput(text: String!): ParsedVoiceResult!
+  parseVoiceInput(audioFile: Upload!): ParsedVoiceResult!
 
   addActivities(activities: [ActivityInput!]!): CareSession!
 
@@ -1257,11 +1258,11 @@ func (ec *executionContext) field_Mutation_joinFamily_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_parseVoiceInput_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "text", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "audioFile", ec.unmarshalNUpload2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload)
 	if err != nil {
 		return nil, err
 	}
-	args["text"] = arg0
+	args["audioFile"] = arg0
 	return args, nil
 }
 
@@ -3099,7 +3100,7 @@ func (ec *executionContext) _Mutation_parseVoiceInput(ctx context.Context, field
 		ec.fieldContext_Mutation_parseVoiceInput,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().ParseVoiceInput(ctx, fc.Args["text"].(string))
+			return ec.resolvers.Mutation().ParseVoiceInput(ctx, fc.Args["audioFile"].(graphql.Upload))
 		},
 		nil,
 		ec.marshalNParsedVoiceResult2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐParsedVoiceResult,
@@ -7870,6 +7871,22 @@ func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) 
 func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	_ = sel
 	res := graphql.MarshalString(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNUpload2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx context.Context, v any) (graphql.Upload, error) {
+	res, err := graphql.UnmarshalUpload(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNUpload2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx context.Context, sel ast.SelectionSet, v graphql.Upload) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalUpload(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")

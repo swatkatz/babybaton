@@ -1,4 +1,5 @@
 scalar DateTime
+scalar Upload
 
 # Enums
 enum CareSessionStatus {
@@ -206,7 +207,7 @@ type Mutation {
   # Care Session Management
   startCareSession: CareSession!
 
-  parseVoiceInput(text: String!): ParsedVoiceResult!
+  parseVoiceInput(audioFile: Upload!): ParsedVoiceResult!
 
   addActivities(activities: [ActivityInput!]!): CareSession!
 

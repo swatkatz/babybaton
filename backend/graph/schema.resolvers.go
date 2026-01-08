@@ -6,17 +6,14 @@ package graph
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/graph/model"
-	"github.com/swatkatz/babybaton/backend/internal/ai"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
 	"github.com/swatkatz/babybaton/backend/internal/mapper"
-	"github.com/swatkatz/babybaton/backend/internal/middleware"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -184,42 +181,26 @@ func (r *mutationResolver) StartCareSession(ctx context.Context) (*model.CareSes
 }
 
 // ParseVoiceInput is the resolver for the parseVoiceInput field.
-func (r *mutationResolver) ParseVoiceInput(ctx context.Context, text string) (*model.ParsedVoiceResult, error) {
-	// Initialize Claude client
-	claudeClient := ai.NewClaudeClient(os.Getenv("CLAUDE_API_KEY"))
+func (r *mutationResolver) ParseVoiceInput(ctx context.Context, audioFile graphql.Upload) (*model.ParsedVoiceResult, error) {
+	// TODO: Step 1 - Send audio file to OpenAI Whisper API for transcription
+	// TODO: Step 2 - Get transcribed text
+	// TODO: Step 3 - Send transcribed text to Claude (existing logic below)
 
-	// Get timezone from context
-	timezone := middleware.GetTimezone(ctx)
-
-	// Call Claude API to parse with timezone
-	claudeResponse, err := claudeClient.ParseVoiceInput(text, time.Now(), timezone)
-	if err != nil {
-		return &model.ParsedVoiceResult{
-			Success: false,
-			RawText: text,
-			Errors:  []string{fmt.Sprintf("Failed to parse: %v", err)},
-		}, nil
-	}
-
-	// Parse JSON response
-	var activities []map[string]interface{}
-	if err := json.Unmarshal([]byte(claudeResponse), &activities); err != nil {
-		return &model.ParsedVoiceResult{
-			Success: false,
-			RawText: text,
-			Errors:  []string{"Failed to parse Claude response"},
-		}, nil
-	}
-
-	// Convert to ActivityInput using ai package
-	parsedActivities, errors := ai.ConvertToParsedActivities(activities)
-
+	// For now, return an error until Whisper integration is implemented
 	return &model.ParsedVoiceResult{
-		Success:          len(errors) == 0,
-		ParsedActivities: parsedActivities,
-		Errors:           errors,
-		RawText:          text,
+		Success: false,
+		RawText: "",
+		Errors:  []string{"Audio transcription not yet implemented - need to integrate OpenAI Whisper API"},
 	}, nil
+
+	// EXISTING LOGIC (will be used after Whisper transcription):
+	// Initialize Claude client
+	// claudeClient := ai.NewClaudeClient(os.Getenv("CLAUDE_API_KEY"))
+	// Get timezone from context
+	// timezone := middleware.GetTimezone(ctx)
+	// Call Claude API to parse with timezone using transcribed text
+	// claudeResponse, err := claudeClient.ParseVoiceInput(transcribedText, time.Now(), timezone)
+	// ... rest of existing logic
 }
 
 // AddActivities is the resolver for the addActivities field.
@@ -304,15 +285,3 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *mutationResolver) AddActivitiesFromVoice(ctx context.Context, text string) (*model.CareSession, error) {
-	panic(fmt.Errorf("not implemented: AddActivitiesFromVoice - addActivitiesFromVoice"))
-}
-*/

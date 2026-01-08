@@ -12,7 +12,7 @@ import { Utensils, Droplets, Moon } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { formatDuration, formatTime } from '../utils/time';
-import { GetCurrentSessionQuery } from '../generated/graphql';
+import { GetCurrentSessionQuery } from '../types/__generated__/graphql';
 /**
  * ActivityItem Component
  * Displays a single activity (feed, diaper, or sleep)

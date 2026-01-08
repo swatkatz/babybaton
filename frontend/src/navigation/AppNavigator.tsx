@@ -9,7 +9,7 @@ import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { CreateFamilyScreen } from '../screens/CreateFamilyScreen';
 import { JoinFamilyScreen } from '../screens/JoinFamilyScreen';
 import { CustomHeader } from '../components/CustomHeader';
-import { GetPredictionQuery } from '../generated/graphql';
+import { GetPredictionQuery } from '../types/__generated__/graphql';
 import { useAuth } from '../hooks/useAuth';
 
 // Define the route params for type safety

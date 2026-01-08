@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
-import { GetRecentSessionsQuery } from '../generated/graphql';
+import { GetRecentSessionsQuery } from '../types/__generated__/graphql';
 import {
   formatDuration,
   formatMinutesToDuration,

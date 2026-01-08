@@ -8,12 +8,13 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Platform,
 } from 'react-native';
-import { Audio } from 'expo-av';
 import { useMutation } from '@apollo/client/react';
-import { PARSE_VOICE_INPUT } from '../graphql/mutations';
+import { useAudioRecorder, RecordingPresets } from 'expo-audio';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { ParseVoiceInputDocument } from '../types/__generated__/graphql';
 
 interface VoiceInputModalProps {
   visible: boolean;
@@ -26,16 +27,14 @@ export function VoiceInputModal({
   onClose,
   onActivitiesParsed,
 }: VoiceInputModalProps) {
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [transcribedText, setTranscribedText] = useState('');
   const [waveAnimation] = useState(new Animated.Value(0));
 
-  const [parseVoiceInput] = useMutation(PARSE_VOICE_INPUT);
+  const [parseVoiceInput] = useMutation(ParseVoiceInputDocument);
 
   useEffect(() => {
-    if (isRecording) {
+    if (audioRecorder.isRecording) {
       // Animate waveform while recording
       Animated.loop(
         Animated.sequence([
@@ -54,94 +53,66 @@ export function VoiceInputModal({
     } else {
       waveAnimation.setValue(0);
     }
-  }, [isRecording]);
-
-  const requestPermissions = async () => {
-    try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'Microphone access is required to record voice input.'
-        );
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error('Error requesting permissions:', error);
-      Alert.alert('Error', 'Failed to request microphone permissions');
-      return false;
-    }
-  };
+  }, [audioRecorder.isRecording]);
 
   const startRecording = async () => {
     try {
-      const hasPermission = await requestPermissions();
-      if (!hasPermission) return;
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-
-      setRecording(newRecording);
-      setIsRecording(true);
+      // expo-audio handles permissions automatically
+      audioRecorder.record();
     } catch (error) {
       console.error('Failed to start recording:', error);
-      Alert.alert('Error', 'Failed to start recording');
+      Alert.alert('Error', 'Failed to start recording: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
   const stopRecording = async () => {
-    if (!recording) return;
-
     try {
-      setIsRecording(false);
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      });
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
 
-      const uri = recording.getURI();
+      if (!uri) {
+        Alert.alert('Error', 'No recording found');
+        return;
+      }
+
       console.log('Recording stopped and stored at', uri);
-
-      // For now, we'll use a placeholder transcription
-      // In a real implementation, you'd send the audio to a speech-to-text service
       setIsProcessing(true);
 
-      // Simulate transcription (replace with actual service call)
-      setTimeout(() => {
-        const mockTranscription =
-          'Fed baby 120ml at 3pm, changed diaper at 4pm';
-        setTranscribedText(mockTranscription);
-        handleTranscription(mockTranscription);
-      }, 1500);
+      // Upload the audio file to the backend
+      await uploadAndParse(uri);
     } catch (error) {
       console.error('Failed to stop recording:', error);
-      Alert.alert('Error', 'Failed to stop recording');
+      Alert.alert('Error', 'Failed to stop recording: ' + (error instanceof Error ? error.message : 'Unknown error'));
       setIsProcessing(false);
     }
   };
 
-  const handleTranscription = async (text: string) => {
+  const uploadAndParse = async (audioUri: string) => {
     try {
-      console.log('Parsing voice input:', { text });
+      // Create a File object from the audio URI
+      const response = await fetch(audioUri);
+      const blob = await response.blob();
+      const file = new File([blob], 'recording' + Platform.select({
+        ios: '.m4a',
+        android: '.m4a',
+        default: '.webm',
+      }), {
+        type: blob.type,
+      });
 
-      const { data, errors } = await parseVoiceInput({
+      console.log('Uploading audio file:', { name: file.name, type: file.type, size: file.size });
+
+      const result = await parseVoiceInput({
         variables: {
-          text,
+          audioFile: file,
         },
       });
 
       setIsProcessing(false);
 
       // Check for GraphQL errors
-      if (errors && errors.length > 0) {
-        console.error('GraphQL errors:', errors);
+      if (result.error) {
+        console.error('GraphQL error:', result.error);
         Alert.alert(
           'Backend Error',
           'Failed to parse voice input. Please check the backend logs.'
@@ -149,38 +120,30 @@ export function VoiceInputModal({
         return;
       }
 
-      if (data?.parseVoiceInput?.success) {
-        onActivitiesParsed({
-          ...data.parseVoiceInput,
-          rawText: text,
-        });
+      if (result.data?.parseVoiceInput?.success) {
+        onActivitiesParsed(result.data.parseVoiceInput);
         handleClose();
       } else {
         const errorMsg =
-          data?.parseVoiceInput?.errors?.join(', ') ||
+          result.data?.parseVoiceInput?.errors?.join(', ') ||
           'Failed to parse voice input';
         Alert.alert('Parse Error', errorMsg);
       }
     } catch (error: any) {
-      console.error('Error parsing voice input:', error);
-      Alert.alert('Error', 'Failed to process voice input: ' + (error.message || 'Unknown error'));
+      console.error('Error uploading/parsing audio:', error);
+      Alert.alert('Error', 'Failed to process audio: ' + (error.message || 'Unknown error'));
       setIsProcessing(false);
     }
   };
 
   const handleClose = () => {
-    setRecording(null);
-    setIsRecording(false);
     setIsProcessing(false);
-    setTranscribedText('');
     onClose();
   };
 
   const handleCancel = async () => {
-    if (isRecording && recording) {
-      await recording.stopAndUnloadAsync();
-      setRecording(null);
-      setIsRecording(false);
+    if (audioRecorder.isRecording) {
+      await audioRecorder.stop();
     }
     handleClose();
   };
@@ -213,20 +176,15 @@ export function VoiceInputModal({
               <View style={styles.processingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.processingText}>
-                  Processing voice input...
+                  Processing audio...
                 </Text>
-                {transcribedText ? (
-                  <Text style={styles.transcribedText}>
-                    "{transcribedText}"
-                  </Text>
-                ) : null}
               </View>
             ) : (
               <>
                 {/* Microphone Icon with Animation - Tappable */}
                 <TouchableOpacity
                   style={styles.microphoneContainer}
-                  onPress={isRecording ? stopRecording : startRecording}
+                  onPress={audioRecorder.isRecording ? stopRecording : startRecording}
                   activeOpacity={0.7}
                 >
                   <Animated.View
@@ -234,7 +192,7 @@ export function VoiceInputModal({
                       styles.waveform,
                       {
                         transform: [{ scale: waveScale }],
-                        opacity: isRecording ? 0.3 : 0,
+                        opacity: audioRecorder.isRecording ? 0.3 : 0,
                       },
                     ]}
                   />
@@ -243,13 +201,13 @@ export function VoiceInputModal({
 
                 {/* Status Text */}
                 <Text style={styles.statusText}>
-                  {isRecording
+                  {audioRecorder.isRecording
                     ? 'Tap the microphone to stop'
                     : 'Tap the microphone to start'}
                 </Text>
 
                 {/* Instructions */}
-                {!isRecording && (
+                {!audioRecorder.isRecording && (
                   <View style={styles.instructionsContainer}>
                     <Text style={styles.instructionsTitle}>Examples:</Text>
                     <Text style={styles.instruction}>

@@ -9,18 +9,19 @@ import {
   Alert,
   Clipboard,
 } from 'react-native';
+import { useQuery } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
 import { spacing, typography, layout } from '../theme/spacing';
 import { useAuth } from '../hooks/useAuth';
-import { useGetFamilySettingsQuery } from '../generated/graphql';
+import { GetFamilySettingsDocument } from '../types/__generated__/graphql';
 
 type Props = StackScreenProps<RootStackParamList, 'Settings'>;
 
 export function SettingsScreen({ navigation }: Props) {
   const { authData, logout } = useAuth();
-  const { data, loading, error } = useGetFamilySettingsQuery();
+  const { data, loading, error } = useQuery(GetFamilySettingsDocument);
 
   const handleCopyPassword = () => {
     if (data?.getMyFamily?.password) {

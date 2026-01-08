@@ -1,7 +1,15 @@
 // src/screens/DashboardScreen.tsx
 
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
+import { useQuery } from '@apollo/client/react';
 import { PredictionCard } from '../components/PredictionCard';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -12,11 +20,10 @@ import { ActivityConfirmationModal } from '../components/ActivityConfirmationMod
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import {
-  useGetPredictionQuery,
-  useGetCurrentSessionQuery,
-  useGetRecentSessionsQuery,
-  CareSession,
-} from '../generated/graphql';
+  GetPredictionDocument,
+  GetCurrentSessionDocument,
+  GetRecentSessionsDocument,
+} from '../types/__generated__/graphql';
 
 /**
  * Dashboard Screen - Main overview screen showing:
@@ -28,26 +35,27 @@ type Props = StackScreenProps<RootStackParamList, 'Dashboard'>;
 
 export function DashboardScreen({ navigation }: Props) {
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
-  const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
+  const [confirmationModalVisible, setConfirmationModalVisible] =
+    useState(false);
   const [parsedResult, setParsedResult] = useState<any>(null);
 
   const {
     data: predictionData,
     loading: predictionLoading,
     error: predictionError,
-  } = useGetPredictionQuery();
+  } = useQuery(GetPredictionDocument);
 
   const {
     data: sessionData,
     loading: sessionLoading,
     error: sessionError,
-  } = useGetCurrentSessionQuery();
+  } = useQuery(GetCurrentSessionDocument);
 
   const {
     data: recentSessionsData,
     loading: recentSessionsLoading,
     error: recentSessionsError,
-  } = useGetRecentSessionsQuery({
+  } = useQuery(GetRecentSessionsDocument, {
     variables: { limit: 3 },
   });
 
@@ -139,7 +147,7 @@ export function DashboardScreen({ navigation }: Props) {
         {/* Recent Sessions List */}
         {recentSessionsLoading && <Text>Loading recent sessions...</Text>}
         {recentSessionsError && <Text>Error loading recent sessions</Text>}
-        {recentSessions.map((session: CareSession) => (
+        {recentSessions.map((session) => (
           <View key={session.id}>
             <RecentSessionCard
               session={session}

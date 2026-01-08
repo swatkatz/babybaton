@@ -10,13 +10,14 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useMutation } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
 import { spacing, typography, layout } from '../theme/spacing';
 import deviceService from '../services/deviceService';
 import { useAuth } from '../hooks/useAuth';
-import { useCreateFamilyMutation } from '../generated/graphql';
+import { CreateFamilyDocument } from '../types/__generated__/graphql';
 
 type Props = StackScreenProps<RootStackParamList, 'CreateFamily'>;
 
@@ -31,7 +32,7 @@ export function CreateFamilyScreen({ navigation }: Props) {
   const [caregiverName, setCaregiverName] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [createFamily, { loading }] = useCreateFamilyMutation();
+  const [createFamily, { loading }] = useMutation(CreateFamilyDocument);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};

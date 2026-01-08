@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { useQuery } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { useGetCareSessionQuery, Activity } from '../generated/graphql';
+import { GetCareSessionDocument, Activity } from '../types/__generated__/graphql';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { ActivityItem } from '../components/ActivityItem';
@@ -13,7 +14,7 @@ type Props = StackScreenProps<RootStackParamList, 'SessionDetail'>;
 export function SessionDetailScreen({ route }: Props) {
   const { sessionId } = route.params;
 
-  const { data, loading, error } = useGetCareSessionQuery({
+  const { data, loading, error } = useQuery(GetCareSessionDocument, {
     variables: { id: sessionId },
   });
 
