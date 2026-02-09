@@ -54,6 +54,40 @@ func CareSessionToGraphQL(s *domain.CareSession) *model.CareSession {
 	}
 }
 
+// ActivityToGraphQL converts a domain Activity to a GraphQL model (concrete type based on ActivityType)
+func ActivityToGraphQL(a *domain.Activity) model.Activity {
+	if a == nil {
+		return nil
+	}
+
+	// Return appropriate concrete type based on activity type
+	switch a.ActivityType {
+	case domain.ActivityTypeFeed:
+		return &model.FeedActivity{
+			ID:           a.ID.String(),
+			ActivityType: model.ActivityType(a.ActivityType),
+			CreatedAt:    a.CreatedAt,
+			// FeedDetails loaded via resolver
+		}
+	case domain.ActivityTypeDiaper:
+		return &model.DiaperActivity{
+			ID:           a.ID.String(),
+			ActivityType: model.ActivityType(a.ActivityType),
+			CreatedAt:    a.CreatedAt,
+			// DiaperDetails loaded via resolver
+		}
+	case domain.ActivityTypeSleep:
+		return &model.SleepActivity{
+			ID:           a.ID.String(),
+			ActivityType: model.ActivityType(a.ActivityType),
+			CreatedAt:    a.CreatedAt,
+			// SleepDetails loaded via resolver
+		}
+	default:
+		return nil
+	}
+}
+
 // FeedDetailsToGraphQL converts domain FeedDetails to GraphQL model
 func FeedDetailsToGraphQL(fd *domain.FeedDetails) *model.FeedDetails {
 	if fd == nil {

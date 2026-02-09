@@ -1,10 +1,11 @@
-import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
+import { ApolloClient, InMemoryCache } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
+import UploadHttpLink from 'apollo-upload-client/UploadHttpLink.mjs';
 import * as Localization from 'expo-localization';
 import authService from '../services/authService';
 
-// Create HTTP link to your backend
-const httpLink = new HttpLink({
+// Create upload link to your backend (supports file uploads)
+const uploadLink = new UploadHttpLink({
   uri: 'http://localhost:8080/query', // Your Go backend endpoint
 });
 
@@ -46,9 +47,9 @@ const authLink = setContext(async (_, { headers }) => {
   }
 });
 
-// Create Apollo Client with auth middleware
+// Create Apollo Client with auth middleware and upload support
 export const client = new ApolloClient({
-  link: authLink.concat(httpLink),
+  link: authLink.concat(uploadLink),
   cache: new InMemoryCache({
     typePolicies: {
       CareSession: {

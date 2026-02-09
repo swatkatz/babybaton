@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { PredictionCard } from '../components/PredictionCard';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -23,6 +23,7 @@ import {
   GetPredictionDocument,
   GetCurrentSessionDocument,
   GetRecentSessionsDocument,
+  AddActivitiesDocument,
 } from '../types/__generated__/graphql';
 
 /**
@@ -59,6 +60,8 @@ export function DashboardScreen({ navigation }: Props) {
     variables: { limit: 3 },
   });
 
+  const [addActivities, { loading: addingActivities }] = useMutation(AddActivitiesDocument);
+
   const handlePredictionPress = () => {
     const prediction = predictionData?.predictNextFeed;
     if (prediction) {
@@ -84,12 +87,48 @@ export function DashboardScreen({ navigation }: Props) {
     setConfirmationModalVisible(true);
   };
 
-  const handleConfirm = () => {
-    // For now, just show a success message
-    // Later, this will call the addActivities mutation
-    setConfirmationModalVisible(false);
-    setParsedResult(null);
-    Alert.alert('Success', 'Activities will be saved (coming soon!)');
+  const handleConfirm = async () => {
+    if (!parsedResult || !parsedResult.parsedActivities) {
+      return;
+    }
+
+    try {
+      // Convert ParsedActivity to ActivityInput format
+      // Filter out read-only fields that don't exist in input types
+      const activities = parsedResult.parsedActivities.map((activity: any) => ({
+        activityType: activity.activityType,
+        feedDetails: activity.feedDetails ? {
+          startTime: activity.feedDetails.startTime,
+          endTime: activity.feedDetails.endTime,
+          amountMl: activity.feedDetails.amountMl,
+          feedType: activity.feedDetails.feedType,
+        } : undefined,
+        diaperDetails: activity.diaperDetails ? {
+          changedAt: activity.diaperDetails.changedAt,
+          hadPoop: activity.diaperDetails.hadPoop,
+          hadPee: activity.diaperDetails.hadPee,
+        } : undefined,
+        sleepDetails: activity.sleepDetails ? {
+          startTime: activity.sleepDetails.startTime,
+          endTime: activity.sleepDetails.endTime,
+        } : undefined,
+      }));
+
+      const { data } = await addActivities({
+        variables: { activities },
+        refetchQueries: [{ query: GetCurrentSessionDocument }],
+      });
+
+      setConfirmationModalVisible(false);
+      setParsedResult(null);
+
+      if (data?.addActivities) {
+        Alert.alert('Success', 'Activities saved successfully!');
+      }
+    } catch (error) {
+      console.error('Error saving activities:', error);
+      Alert.alert('Error', 'Failed to save activities. Please try again.');
+    }
   };
 
   const handleReRecord = () => {

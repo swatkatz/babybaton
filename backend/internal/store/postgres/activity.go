@@ -24,6 +24,29 @@ func (s *PostgresStore) CreateActivity(ctx context.Context, activity *domain.Act
 	return nil
 }
 
+// GetActivityByID retrieves a single activity by ID
+func (s *PostgresStore) GetActivityByID(ctx context.Context, id uuid.UUID) (*domain.Activity, error) {
+	activity := &domain.Activity{}
+
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, care_session_id, activity_type, created_at, updated_at
+		FROM activities
+		WHERE id = $1
+	`, id).Scan(
+		&activity.ID,
+		&activity.CareSessionID,
+		&activity.ActivityType,
+		&activity.CreatedAt,
+		&activity.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get activity: %w", err)
+	}
+
+	return activity, nil
+}
+
 // GetActivitiesForSession retrieves all activities for a care session
 func (s *PostgresStore) GetActivitiesForSession(ctx context.Context, sessionID uuid.UUID) ([]*domain.Activity, error) {
 	rows, err := s.db.QueryContext(ctx, `

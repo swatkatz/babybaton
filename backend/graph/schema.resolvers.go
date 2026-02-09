@@ -6,14 +6,19 @@ package graph
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/graph/model"
+	"github.com/swatkatz/babybaton/backend/internal/ai"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
 	"github.com/swatkatz/babybaton/backend/internal/mapper"
+	"github.com/swatkatz/babybaton/backend/internal/middleware"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -182,45 +187,316 @@ func (r *mutationResolver) StartCareSession(ctx context.Context) (*model.CareSes
 
 // ParseVoiceInput is the resolver for the parseVoiceInput field.
 func (r *mutationResolver) ParseVoiceInput(ctx context.Context, audioFile graphql.Upload) (*model.ParsedVoiceResult, error) {
-	// TODO: Step 1 - Send audio file to OpenAI Whisper API for transcription
-	// TODO: Step 2 - Get transcribed text
-	// TODO: Step 3 - Send transcribed text to Claude (existing logic below)
+	// Step 1: Initialize clients
+	whisperClient := ai.NewWhisperClient()
+	claudeClient := ai.NewClaudeClient(os.Getenv("CLAUDE_API_KEY"))
 
-	// For now, return an error until Whisper integration is implemented
+	// Step 2: Transcribe audio using Whisper
+	fmt.Printf("📤 Uploading audio: %s (%d bytes, %s)\n", audioFile.Filename, audioFile.Size, audioFile.ContentType)
+	transcribedText, err := whisperClient.TranscribeAudio(ctx, audioFile.File, audioFile.Filename)
+	if err != nil {
+		fmt.Printf("❌ Whisper transcription failed: %v\n", err)
+		return &model.ParsedVoiceResult{
+			Success: false,
+			RawText: "",
+			Errors:  []string{fmt.Sprintf("Failed to transcribe audio: %v", err)},
+		}, nil
+	}
+	fmt.Printf("✅ Whisper transcription: %q\n", transcribedText)
+
+	// Step 3: Parse transcribed text with Claude
+	timezone := middleware.GetTimezone(ctx)
+	claudeResponse, err := claudeClient.ParseVoiceInput(transcribedText, time.Now(), timezone)
+	if err != nil {
+		fmt.Printf("❌ Claude parsing failed: %v\n", err)
+		return &model.ParsedVoiceResult{
+			Success: false,
+			RawText: transcribedText,
+			Errors:  []string{fmt.Sprintf("Failed to parse voice input: %v", err)},
+		}, nil
+	}
+	fmt.Printf("✅ Claude response: %s\n", claudeResponse)
+
+	// Step 4: Parse Claude's JSON response
+	var activities []map[string]interface{}
+	if err := json.Unmarshal([]byte(claudeResponse), &activities); err != nil {
+		return &model.ParsedVoiceResult{
+			Success: false,
+			RawText: transcribedText,
+			Errors:  []string{fmt.Sprintf("Failed to parse Claude response: %v", err)},
+		}, nil
+	}
+
+	// Step 5: Convert to GraphQL types
+	parsedActivities, conversionErrors := ai.ConvertToParsedActivities(activities)
+
+	// Step 6: Return result
+	fmt.Printf("✅ Successfully parsed %d activities\n", len(parsedActivities))
+	for i, activity := range parsedActivities {
+		fmt.Printf("   Activity %d: Type=%s\n", i+1, activity.ActivityType)
+	}
+	if len(conversionErrors) > 0 {
+		fmt.Printf("⚠️  Conversion errors: %v\n", conversionErrors)
+	}
+
 	return &model.ParsedVoiceResult{
-		Success: false,
-		RawText: "",
-		Errors:  []string{"Audio transcription not yet implemented - need to integrate OpenAI Whisper API"},
+		Success:          true,
+		RawText:          transcribedText,
+		ParsedActivities: parsedActivities,
+		Errors:           conversionErrors,
 	}, nil
-
-	// EXISTING LOGIC (will be used after Whisper transcription):
-	// Initialize Claude client
-	// claudeClient := ai.NewClaudeClient(os.Getenv("CLAUDE_API_KEY"))
-	// Get timezone from context
-	// timezone := middleware.GetTimezone(ctx)
-	// Call Claude API to parse with timezone using transcribed text
-	// claudeResponse, err := claudeClient.ParseVoiceInput(transcribedText, time.Now(), timezone)
-	// ... rest of existing logic
 }
 
 // AddActivities is the resolver for the addActivities field.
 func (r *mutationResolver) AddActivities(ctx context.Context, activities []*model.ActivityInput) (*model.CareSession, error) {
-	panic(fmt.Errorf("not implemented: AddActivities - addActivities"))
+	// Step 1: Get authenticated user
+	caregiverID, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	// Step 2: Get or create in_progress session
+	session, err := r.store.GetInProgressSessionForFamily(ctx, familyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-progress session: %w", err)
+	}
+
+	if session == nil {
+		// No active session, create one
+		now := time.Now()
+		session = &domain.CareSession{
+			ID:          uuid.New(),
+			CaregiverID: caregiverID,
+			FamilyID:    familyID,
+			Status:      domain.StatusInProgress,
+			StartedAt:   now,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		if err := r.store.CreateCareSession(ctx, session); err != nil {
+			return nil, fmt.Errorf("failed to create care session: %w", err)
+		}
+		fmt.Printf("✨ Created new care session: %s\n", session.ID)
+	}
+
+	// Step 3: Add each activity
+	fmt.Printf("📝 Adding %d activities to session %s\n", len(activities), session.ID)
+	for i, activityInput := range activities {
+		now := time.Now()
+
+		// Convert GraphQL ActivityType (FEED, DIAPER, SLEEP) to domain ActivityType (feed, diaper, sleep)
+		activityType := strings.ToLower(string(activityInput.ActivityType))
+
+		activity := &domain.Activity{
+			ID:            uuid.New(),
+			CareSessionID: session.ID,
+			ActivityType:  domain.ActivityType(activityType),
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}
+
+		if err := r.store.CreateActivity(ctx, activity); err != nil {
+			return nil, fmt.Errorf("failed to create activity: %w", err)
+		}
+
+		// Create activity details based on type
+		switch activityInput.ActivityType {
+		case model.ActivityTypeFeed:
+			if activityInput.FeedDetails == nil {
+				return nil, fmt.Errorf("feed activity requires feedDetails")
+			}
+
+			// Convert GraphQL FeedType (BREAST_MILK, FORMULA) to domain FeedType (breast_milk, formula)
+			var feedType *domain.FeedType
+			if activityInput.FeedDetails.FeedType != nil {
+				ft := domain.FeedType(strings.ToLower(string(*activityInput.FeedDetails.FeedType)))
+				feedType = &ft
+			}
+
+			// Convert *int32 to *int for AmountMl
+			var amountMl *int
+			if activityInput.FeedDetails.AmountMl != nil {
+				val := int(*activityInput.FeedDetails.AmountMl)
+				amountMl = &val
+			}
+
+			details := &domain.FeedDetails{
+				ID:         uuid.New(),
+				ActivityID: activity.ID,
+				StartTime:  activityInput.FeedDetails.StartTime,
+				EndTime:    activityInput.FeedDetails.EndTime,
+				AmountMl:   amountMl,
+				FeedType:   feedType,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			}
+			fmt.Printf("📝 Creating feed details for activity %s (feed_type: %v)\n", activity.ID, feedType)
+			if err := r.store.CreateFeedDetails(ctx, details); err != nil {
+				return nil, fmt.Errorf("failed to create feed details: %w", err)
+			}
+			fmt.Printf("✅ Feed details created successfully\n")
+
+		case model.ActivityTypeDiaper:
+			if activityInput.DiaperDetails == nil {
+				return nil, fmt.Errorf("diaper activity requires diaperDetails")
+			}
+			hadPee := false
+			if activityInput.DiaperDetails.HadPee != nil {
+				hadPee = *activityInput.DiaperDetails.HadPee
+			}
+			details := &domain.DiaperDetails{
+				ID:         uuid.New(),
+				ActivityID: activity.ID,
+				ChangedAt:  activityInput.DiaperDetails.ChangedAt,
+				HadPoop:    activityInput.DiaperDetails.HadPoop,
+				HadPee:     hadPee,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			}
+			if err := r.store.CreateDiaperDetails(ctx, details); err != nil {
+				return nil, fmt.Errorf("failed to create diaper details: %w", err)
+			}
+
+		case model.ActivityTypeSleep:
+			if activityInput.SleepDetails == nil {
+				return nil, fmt.Errorf("sleep activity requires sleepDetails")
+			}
+			var durationMinutes *int
+			if activityInput.SleepDetails.EndTime != nil {
+				duration := int(activityInput.SleepDetails.EndTime.Sub(activityInput.SleepDetails.StartTime).Minutes())
+				durationMinutes = &duration
+			}
+			details := &domain.SleepDetails{
+				ID:              uuid.New(),
+				ActivityID:      activity.ID,
+				StartTime:       activityInput.SleepDetails.StartTime,
+				EndTime:         activityInput.SleepDetails.EndTime,
+				DurationMinutes: durationMinutes,
+				CreatedAt:       now,
+				UpdatedAt:       now,
+			}
+			if err := r.store.CreateSleepDetails(ctx, details); err != nil {
+				return nil, fmt.Errorf("failed to create sleep details: %w", err)
+			}
+		}
+
+		fmt.Printf("   ✅ Activity %d: %s\n", i+1, activity.ActivityType)
+	}
+
+	// Step 4: Return the updated session
+	return mapper.CareSessionToGraphQL(session), nil
 }
 
 // EndActivity is the resolver for the endActivity field.
 func (r *mutationResolver) EndActivity(ctx context.Context, activityID string, endTime *time.Time) (model.Activity, error) {
-	panic(fmt.Errorf("not implemented: EndActivity - endActivity"))
+	// Require authentication
+	_, _, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	activityUUID, err := uuid.Parse(activityID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid activity ID: %w", err)
+	}
+
+	// Get the activity
+	activity, err := r.store.GetActivityByID(ctx, activityUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get activity: %w", err)
+	}
+
+	// Only sleep activities can be ended
+	if activity.ActivityType != domain.ActivityTypeSleep {
+		return nil, fmt.Errorf("only sleep activities can be ended")
+	}
+
+	// Get sleep details and update end time
+	sleepDetails, err := r.store.GetSleepDetails(ctx, activityUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sleep details: %w", err)
+	}
+
+	now := time.Now()
+	if endTime == nil {
+		endTime = &now
+	}
+
+	sleepDetails.EndTime = endTime
+	duration := int(endTime.Sub(sleepDetails.StartTime).Minutes())
+	sleepDetails.DurationMinutes = &duration
+	sleepDetails.UpdatedAt = now
+
+	if err := r.store.UpdateSleepDetails(ctx, sleepDetails); err != nil {
+		return nil, fmt.Errorf("failed to update sleep details: %w", err)
+	}
+
+	fmt.Printf("✅ Ended sleep activity %s at %s (duration: %d minutes)\n", activityID, endTime.Format(time.RFC3339), duration)
+
+	// Return the sleep activity with details
+	return &model.SleepActivity{
+		ID:           activity.ID.String(),
+		ActivityType: model.ActivityType(activity.ActivityType),
+		CreatedAt:    activity.CreatedAt,
+		SleepDetails: mapper.SleepDetailsToGraphQL(sleepDetails),
+	}, nil
 }
 
 // CompleteCareSession is the resolver for the completeCareSession field.
 func (r *mutationResolver) CompleteCareSession(ctx context.Context, notes *string) (*model.CareSession, error) {
-	panic(fmt.Errorf("not implemented: CompleteCareSession - completeCareSession"))
+	// Require authentication
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	// Get the current in-progress session
+	session, err := r.store.GetInProgressSessionForFamily(ctx, familyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-progress session: %w", err)
+	}
+
+	if session == nil {
+		return nil, fmt.Errorf("no active session to complete")
+	}
+
+	// Update session to completed
+	now := time.Now()
+	session.Status = domain.StatusCompleted
+	session.CompletedAt = &now
+	session.Notes = notes
+	session.UpdatedAt = now
+
+	if err := r.store.UpdateCareSession(ctx, session); err != nil {
+		return nil, fmt.Errorf("failed to complete care session: %w", err)
+	}
+
+	fmt.Printf("✅ Completed care session %s\n", session.ID)
+
+	return mapper.CareSessionToGraphQL(session), nil
 }
 
 // DeleteActivity is the resolver for the deleteActivity field.
 func (r *mutationResolver) DeleteActivity(ctx context.Context, activityID string) (bool, error) {
-	panic(fmt.Errorf("not implemented: DeleteActivity - deleteActivity"))
+	// Require authentication
+	_, _, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return false, fmt.Errorf("authentication required: %w", err)
+	}
+
+	activityUUID, err := uuid.Parse(activityID)
+	if err != nil {
+		return false, fmt.Errorf("invalid activity ID: %w", err)
+	}
+
+	// Delete the activity (cascades to details via DB foreign key)
+	if err := r.store.DeleteActivity(ctx, activityUUID); err != nil {
+		return false, fmt.Errorf("failed to delete activity: %w", err)
+	}
+
+	fmt.Printf("🗑️  Deleted activity %s\n", activityID)
+
+	return true, nil
 }
 
 // CheckFamilyNameAvailable is the resolver for the checkFamilyNameAvailable field.
@@ -242,6 +518,122 @@ func (r *queryResolver) GetMyCaregiver(ctx context.Context) (*model.Caregiver, e
 	panic(fmt.Errorf("not implemented: GetMyCaregiver - getMyCaregiver"))
 }
 
+// loadCareSessionWithActivities loads all activities and details for a care session
+func (r *queryResolver) loadCareSessionWithActivities(ctx context.Context, session *domain.CareSession) (*model.CareSession, error) {
+	// Get all activities for the session
+	activities, err := r.store.GetActivitiesForSession(ctx, session.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get activities: %w", err)
+	}
+
+	fmt.Printf("📋 Loading %d activities for session %s\n", len(activities), session.ID)
+
+	// Load details for each activity and convert to GraphQL types
+	graphQLActivities := make([]model.Activity, 0, len(activities))
+
+	// Variables for summary calculation
+	var totalFeeds, totalMl, totalDiaperChanges, totalSleepMinutes int32
+	var lastFeedTime, lastSleepTime *time.Time
+	var currentlyAsleep bool
+
+	for _, activity := range activities {
+		fmt.Printf("   🔍 Processing activity %s (type: %s)\n", activity.ID, activity.ActivityType)
+		switch activity.ActivityType {
+		case domain.ActivityTypeFeed:
+			fmt.Printf("   📥 Loading feed details for activity %s\n", activity.ID)
+			feedDetails, err := r.store.GetFeedDetails(ctx, activity.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get feed details: %w", err)
+			}
+			fmt.Printf("   ✅ Feed details loaded successfully\n")
+
+			graphQLActivities = append(graphQLActivities, &model.FeedActivity{
+				ID:           activity.ID.String(),
+				ActivityType: model.ActivityType(strings.ToUpper(string(activity.ActivityType))),
+				CreatedAt:    activity.CreatedAt,
+				FeedDetails:  mapper.FeedDetailsToGraphQL(feedDetails),
+			})
+
+			// Update summary
+			totalFeeds++
+			if feedDetails.AmountMl != nil {
+				totalMl += int32(*feedDetails.AmountMl)
+			}
+			feedTime := feedDetails.StartTime
+			if lastFeedTime == nil || feedTime.After(*lastFeedTime) {
+				lastFeedTime = &feedTime
+			}
+
+		case domain.ActivityTypeDiaper:
+			diaperDetails, err := r.store.GetDiaperDetails(ctx, activity.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get diaper details: %w", err)
+			}
+
+			graphQLActivities = append(graphQLActivities, &model.DiaperActivity{
+				ID:            activity.ID.String(),
+				ActivityType:  model.ActivityType(strings.ToUpper(string(activity.ActivityType))),
+				CreatedAt:     activity.CreatedAt,
+				DiaperDetails: mapper.DiaperDetailsToGraphQL(diaperDetails),
+			})
+
+			// Update summary
+			totalDiaperChanges++
+
+		case domain.ActivityTypeSleep:
+			sleepDetails, err := r.store.GetSleepDetails(ctx, activity.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get sleep details: %w", err)
+			}
+
+			graphQLActivities = append(graphQLActivities, &model.SleepActivity{
+				ID:           activity.ID.String(),
+				ActivityType: model.ActivityType(strings.ToUpper(string(activity.ActivityType))),
+				CreatedAt:    activity.CreatedAt,
+				SleepDetails: mapper.SleepDetailsToGraphQL(sleepDetails),
+			})
+
+			// Update summary
+			sleepTime := sleepDetails.StartTime
+			if lastSleepTime == nil || sleepTime.After(*lastSleepTime) {
+				lastSleepTime = &sleepTime
+			}
+			if sleepDetails.DurationMinutes != nil {
+				totalSleepMinutes += int32(*sleepDetails.DurationMinutes)
+			}
+			if sleepDetails.EndTime == nil {
+				currentlyAsleep = true
+			}
+		}
+	}
+
+	// Get caregiver
+	caregiver, err := r.store.GetCaregiverByID(ctx, session.CaregiverID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get caregiver: %w", err)
+	}
+
+	// Build GraphQL response
+	return &model.CareSession{
+		ID:          session.ID.String(),
+		Caregiver:   mapper.CaregiverToGraphQL(caregiver),
+		Status:      model.CareSessionStatus(strings.ToUpper(string(session.Status))),
+		StartedAt:   session.StartedAt,
+		CompletedAt: session.CompletedAt,
+		Activities:  graphQLActivities,
+		Notes:       session.Notes,
+		Summary: &model.CareSessionSummary{
+			TotalFeeds:         totalFeeds,
+			TotalMl:            totalMl,
+			TotalDiaperChanges: totalDiaperChanges,
+			TotalSleepMinutes:  totalSleepMinutes,
+			LastFeedTime:       lastFeedTime,
+			LastSleepTime:      lastSleepTime,
+			CurrentlyAsleep:    currentlyAsleep,
+		},
+	}, nil
+}
+
 // GetRecentCareSessions is the resolver for the getRecentCareSessions field.
 func (r *queryResolver) GetRecentCareSessions(ctx context.Context, limit *int32) ([]*model.CareSession, error) {
 	return GetMockRecentSessions(), nil
@@ -249,7 +641,25 @@ func (r *queryResolver) GetRecentCareSessions(ctx context.Context, limit *int32)
 
 // GetCurrentSession is the resolver for the getCurrentSession field.
 func (r *queryResolver) GetCurrentSession(ctx context.Context) (*model.CareSession, error) {
-	return GetMockCurrentSession(), nil
+	// Get authenticated user
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	// Get in-progress session for family
+	session, err := r.store.GetInProgressSessionForFamily(ctx, familyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-progress session: %w", err)
+	}
+
+	// If no session exists, return nil
+	if session == nil {
+		return nil, nil
+	}
+
+	// Load activities and build GraphQL response
+	return r.loadCareSessionWithActivities(ctx, session)
 }
 
 // GetCareSession is the resolver for the getCareSession field.

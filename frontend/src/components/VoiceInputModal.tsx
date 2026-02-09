@@ -28,13 +28,14 @@ export function VoiceInputModal({
   onActivitiesParsed,
 }: VoiceInputModalProps) {
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [waveAnimation] = useState(new Animated.Value(0));
 
   const [parseVoiceInput] = useMutation(ParseVoiceInputDocument);
 
   useEffect(() => {
-    if (audioRecorder.isRecording) {
+    if (isRecording) {
       // Animate waveform while recording
       Animated.loop(
         Animated.sequence([
@@ -53,12 +54,14 @@ export function VoiceInputModal({
     } else {
       waveAnimation.setValue(0);
     }
-  }, [audioRecorder.isRecording]);
+  }, [isRecording]);
 
   const startRecording = async () => {
     try {
       // expo-audio handles permissions automatically
-      audioRecorder.record();
+      await audioRecorder.prepareToRecordAsync();
+      await audioRecorder.record();
+      setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
       Alert.alert('Error', 'Failed to start recording: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -67,6 +70,7 @@ export function VoiceInputModal({
 
   const stopRecording = async () => {
     try {
+      setIsRecording(false);
       await audioRecorder.stop();
       const uri = audioRecorder.uri;
 
@@ -75,7 +79,6 @@ export function VoiceInputModal({
         return;
       }
 
-      console.log('Recording stopped and stored at', uri);
       setIsProcessing(true);
 
       // Upload the audio file to the backend
@@ -97,10 +100,8 @@ export function VoiceInputModal({
         android: '.m4a',
         default: '.webm',
       }), {
-        type: blob.type,
+        type: blob.type || 'audio/webm',
       });
-
-      console.log('Uploading audio file:', { name: file.name, type: file.type, size: file.size });
 
       const result = await parseVoiceInput({
         variables: {
@@ -142,7 +143,8 @@ export function VoiceInputModal({
   };
 
   const handleCancel = async () => {
-    if (audioRecorder.isRecording) {
+    if (isRecording) {
+      setIsRecording(false);
       await audioRecorder.stop();
     }
     handleClose();
@@ -184,7 +186,7 @@ export function VoiceInputModal({
                 {/* Microphone Icon with Animation - Tappable */}
                 <TouchableOpacity
                   style={styles.microphoneContainer}
-                  onPress={audioRecorder.isRecording ? stopRecording : startRecording}
+                  onPress={isRecording ? stopRecording : startRecording}
                   activeOpacity={0.7}
                 >
                   <Animated.View
@@ -192,7 +194,7 @@ export function VoiceInputModal({
                       styles.waveform,
                       {
                         transform: [{ scale: waveScale }],
-                        opacity: audioRecorder.isRecording ? 0.3 : 0,
+                        opacity: isRecording ? 0.3 : 0,
                       },
                     ]}
                   />
@@ -201,13 +203,13 @@ export function VoiceInputModal({
 
                 {/* Status Text */}
                 <Text style={styles.statusText}>
-                  {audioRecorder.isRecording
+                  {isRecording
                     ? 'Tap the microphone to stop'
                     : 'Tap the microphone to start'}
                 </Text>
 
                 {/* Instructions */}
-                {!audioRecorder.isRecording && (
+                {!isRecording && (
                   <View style={styles.instructionsContainer}>
                     <Text style={styles.instructionsTitle}>Examples:</Text>
                     <Text style={styles.instruction}>

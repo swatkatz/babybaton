@@ -104,3 +104,16 @@ export const PARSE_VOICE_INPUT = gql`
     }
   }
 `;
+
+export const ADD_ACTIVITIES = gql`
+  mutation AddActivities($activities: [ActivityInput!]!) {
+    addActivities(activities: $activities) {
+      id
+      familyId
+      status
+      startedAt
+      completedAt
+      notes
+    }
+  }
+`;

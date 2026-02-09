@@ -109,6 +109,7 @@ Rules:
 2. Relative times like "at 2:30" are absolute within today
 3. Default feed type to "FORMULA" if not specified
 4. "pooped" means had_poop=true for diaper change
+5. "peed" means had_pee=true for diaper change
 
 FEED ACTIVITIES:
 - MUST have: start_time, amount_ml, feed_type

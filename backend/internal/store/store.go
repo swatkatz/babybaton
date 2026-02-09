@@ -35,6 +35,7 @@ type Store interface {
 
 	// Activity operations (details loaded separately via resolvers)
 	CreateActivity(ctx context.Context, activity *domain.Activity) error
+	GetActivityByID(ctx context.Context, id uuid.UUID) (*domain.Activity, error)
 	GetActivitiesForSession(ctx context.Context, sessionID uuid.UUID) ([]*domain.Activity, error)
 	DeleteActivity(ctx context.Context, id uuid.UUID) error
 
