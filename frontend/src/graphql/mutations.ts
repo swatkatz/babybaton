@@ -117,3 +117,13 @@ export const ADD_ACTIVITIES = gql`
     }
   }
 `;
+
+export const COMPLETE_CARE_SESSION = gql`
+  mutation CompleteCareSession($notes: String) {
+    completeCareSession(notes: $notes) {
+      id
+      status
+      completedAt
+    }
+  }
+`;

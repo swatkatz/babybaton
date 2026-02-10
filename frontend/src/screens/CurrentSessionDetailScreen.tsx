@@ -5,11 +5,17 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { GetCurrentSessionDocument, Activity } from '../types/__generated__/graphql';
+import {
+  GetCurrentSessionDocument,
+  GetRecentSessionsDocument,
+  CompleteCareSessionDocument,
+  Activity,
+} from '../types/__generated__/graphql';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { ActivityItem } from '../components/ActivityItem';
@@ -17,8 +23,14 @@ import { formatDuration, formatTime } from '../utils/time';
 
 type Props = StackScreenProps<RootStackParamList, 'CurrentSessionDetail'>;
 
-export function CurrentSessionDetailScreen({ route }: Props) {
+export function CurrentSessionDetailScreen({ navigation }: Props) {
   const { data, loading, error } = useQuery(GetCurrentSessionDocument);
+  const [completeCareSession, { loading: completing }] = useMutation(
+    CompleteCareSessionDocument,
+    {
+      refetchQueries: [GetCurrentSessionDocument, GetRecentSessionsDocument],
+    },
+  );
 
   const handleDeleteActivity = (activityId: string) => {
     console.log('Delete activity:', activityId);
@@ -31,8 +43,24 @@ export function CurrentSessionDetailScreen({ route }: Props) {
   };
 
   const handleCompleteSession = () => {
-    console.log('Complete session');
-    // TODO: Implement complete session mutation
+    Alert.alert(
+      'Complete Session',
+      'Are you sure you want to complete this care session?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Complete',
+          onPress: async () => {
+            try {
+              await completeCareSession();
+              navigation.goBack();
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Failed to complete session');
+            }
+          },
+        },
+      ],
+    );
   };
 
   if (loading) {
@@ -141,10 +169,13 @@ export function CurrentSessionDetailScreen({ route }: Props) {
 
         {/* Complete Session Button */}
         <TouchableOpacity
-          style={styles.completeButton}
+          style={[styles.completeButton, completing && styles.completeButtonDisabled]}
           onPress={handleCompleteSession}
+          disabled={completing}
         >
-          <Text style={styles.completeButtonText}>✓ Complete Session</Text>
+          <Text style={styles.completeButtonText}>
+            {completing ? 'Completing...' : '✓ Complete Session'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -258,6 +289,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.xl,
     alignItems: 'center',
+  },
+  completeButtonDisabled: {
+    opacity: 0.5,
   },
   completeButtonText: {
     fontSize: typography.lg,
