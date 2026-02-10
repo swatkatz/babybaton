@@ -97,19 +97,27 @@ func (c *ClaudeClient) ParseVoiceInput(text string, currentTime time.Time, timez
 }
 
 func buildVoiceParsingPrompt(voiceText string, currentTime time.Time, timezone string) string {
+	// Convert current time to the user's timezone so Claude sees the correct local time
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+	localTime := currentTime.In(loc)
+
 	return fmt.Sprintf(`You are parsing baby care voice input into structured activities.
 
-Current time: %s
-Current timezone: %s
+Current local time: %s
+Timezone: %s
 
 Voice input: "%s"
 
 Rules:
-1. "now" or "right now" = current time
-2. Relative times like "at 2:30" are absolute within today
+1. "now" or "right now" = current local time
+2. Relative times like "at 2:30" are absolute within today in the user's timezone
 3. Default feed type to "FORMULA" if not specified
 4. "pooped" means had_poop=true for diaper change
 5. "peed" means had_pee=true for diaper change
+6. ALL timestamps MUST use the user's timezone offset (e.g. -05:00), NEVER use "Z"
 
 FEED ACTIVITIES:
 - MUST have: start_time, amount_ml, feed_type
@@ -131,26 +139,26 @@ Extract all activities mentioned. Return ONLY valid JSON array (no markdown, no 
   {
     "activity_type": "FEED|DIAPER|SLEEP",
     "feed_details": {
-      "start_time": "2024-01-15T14:30:00Z",
+      "start_time": "2024-01-15T14:30:00-05:00",
       "end_time": null,
       "amount_ml": 60,
       "feed_type": "FORMULA"
     },
     "diaper_details": {
-      "changed_at": "2024-01-15T14:55:00Z",
+      "changed_at": "2024-01-15T14:55:00-05:00",
       "had_poop": true,
       "had_pee": true
     },
     "sleep_details": {
-      "start_time": "2024-01-15T15:00:00Z",
+      "start_time": "2024-01-15T15:00:00-05:00",
       "end_time": null
     }
   }
 ]
 
-If you cannot parse the input, return: {"error": "reason"}`, 
-		currentTime.Format(time.RFC3339), 
-		timezone, 
+If you cannot parse the input, return: {"error": "reason"}`,
+		localTime.Format(time.RFC3339),
+		timezone,
 		voiceText,
 	)
 }

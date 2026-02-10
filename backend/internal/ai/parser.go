@@ -48,11 +48,13 @@ func parseFeedDetailsOutput(details map[string]interface{}) *model.FeedDetails {
 
 	if startTime, ok := details["start_time"].(string); ok {
 		t, _ := time.Parse(time.RFC3339, startTime)
+		t = t.UTC()
 		fd.StartTime = t
 	}
 
 	if endTime, ok := details["end_time"].(string); ok && endTime != "" {
 		t, _ := time.Parse(time.RFC3339, endTime)
+		t = t.UTC()
 		fd.EndTime = &t
 	}
 
@@ -80,7 +82,7 @@ func parseDiaperDetailsOutput(details map[string]interface{}) *model.DiaperDetai
 
 	if changedAt, ok := details["changed_at"].(string); ok {
 		t, _ := time.Parse(time.RFC3339, changedAt)
-		dd.ChangedAt = t
+		dd.ChangedAt = t.UTC()
 	}
 
 	if hadPoop, ok := details["had_poop"].(bool); ok {
@@ -99,11 +101,13 @@ func parseSleepDetailsOutput(details map[string]interface{}) *model.SleepDetails
 
 	if startTime, ok := details["start_time"].(string); ok {
 		t, _ := time.Parse(time.RFC3339, startTime)
+		t = t.UTC()
 		sd.StartTime = t
 	}
 
 	if endTime, ok := details["end_time"].(string); ok && endTime != "" {
 		t, _ := time.Parse(time.RFC3339, endTime)
+		t = t.UTC()
 		sd.EndTime = &t
 	}
 
@@ -163,11 +167,13 @@ func parseFeedDetails(details map[string]interface{}) *model.FeedDetailsInput {
 
 	if startTime, ok := details["start_time"].(string); ok {
 		t, _ := time.Parse(time.RFC3339, startTime)
+		t = t.UTC()
 		fd.StartTime = t
 	}
 
 	if endTime, ok := details["end_time"].(string); ok && endTime != "" {
 		t, _ := time.Parse(time.RFC3339, endTime)
+		t = t.UTC()
 		fd.EndTime = &t
 	}
 
@@ -189,7 +195,7 @@ func parseDiaperDetails(details map[string]interface{}) *model.DiaperDetailsInpu
 
 	if changedAt, ok := details["changed_at"].(string); ok {
 		t, _ := time.Parse(time.RFC3339, changedAt)
-		dd.ChangedAt = t
+		dd.ChangedAt = t.UTC()
 	}
 
 	if hadPoop, ok := details["had_poop"].(bool); ok {
@@ -209,11 +215,13 @@ func parseSleepDetails(details map[string]interface{}) *model.SleepDetailsInput 
 
 	if startTime, ok := details["start_time"].(string); ok {
 		t, _ := time.Parse(time.RFC3339, startTime)
+		t = t.UTC()
 		sd.StartTime = t
 	}
 
 	if endTime, ok := details["end_time"].(string); ok && endTime != "" {
 		t, _ := time.Parse(time.RFC3339, endTime)
+		t = t.UTC()
 		sd.EndTime = &t
 	}
 
