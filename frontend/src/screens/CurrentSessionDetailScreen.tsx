@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
@@ -42,25 +41,13 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
     // TODO: Implement mark awake mutation
   };
 
-  const handleCompleteSession = () => {
-    Alert.alert(
-      'Complete Session',
-      'Are you sure you want to complete this care session?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Complete',
-          onPress: async () => {
-            try {
-              await completeCareSession();
-              navigation.goBack();
-            } catch (e: any) {
-              Alert.alert('Error', e.message ?? 'Failed to complete session');
-            }
-          },
-        },
-      ],
-    );
+  const handleCompleteSession = async () => {
+    try {
+      await completeCareSession();
+      navigation.goBack();
+    } catch (e: any) {
+      console.error('Failed to complete session:', e.message);
+    }
   };
 
   if (loading) {

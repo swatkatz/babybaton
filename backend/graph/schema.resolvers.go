@@ -539,6 +539,32 @@ func (r *mutationResolver) CompleteCareSession(ctx context.Context, notes *strin
 		return nil, fmt.Errorf("failed to complete care session: %w", err)
 	}
 
+	// End any active sleep activities
+	activities, err := r.store.GetActivitiesForSession(ctx, session.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get activities for session: %w", err)
+	}
+	for _, activity := range activities {
+		if activity.ActivityType != domain.ActivityTypeSleep {
+			continue
+		}
+		sleepDetails, err := r.store.GetSleepDetails(ctx, activity.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sleep details: %w", err)
+		}
+		if sleepDetails.EndTime != nil {
+			continue
+		}
+		sleepDetails.EndTime = &now
+		duration := int(now.Sub(sleepDetails.StartTime).Minutes())
+		sleepDetails.DurationMinutes = &duration
+		sleepDetails.UpdatedAt = now
+		if err := r.store.UpdateSleepDetails(ctx, sleepDetails); err != nil {
+			return nil, fmt.Errorf("failed to end active sleep: %w", err)
+		}
+		fmt.Printf("💤 Auto-ended sleep activity %s (duration: %d minutes)\n", activity.ID, duration)
+	}
+
 	fmt.Printf("✅ Completed care session %s\n", session.ID)
 
 	return mapper.CareSessionToGraphQL(session), nil
