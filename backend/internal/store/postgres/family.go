@@ -51,13 +51,14 @@ func (s *PostgresStore) GetFamilyByID(ctx context.Context, id uuid.UUID) (*domai
 	family := &domain.Family{}
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, name, password_hash, baby_name, created_at, updated_at
+		SELECT id, name, password_hash, password, baby_name, created_at, updated_at
 		FROM families
 		WHERE id = $1
 	`, id).Scan(
 		&family.ID,
 		&family.Name,
 		&family.PasswordHash,
+		&family.Password,
 		&family.BabyName,
 		&family.CreatedAt,
 		&family.UpdatedAt,
@@ -78,13 +79,14 @@ func (s *PostgresStore) GetFamilyByName(ctx context.Context, name string) (*doma
 	family := &domain.Family{}
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, name, password_hash, baby_name, created_at, updated_at
+		SELECT id, name, password_hash, password, baby_name, created_at, updated_at
 		FROM families
 		WHERE LOWER(name) = LOWER($1)
 	`, name).Scan(
 		&family.ID,
 		&family.Name,
 		&family.PasswordHash,
+		&family.Password,
 		&family.BabyName,
 		&family.CreatedAt,
 		&family.UpdatedAt,

@@ -144,6 +144,43 @@ func (s *PostgresStore) GetSleepDetails(ctx context.Context, activityID uuid.UUI
 	return details, nil
 }
 
+// GetRecentFeedDetailsForFamily retrieves recent feed details across all sessions for a family
+func (s *PostgresStore) GetRecentFeedDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.FeedDetails, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT fd.id, fd.activity_id, fd.start_time, fd.end_time, fd.amount_ml, fd.feed_type, fd.created_at, fd.updated_at
+		FROM feed_details fd
+		JOIN activities a ON fd.activity_id = a.id
+		JOIN care_sessions cs ON a.care_session_id = cs.id
+		WHERE cs.family_id = $1
+		ORDER BY fd.start_time DESC
+		LIMIT $2
+	`, familyID, limit)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query recent feed details: %w", err)
+	}
+	defer rows.Close()
+
+	var details []*domain.FeedDetails
+	for rows.Next() {
+		d := &domain.FeedDetails{}
+		err := rows.Scan(
+			&d.ID, &d.ActivityID, &d.StartTime, &d.EndTime,
+			&d.AmountMl, &d.FeedType, &d.CreatedAt, &d.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan feed details: %w", err)
+		}
+		details = append(details, d)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating feed details: %w", err)
+	}
+
+	return details, nil
+}
+
 // UpdateSleepDetails updates sleep details (for marking sleep as complete)
 func (s *PostgresStore) UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error {
 	result, err := s.db.ExecContext(ctx, `

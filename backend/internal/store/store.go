@@ -42,10 +42,11 @@ type Store interface {
 	// Activity detail operations (lazy loaded)
 	CreateFeedDetails(ctx context.Context, details *domain.FeedDetails) error
 	GetFeedDetails(ctx context.Context, activityID uuid.UUID) (*domain.FeedDetails, error)
-	
+	GetRecentFeedDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.FeedDetails, error)
+
 	CreateDiaperDetails(ctx context.Context, details *domain.DiaperDetails) error
 	GetDiaperDetails(ctx context.Context, activityID uuid.UUID) (*domain.DiaperDetails, error)
-	
+
 	CreateSleepDetails(ctx context.Context, details *domain.SleepDetails) error
 	GetSleepDetails(ctx context.Context, activityID uuid.UUID) (*domain.SleepDetails, error)
 	UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error

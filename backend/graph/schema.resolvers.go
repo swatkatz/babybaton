@@ -172,17 +172,85 @@ func (r *mutationResolver) JoinFamily(ctx context.Context, familyName string, pa
 
 // UpdateBabyName is the resolver for the updateBabyName field.
 func (r *mutationResolver) UpdateBabyName(ctx context.Context, babyName string) (*model.Family, error) {
-	panic(fmt.Errorf("not implemented: UpdateBabyName - updateBabyName"))
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	family, err := r.store.GetFamilyByID(ctx, familyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get family: %w", err)
+	}
+
+	family.BabyName = babyName
+	family.UpdatedAt = time.Now()
+
+	if err := r.store.UpdateFamily(ctx, family); err != nil {
+		return nil, fmt.Errorf("failed to update baby name: %w", err)
+	}
+
+	return mapper.FamilyToGraphQL(family), nil
 }
 
 // LeaveFamily is the resolver for the leaveFamily field.
 func (r *mutationResolver) LeaveFamily(ctx context.Context) (bool, error) {
-	panic(fmt.Errorf("not implemented: LeaveFamily - leaveFamily"))
+	caregiverID, _, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return false, fmt.Errorf("authentication required: %w", err)
+	}
+
+	if err := r.store.DeleteCaregiver(ctx, caregiverID); err != nil {
+		return false, fmt.Errorf("failed to leave family: %w", err)
+	}
+
+	return true, nil
 }
 
 // StartCareSession is the resolver for the startCareSession field.
 func (r *mutationResolver) StartCareSession(ctx context.Context) (*model.CareSession, error) {
-	panic(fmt.Errorf("not implemented: StartCareSession - startCareSession"))
+	caregiverID, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	// Check for existing in-progress session
+	existing, err := r.store.GetInProgressSessionForFamily(ctx, familyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for existing session: %w", err)
+	}
+	if existing != nil {
+		return nil, fmt.Errorf("a care session is already in progress")
+	}
+
+	now := time.Now()
+	session := &domain.CareSession{
+		ID:          uuid.New(),
+		CaregiverID: caregiverID,
+		FamilyID:    familyID,
+		Status:      domain.StatusInProgress,
+		StartedAt:   now,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err := r.store.CreateCareSession(ctx, session); err != nil {
+		return nil, fmt.Errorf("failed to create care session: %w", err)
+	}
+
+	caregiver, err := r.store.GetCaregiverByID(ctx, caregiverID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get caregiver: %w", err)
+	}
+
+	return &model.CareSession{
+		ID:         session.ID.String(),
+		Caregiver:  mapper.CaregiverToGraphQL(caregiver),
+		FamilyID:   familyID.String(),
+		Status:     model.CareSessionStatusInProgress,
+		StartedAt:  session.StartedAt,
+		Activities: []model.Activity{},
+		Summary:    &model.CareSessionSummary{},
+	}, nil
 }
 
 // ParseVoiceInput is the resolver for the parseVoiceInput field.
@@ -510,12 +578,32 @@ func (r *queryResolver) CheckFamilyNameAvailable(ctx context.Context, name strin
 
 // GetMyFamily is the resolver for the getMyFamily field.
 func (r *queryResolver) GetMyFamily(ctx context.Context) (*model.Family, error) {
-	panic(fmt.Errorf("not implemented: GetMyFamily - getMyFamily"))
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	family, err := r.store.GetFamilyByID(ctx, familyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get family: %w", err)
+	}
+
+	return mapper.FamilyToGraphQL(family), nil
 }
 
 // GetMyCaregiver is the resolver for the getMyCaregiver field.
 func (r *queryResolver) GetMyCaregiver(ctx context.Context) (*model.Caregiver, error) {
-	panic(fmt.Errorf("not implemented: GetMyCaregiver - getMyCaregiver"))
+	caregiverID, _, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	caregiver, err := r.store.GetCaregiverByID(ctx, caregiverID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get caregiver: %w", err)
+	}
+
+	return mapper.CaregiverToGraphQL(caregiver), nil
 }
 
 // loadCareSessionWithActivities loads all activities and details for a care session
@@ -636,7 +724,31 @@ func (r *queryResolver) loadCareSessionWithActivities(ctx context.Context, sessi
 
 // GetRecentCareSessions is the resolver for the getRecentCareSessions field.
 func (r *queryResolver) GetRecentCareSessions(ctx context.Context, limit *int32) ([]*model.CareSession, error) {
-	return GetMockRecentSessions(), nil
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	queryLimit := 10
+	if limit != nil {
+		queryLimit = int(*limit)
+	}
+
+	sessions, err := r.store.GetRecentCareSessionsForFamily(ctx, familyID, queryLimit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get recent sessions: %w", err)
+	}
+
+	var result []*model.CareSession
+	for _, session := range sessions {
+		loaded, err := r.loadCareSessionWithActivities(ctx, session)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load session %s: %w", session.ID, err)
+		}
+		result = append(result, loaded)
+	}
+
+	return result, nil
 }
 
 // GetCurrentSession is the resolver for the getCurrentSession field.
@@ -664,22 +776,22 @@ func (r *queryResolver) GetCurrentSession(ctx context.Context) (*model.CareSessi
 
 // GetCareSession is the resolver for the getCareSession field.
 func (r *queryResolver) GetCareSession(ctx context.Context, id string) (*model.CareSession, error) {
-	sessions := GetMockRecentSessions()
-	currentSession := GetMockCurrentSession()
-
-	// Check current session
-	if currentSession.ID == id {
-		return currentSession, nil
+	_, _, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
 	}
 
-	// Check recent sessions
-	for _, session := range sessions {
-		if session.ID == id {
-			return session, nil
-		}
+	sessionUUID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid session ID: %w", err)
 	}
 
-	return nil, fmt.Errorf("session not found: %s", id)
+	session, err := r.store.GetCareSessionByID(ctx, sessionUUID)
+	if err != nil {
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	return r.loadCareSessionWithActivities(ctx, session)
 }
 
 // PredictNextFeed is the resolver for the predictNextFeed field.
