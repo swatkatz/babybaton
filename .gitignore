@@ -1,2 +1,11 @@
 node_modules
 backend/.env
+.env
+
+# Compiled binaries
+backend/backend
+
+# Build artifacts
+*.apk
+*.aab
+*.ipa

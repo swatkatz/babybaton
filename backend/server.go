@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -61,11 +62,21 @@ func main() {
 	})
 
 	// Add CORS middleware
+	allowedOrigins := []string{"http://localhost:8081"}
+	if corsOrigin := os.Getenv("CORS_ALLOWED_ORIGIN"); corsOrigin != "" {
+		allowedOrigins = append(allowedOrigins, corsOrigin)
+	}
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:8081"}, // Expo web origin
+		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
 		AllowedHeaders:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+	})
+
+	// Health check endpoint for deployment platforms
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	})
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))

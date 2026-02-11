@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --ci
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: baby_baton_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.3'
+          cache-dependency-path: backend/go.sum
+
+      - name: Run migrations
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d baby_baton_test -f ../migrations/001_init_schema.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d baby_baton_test -f ../migrations/002_add_password_to_families.sql
+
+      - run: go build ./...
+      - run: go test -v -count=1 ./...
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/baby_baton_test?sslmode=disable
