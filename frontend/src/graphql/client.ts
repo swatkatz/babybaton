@@ -1,13 +1,36 @@
 import { ApolloClient, InMemoryCache } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import UploadHttpLink from 'apollo-upload-client/UploadHttpLink.mjs';
+import defaultIsExtractableFile from 'extract-files/isExtractableFile.mjs';
 import * as Localization from 'expo-localization';
+import { Platform } from 'react-native';
 import { API_URL } from '../config';
 import authService from '../services/authService';
+
+// React Native file uploads use {uri, name, type} objects instead of File/Blob
+function isExtractableFile(value: unknown): value is { uri: string; name: string; type: string } {
+  return defaultIsExtractableFile(value) ||
+    (value != null &&
+      typeof value === 'object' &&
+      'uri' in value &&
+      'name' in value &&
+      'type' in value);
+}
+
+function formDataAppendFile(formData: FormData, fieldName: string, file: any) {
+  if (Platform.OS === 'web' || file instanceof Blob) {
+    formData.append(fieldName, file, file.name);
+  } else {
+    // React Native: pass {uri, name, type} directly — RN's FormData handles it
+    formData.append(fieldName, file);
+  }
+}
 
 // Create upload link to your backend (supports file uploads)
 const uploadLink = new UploadHttpLink({
   uri: API_URL,
+  isExtractableFile,
+  formDataAppendFile,
 });
 
 // Middleware to add authentication and timezone headers to every request

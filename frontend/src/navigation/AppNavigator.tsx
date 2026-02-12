@@ -106,7 +106,7 @@ export function AppNavigator() {
             name="CurrentSessionDetail"
             component={CurrentSessionDetailScreen}
             options={{
-              title: '🍼  Current Session',
+              title: '🍼  Ongoing Session',
               header: (props) => <CustomHeader {...props} />,
             }}
           />

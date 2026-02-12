@@ -277,7 +277,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   scrollContent: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
   },
   section: {
     padding: spacing.lg,

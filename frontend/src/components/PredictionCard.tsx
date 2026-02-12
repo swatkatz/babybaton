@@ -36,13 +36,7 @@ export function PredictionCard({ prediction, onPress }: PredictionCardProps) {
         <View style={styles.contentRow}>
           <View style={styles.textContainer}>
             <Text style={styles.subtitle}>🔮 Next Feed Prediction</Text>
-            <Text style={styles.title}>Upcoming Feed</Text>
-            <Text style={styles.timeText}>Scheduled for {formattedTime}</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                📊 {prediction.confidence} confidence
-              </Text>
-            </View>
+            <Text style={styles.timeText}>{formattedTime}</Text>
           </View>
           <ChevronRight size={24} color="#fff" />
         </View>
@@ -59,7 +53,8 @@ const styles = StyleSheet.create({
   },
   gradient: {
     borderRadius: layout.radiusLarge,
-    padding: spacing.md,
+    padding: spacing.sm,
+    paddingHorizontal: spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -73,7 +68,6 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1,
-    gap: spacing.xs,
   },
   subtitle: {
     fontSize: typography.sm,
@@ -81,27 +75,10 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     fontWeight: '500',
   },
-  title: {
-    fontSize: typography.xl,
+  timeText: {
+    fontSize: typography.lg,
     color: colors.surface,
     fontWeight: 'bold',
-  },
-  timeText: {
-    fontSize: typography.base,
-    color: colors.surface,
-    opacity: 0.95,
-  },
-  badge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: layout.radiusMedium,
-    alignSelf: 'flex-start',
-    marginTop: spacing.xs,
-  },
-  badgeText: {
-    fontSize: typography.xs,
-    color: colors.surface,
-    fontWeight: '600',
+    marginTop: 2,
   },
 });

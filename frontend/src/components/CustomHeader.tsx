@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { StackHeaderProps } from '@react-navigation/stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaregiverAvatar } from './CaregiverAvatar';
 import { useAuth } from '../hooks/useAuth';
 import { colors } from '../theme/colors';
@@ -8,6 +9,7 @@ import { spacing } from '../theme/spacing';
 
 export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
   const { authData } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const handleAvatarPress = () => {
     navigation.navigate('Settings' as never);
@@ -26,7 +28,7 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
       : options.title || route.name;
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top }]}>
       <View style={styles.content}>
         {/* Back Button */}
         {canGoBack && (

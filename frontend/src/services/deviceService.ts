@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DeviceInfo from 'react-native-device-info';
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
 const DEVICE_ID_KEY = '@baby_baton:device_id';
@@ -19,18 +19,8 @@ class DeviceService {
       return storedId;
     }
 
-    // Generate new device ID
-    let newDeviceId: string;
-
-    if (Platform.OS === 'web') {
-      // For web: generate UUID
-      newDeviceId = this.generateUUID();
-    } else {
-      // For native: use device's unique ID
-      newDeviceId = await DeviceInfo.getUniqueId();
-    }
-
-    // Store for future use
+    // Generate a UUID and persist it
+    const newDeviceId = this.generateUUID();
     await AsyncStorage.setItem(DEVICE_ID_KEY, newDeviceId);
     this.deviceId = newDeviceId;
 
@@ -42,8 +32,7 @@ class DeviceService {
       return `${this.getBrowserName()} Browser`;
     }
 
-    const model = await DeviceInfo.getModel();
-    return model;
+    return Device.modelName ?? Device.deviceName ?? 'Unknown Device';
   }
 
   async clearDeviceId(): Promise<void> {

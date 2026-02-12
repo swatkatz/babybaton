@@ -34,13 +34,6 @@ describe('PredictionCard', () => {
     jest.clearAllMocks();
   });
 
-  it('should render the prediction title', () => {
-    const { getByText } = render(
-      <PredictionCard prediction={makePrediction()} onPress={onPress} />
-    );
-    expect(getByText('Upcoming Feed')).toBeTruthy();
-  });
-
   it('should render the subtitle with crystal ball emoji', () => {
     const { getByText } = render(
       <PredictionCard prediction={makePrediction()} onPress={onPress} />
@@ -53,42 +46,15 @@ describe('PredictionCard', () => {
       <PredictionCard prediction={makePrediction()} onPress={onPress} />
     );
     // The component calls toLocaleTimeString which varies by environment
-    // Just verify the "Scheduled for" prefix is there
-    expect(getByText(/Scheduled for/)).toBeTruthy();
-  });
-
-  it('should display the confidence level', () => {
-    const { getByText } = render(
-      <PredictionCard prediction={makePrediction()} onPress={onPress} />
-    );
-    expect(getByText(/HIGH confidence/)).toBeTruthy();
-  });
-
-  it('should display MEDIUM confidence', () => {
-    const prediction = makePrediction({
-      confidence: PredictionConfidence.Medium,
-    });
-    const { getByText } = render(
-      <PredictionCard prediction={prediction} onPress={onPress} />
-    );
-    expect(getByText(/MEDIUM confidence/)).toBeTruthy();
-  });
-
-  it('should display LOW confidence', () => {
-    const prediction = makePrediction({
-      confidence: PredictionConfidence.Low,
-    });
-    const { getByText } = render(
-      <PredictionCard prediction={prediction} onPress={onPress} />
-    );
-    expect(getByText(/LOW confidence/)).toBeTruthy();
+    // Just verify some time text is rendered
+    expect(getByText(/\d/)).toBeTruthy();
   });
 
   it('should call onPress when tapped', () => {
     const { getByText } = render(
       <PredictionCard prediction={makePrediction()} onPress={onPress} />
     );
-    fireEvent.press(getByText('Upcoming Feed'));
+    fireEvent.press(getByText(/Next Feed Prediction/));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useMutation } from '@apollo/client/react';
-import { useAudioRecorder, RecordingPresets } from 'expo-audio';
+import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { ParseVoiceInputDocument } from '../types/__generated__/graphql';
@@ -58,7 +58,16 @@ export function VoiceInputModal({
 
   const startRecording = async () => {
     try {
-      // expo-audio handles permissions automatically
+      // Request microphone permission
+      const { granted } = await requestRecordingPermissionsAsync();
+      if (!granted) {
+        Alert.alert('Permission Required', 'Microphone access is needed for voice input.');
+        return;
+      }
+
+      // Enable recording on iOS
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+
       await audioRecorder.prepareToRecordAsync();
       await audioRecorder.record();
       setIsRecording(true);
@@ -92,20 +101,18 @@ export function VoiceInputModal({
 
   const uploadAndParse = async (audioUri: string) => {
     try {
-      // Create a File object from the audio URI
-      const response = await fetch(audioUri);
-      const blob = await response.blob();
-      const file = new File([blob], 'recording' + Platform.select({
-        ios: '.m4a',
-        android: '.m4a',
-        default: '.webm',
-      }), {
-        type: blob.type || 'audio/webm',
-      });
+      // Create a ReactNativeFile-compatible object for apollo-upload-client
+      const extension = Platform.select({ ios: 'm4a', android: 'm4a', default: 'webm' });
+      const mimeType = Platform.select({ ios: 'audio/m4a', android: 'audio/m4a', default: 'audio/webm' });
+      const file = {
+        uri: audioUri,
+        name: `recording.${extension}`,
+        type: mimeType,
+      };
 
       const result = await parseVoiceInput({
         variables: {
-          audioFile: file,
+          audioFile: file as unknown as File,
         },
       });
 

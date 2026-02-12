@@ -155,13 +155,16 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
         )}
 
         {/* Complete Session Button */}
+        <Text style={styles.completeHint}>
+          Completing the session passes the baton to the next caregiver.
+        </Text>
         <TouchableOpacity
           style={[styles.completeButton, completing && styles.completeButtonDisabled]}
           onPress={handleCompleteSession}
           disabled={completing}
         >
           <Text style={styles.completeButtonText}>
-            {completing ? 'Completing...' : '✓ Complete Session'}
+            {completing ? 'Completing...' : 'Complete Session'}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -284,5 +287,12 @@ const styles = StyleSheet.create({
     fontSize: typography.lg,
     fontWeight: '600',
     color: colors.surface,
+  },
+  completeHint: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
 });
