@@ -9,8 +9,7 @@ import {
   Alert,
   Clipboard,
 } from 'react-native';
-import { useQuery, useMutation } from '@apollo/client/react';
-import { useApolloClient } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
