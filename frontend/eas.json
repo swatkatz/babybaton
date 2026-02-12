@@ -15,6 +15,9 @@
     },
     "production": {
       "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://babybaton-production.up.railway.app"
+      },
       "android": {},
       "ios": {}
     }
