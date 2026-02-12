@@ -9,19 +9,22 @@ import {
   Alert,
   Clipboard,
 } from 'react-native';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
+import { useApolloClient } from '@apollo/client';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
 import { spacing, typography, layout } from '../theme/spacing';
 import { useAuth } from '../hooks/useAuth';
-import { GetFamilySettingsDocument } from '../types/__generated__/graphql';
+import { GetFamilySettingsDocument, LeaveFamilyDocument } from '../types/__generated__/graphql';
 
 type Props = StackScreenProps<RootStackParamList, 'Settings'>;
 
 export function SettingsScreen({ navigation }: Props) {
   const { authData, logout } = useAuth();
+  const client = useApolloClient();
   const { data, loading, error } = useQuery(GetFamilySettingsDocument);
+  const [leaveFamily] = useMutation(LeaveFamilyDocument);
 
   const handleCopyPassword = () => {
     if (data?.getMyFamily?.password) {
@@ -33,8 +36,23 @@ export function SettingsScreen({ navigation }: Props) {
   const handleLeaveFamily = () => {
     Alert.alert(
       'Leave Family',
-      'This feature will be available soon. You will be able to leave the family and create or join a different one.',
-      [{ text: 'OK' }]
+      'Are you sure? This will remove you from the family.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await leaveFamily();
+              await client.clearStore();
+              await logout();
+            } catch (e) {
+              Alert.alert('Error', 'Failed to leave family. Please try again.');
+            }
+          },
+        },
+      ]
     );
   };
 

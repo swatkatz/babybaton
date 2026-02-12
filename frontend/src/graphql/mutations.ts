@@ -118,6 +118,12 @@ export const ADD_ACTIVITIES = gql`
   }
 `;
 
+export const LEAVE_FAMILY = gql`
+  mutation LeaveFamily {
+    leaveFamily
+  }
+`;
+
 export const COMPLETE_CARE_SESSION = gql`
   mutation CompleteCareSession($notes: String) {
     completeCareSession(notes: $notes) {
