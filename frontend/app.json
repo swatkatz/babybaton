@@ -32,8 +32,17 @@
     "plugins": [
       "expo-localization"
     ],
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b2d489b0-bbc5-4079-861e-b1187d6570d6"
+    },
     "extra": {
-      "apiUrl": ""
+      "apiUrl": "",
+      "eas": {
+        "projectId": "b2d489b0-bbc5-4079-861e-b1187d6570d6"
+      }
     }
   }
 }

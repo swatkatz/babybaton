@@ -29,6 +29,7 @@
     "expo-localization": "~17.0.7",
     "expo-speech": "~14.0.7",
     "expo-status-bar": "~3.0.8",
+    "expo-updates": "~29.0.16",
     "graphql": "^16.12.0",
     "lucide-react-native": "^0.548.0",
     "react": "19.1.0",
