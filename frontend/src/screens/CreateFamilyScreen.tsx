@@ -9,6 +9,8 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useMutation } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
@@ -104,6 +106,10 @@ export function CreateFamilyScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.scrollView}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -242,6 +248,7 @@ export function CreateFamilyScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

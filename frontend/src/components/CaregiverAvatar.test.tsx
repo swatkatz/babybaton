@@ -12,42 +12,42 @@ jest.mock('../theme/colors', () => ({
 }));
 
 describe('CaregiverAvatar', () => {
-  it('should render initials from a single-word name', () => {
+  it('should render first 2 letters from a single-word name', () => {
     const { getByText } = render(
       <CaregiverAvatar caregiverId="cg-1" caregiverName="Alice" />
     );
-    expect(getByText('A')).toBeTruthy();
+    expect(getByText('AL')).toBeTruthy();
   });
 
-  it('should render initials from a two-word name', () => {
+  it('should render first 2 letters from a two-word name', () => {
     const { getByText } = render(
       <CaregiverAvatar caregiverId="cg-1" caregiverName="Jane Doe" />
     );
-    expect(getByText('JD')).toBeTruthy();
+    expect(getByText('JA')).toBeTruthy();
   });
 
-  it('should truncate initials to 2 characters for names with more than 2 words', () => {
+  it('should render first 2 letters for names with more than 2 words', () => {
     const { getByText } = render(
       <CaregiverAvatar
         caregiverId="cg-1"
         caregiverName="Mary Jane Watson"
       />
     );
-    expect(getByText('MJ')).toBeTruthy();
+    expect(getByText('MA')).toBeTruthy();
   });
 
   it('should uppercase initials', () => {
     const { getByText } = render(
       <CaregiverAvatar caregiverId="cg-1" caregiverName="jane doe" />
     );
-    expect(getByText('JD')).toBeTruthy();
+    expect(getByText('JA')).toBeTruthy();
   });
 
   it('should use default size of 36', () => {
     const { getByText } = render(
       <CaregiverAvatar caregiverId="cg-1" caregiverName="Jane" />
     );
-    const initials = getByText('J');
+    const initials = getByText('JA');
     // The parent View (avatar) should have width/height of 36
     // We check the text element exists, verifying the component renders
     expect(initials).toBeTruthy();
@@ -57,7 +57,7 @@ describe('CaregiverAvatar', () => {
     const { getByText } = render(
       <CaregiverAvatar caregiverId="cg-1" caregiverName="Jane" size={48} />
     );
-    expect(getByText('J')).toBeTruthy();
+    expect(getByText('JA')).toBeTruthy();
   });
 
   it('should be wrapped in TouchableOpacity when onPress is provided', () => {
@@ -70,7 +70,7 @@ describe('CaregiverAvatar', () => {
       />
     );
 
-    fireEvent.press(getByText('J'));
+    fireEvent.press(getByText('JA'));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
@@ -80,6 +80,6 @@ describe('CaregiverAvatar', () => {
       <CaregiverAvatar caregiverId="cg-1" caregiverName="Jane" />
     );
     // Just verify it renders without crash
-    expect(getByText('J')).toBeTruthy();
+    expect(getByText('JA')).toBeTruthy();
   });
 });

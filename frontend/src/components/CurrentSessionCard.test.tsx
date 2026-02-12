@@ -111,7 +111,7 @@ describe('CurrentSessionCard', () => {
     const { getByText } = render(
       <CurrentSessionCard session={makeSession()} onPress={onPress} />
     );
-    expect(getByText(/Current Care Session/)).toBeTruthy();
+    expect(getByText(/Ongoing Care Session/)).toBeTruthy();
   });
 
   it('should display the caregiver name', () => {

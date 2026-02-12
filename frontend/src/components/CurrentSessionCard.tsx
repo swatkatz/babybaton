@@ -24,7 +24,7 @@ export function CurrentSessionCard({
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>📋 Current Care Session</Text>
+            <Text style={styles.title}>📋 Ongoing Care Session</Text>
             <ChevronRight size={20} color={colors.textSecondary} />
           </View>
 

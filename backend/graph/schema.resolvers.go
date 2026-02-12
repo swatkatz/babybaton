@@ -329,6 +329,44 @@ func (r *mutationResolver) AddActivities(ctx context.Context, activities []*mode
 		return nil, fmt.Errorf("failed to get in-progress session: %w", err)
 	}
 
+	// If a different caregiver is adding activities, auto-complete the old session (pass the baton)
+	if session != nil && session.CaregiverID != caregiverID {
+		now := time.Now()
+		session.Status = domain.StatusCompleted
+		session.CompletedAt = &now
+		session.UpdatedAt = now
+		if err := r.store.UpdateCareSession(ctx, session); err != nil {
+			return nil, fmt.Errorf("failed to complete previous session: %w", err)
+		}
+		// Auto-end any active sleep activities in the old session
+		oldActivities, err := r.store.GetActivitiesForSession(ctx, session.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get activities for previous session: %w", err)
+		}
+		for _, activity := range oldActivities {
+			if activity.ActivityType != domain.ActivityTypeSleep {
+				continue
+			}
+			sleepDetails, err := r.store.GetSleepDetails(ctx, activity.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get sleep details: %w", err)
+			}
+			if sleepDetails.EndTime != nil {
+				continue
+			}
+			sleepDetails.EndTime = &now
+			duration := int(now.Sub(sleepDetails.StartTime).Minutes())
+			sleepDetails.DurationMinutes = &duration
+			sleepDetails.UpdatedAt = now
+			if err := r.store.UpdateSleepDetails(ctx, sleepDetails); err != nil {
+				return nil, fmt.Errorf("failed to end active sleep: %w", err)
+			}
+			fmt.Printf("💤 Auto-ended sleep activity %s during handoff (duration: %d minutes)\n", activity.ID, duration)
+		}
+		fmt.Printf("🤝 Session handoff: completed session %s, new caregiver taking over\n", session.ID)
+		session = nil
+	}
+
 	if session == nil {
 		// No active session, create one
 		now := time.Now()

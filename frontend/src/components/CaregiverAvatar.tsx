@@ -16,12 +16,7 @@ export function CaregiverAvatar({
   onPress,
 }: CaregiverAvatarProps) {
   const color = getCaregiverColor(caregiverId);
-  const initials = caregiverName
-    .split(' ')
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+  const initials = caregiverName.slice(0, 2).toUpperCase();
 
   const avatarStyle = {
     width: size,
