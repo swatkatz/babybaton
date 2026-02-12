@@ -9,7 +9,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://YOUR-RAILWAY-URL.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://babybaton-production.up.railway.app"
       }
     },
     "production": {
