@@ -50,7 +50,7 @@ export function DashboardScreen({ navigation }: Props) {
     data: sessionData,
     loading: sessionLoading,
     error: sessionError,
-  } = useQuery(GetCurrentSessionDocument);
+  } = useQuery(GetCurrentSessionDocument, { pollInterval: 10000 });
 
   const {
     data: recentSessionsData,
@@ -58,6 +58,7 @@ export function DashboardScreen({ navigation }: Props) {
     error: recentSessionsError,
   } = useQuery(GetRecentSessionsDocument, {
     variables: { limit: 3 },
+    pollInterval: 30000,
   });
 
   const [addActivities, { loading: addingActivities }] = useMutation(AddActivitiesDocument);

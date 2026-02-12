@@ -44,11 +44,11 @@ export function SettingsScreen({ navigation }: Props) {
           onPress: async () => {
             try {
               await leaveFamily();
-              await client.clearStore();
-              await logout();
             } catch (e) {
-              Alert.alert('Error', 'Failed to leave family. Please try again.');
+              // Mutation failed (e.g. caregiver already deleted) — still log out
             }
+            await client.clearStore();
+            await logout();
           },
         },
       ]
@@ -75,6 +75,15 @@ export function SettingsScreen({ navigation }: Props) {
             onPress={() => navigation.goBack()}
           >
             <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.leaveFamilyButton, { marginTop: spacing.md }]}
+            onPress={async () => {
+              await client.clearStore();
+              await logout();
+            }}
+          >
+            <Text style={styles.leaveFamilyButtonText}>Log Out</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
