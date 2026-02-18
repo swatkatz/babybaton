@@ -10,6 +10,8 @@ jobs:
   preview:
     name: Publish Preview
     runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     permissions:
       pull-requests: write
     defaults:

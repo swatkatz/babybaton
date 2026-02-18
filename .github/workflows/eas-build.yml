@@ -20,6 +20,8 @@ jobs:
   build:
     name: Build Native App
     runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     defaults:
       run:
         working-directory: frontend
