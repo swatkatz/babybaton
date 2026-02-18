@@ -24,6 +24,7 @@
     "expo": "54.0.23",
     "expo-audio": "^1.1.1",
     "expo-av": "~16.0.7",
+    "expo-dev-client": "~6.0.20",
     "expo-device": "~8.0.10",
     "expo-linear-gradient": "^15.0.7",
     "expo-localization": "~17.0.7",

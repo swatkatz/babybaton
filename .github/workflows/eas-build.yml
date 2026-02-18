@@ -1,0 +1,38 @@
+# .github/workflows/eas-build.yml
+name: EAS Build
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform'
+        required: true
+        default: 'all'
+        type: choice
+        options: [all, ios, android]
+      profile:
+        description: 'Profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options: [preview, production]
+
+jobs:
+  build:
+    name: Build Native App
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - run: eas build --platform ${{ inputs.platform }} --profile ${{ inputs.profile }} --non-interactive --no-wait
