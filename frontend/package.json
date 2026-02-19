@@ -11,7 +11,8 @@
     "generate": "graphql-codegen --config codegen.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "build:web": "expo export --platform web"
   },
   "dependencies": {
     "@apollo/client": "^4.0.9",

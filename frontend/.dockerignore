@@ -1,0 +1,10 @@
+node_modules
+dist
+.expo
+ios
+android
+.git
+*.md
+.env*
+coverage
+__tests__
