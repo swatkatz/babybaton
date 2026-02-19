@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
@@ -61,10 +62,14 @@ func main() {
 		Cache: lru.New[string](100),
 	})
 
-	// Add CORS middleware
+	// Add CORS middleware (CORS_ALLOWED_ORIGIN supports comma-separated values)
 	allowedOrigins := []string{"http://localhost:8081"}
 	if corsOrigin := os.Getenv("CORS_ALLOWED_ORIGIN"); corsOrigin != "" {
-		allowedOrigins = append(allowedOrigins, corsOrigin)
+		for _, origin := range strings.Split(corsOrigin, ",") {
+			if o := strings.TrimSpace(origin); o != "" {
+				allowedOrigins = append(allowedOrigins, o)
+			}
+		}
 	}
 	c := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
