@@ -104,11 +104,21 @@ export function VoiceInputModal({
       // Create a ReactNativeFile-compatible object for apollo-upload-client
       const extension = Platform.select({ ios: 'm4a', android: 'm4a', default: 'webm' });
       const mimeType = Platform.select({ ios: 'audio/m4a', android: 'audio/m4a', default: 'audio/webm' });
-      const file = {
-        uri: audioUri,
-        name: `recording.${extension}`,
-        type: mimeType,
-      };
+
+      let file: any;
+      if (Platform.OS === 'web') {
+        // On web, audioUri is a blob: URL — fetch it to get an actual File object
+        const response = await fetch(audioUri);
+        const blob = await response.blob();
+        file = new File([blob], `recording.${extension}`, { type: mimeType! });
+      } else {
+        // React Native: {uri, name, type} is handled by RN's FormData
+        file = {
+          uri: audioUri,
+          name: `recording.${extension}`,
+          type: mimeType,
+        };
+      }
 
       const result = await parseVoiceInput({
         variables: {
