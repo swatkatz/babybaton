@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
@@ -13,6 +14,7 @@ import {
   GetCurrentSessionDocument,
   GetRecentSessionsDocument,
   CompleteCareSessionDocument,
+  EndActivityDocument,
   Activity,
 } from '../types/__generated__/graphql';
 import { colors, getCaregiverColor } from '../theme/colors';
@@ -30,15 +32,24 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
       refetchQueries: [GetCurrentSessionDocument, GetRecentSessionsDocument],
     },
   );
+  const [endActivity, { loading: endingActivity }] = useMutation(
+    EndActivityDocument,
+    {
+      refetchQueries: [GetCurrentSessionDocument],
+    },
+  );
 
   const handleDeleteActivity = (activityId: string) => {
     console.log('Delete activity:', activityId);
     // TODO: Implement delete mutation
   };
 
-  const handleMarkAwake = (activityId: string) => {
-    console.log('Mark as awake, activity:', activityId);
-    // TODO: Implement mark awake mutation
+  const handleMarkAwake = async (activityId: string) => {
+    try {
+      await endActivity({ variables: { activityId } });
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to mark as awake');
+    }
   };
 
   const handleCompleteSession = async () => {
@@ -121,6 +132,7 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
                 activity={activity}
                 onDelete={handleDeleteActivity}
                 onMarkAwake={handleMarkAwake}
+                markAwakeLoading={endingActivity}
               />
             ))}
           </View>

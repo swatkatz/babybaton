@@ -24,12 +24,14 @@ interface ActivityItemProps {
   activity: Activity;
   onDelete?: (activityId: string) => void;
   onMarkAwake?: (activityId: string) => void;
+  markAwakeLoading?: boolean;
 }
 
 export function ActivityItem({
   activity,
   onDelete,
   onMarkAwake,
+  markAwakeLoading,
 }: ActivityItemProps) {
   const getActivityIcon = () => {
     switch (activity.__typename) {
@@ -114,10 +116,13 @@ export function ActivityItem({
             </Text>
             {isActive && onMarkAwake && (
               <TouchableOpacity
-                style={styles.markAwakeButton}
+                style={[styles.markAwakeButton, markAwakeLoading && styles.markAwakeButtonDisabled]}
                 onPress={() => onMarkAwake(activity.id)}
+                disabled={markAwakeLoading}
               >
-                <Text style={styles.markAwakeButtonText}>☀️ Mark as Awake</Text>
+                <Text style={styles.markAwakeButtonText}>
+                  {markAwakeLoading ? 'Updating...' : '☀️ Mark as Awake'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -234,6 +239,9 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     marginTop: spacing.sm,
     alignItems: 'center',
+  },
+  markAwakeButtonDisabled: {
+    opacity: 0.5,
   },
   markAwakeButtonText: {
     fontSize: typography.sm,
