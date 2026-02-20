@@ -133,3 +133,20 @@ export const COMPLETE_CARE_SESSION = gql`
     }
   }
 `;
+
+export const END_ACTIVITY = gql`
+  mutation EndActivity($activityId: ID!, $endTime: DateTime) {
+    endActivity(activityId: $activityId, endTime: $endTime) {
+      ... on SleepActivity {
+        id
+        activityType
+        sleepDetails {
+          startTime
+          endTime
+          durationMinutes
+          isActive
+        }
+      }
+    }
+  }
+`;
