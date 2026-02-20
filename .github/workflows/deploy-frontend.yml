@@ -27,4 +27,6 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
-      - run: eas update --channel preview --message "${{ github.event.head_commit.message }}" --non-interactive
+      - run: eas update --channel preview --message "$COMMIT_MSG" --non-interactive
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
