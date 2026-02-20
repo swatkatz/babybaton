@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
 
 jobs:
   update:
@@ -27,6 +29,9 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
+      - name: Get commit subject line
+        id: msg
+        run: echo "subject=$(git log -1 --pretty=%s | head -c 200)" >> "$GITHUB_OUTPUT"
       - run: eas update --channel preview --message "$COMMIT_MSG" --non-interactive
         env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_MSG: ${{ steps.msg.outputs.subject }}
