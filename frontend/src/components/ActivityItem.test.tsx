@@ -12,10 +12,11 @@ jest.mock('lucide-react-native', () => ({
 
 // Mock react-native-gesture-handler
 jest.mock('react-native-gesture-handler', () => {
-  const { View } = require('react-native');
+  const { View, TouchableOpacity } = require('react-native');
   return {
     Swipeable: ({ children }: any) => children,
     GestureHandlerRootView: View,
+    TouchableOpacity,
   };
 });
 

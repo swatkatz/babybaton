@@ -14,6 +14,7 @@ import {
   GetCurrentSessionDocument,
   GetRecentSessionsDocument,
   CompleteCareSessionDocument,
+  DeleteActivityDocument,
   EndActivityDocument,
   Activity,
 } from '../types/__generated__/graphql';
@@ -38,10 +39,16 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
       refetchQueries: [GetCurrentSessionDocument],
     },
   );
+  const [deleteActivity] = useMutation(DeleteActivityDocument, {
+    refetchQueries: [GetCurrentSessionDocument],
+  });
 
-  const handleDeleteActivity = (activityId: string) => {
-    console.log('Delete activity:', activityId);
-    // TODO: Implement delete mutation
+  const handleDeleteActivity = async (activityId: string) => {
+    try {
+      await deleteActivity({ variables: { activityId } });
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to delete activity');
+    }
   };
 
   const handleMarkAwake = async (activityId: string) => {

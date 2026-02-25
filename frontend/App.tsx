@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { StatusBar } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApolloProvider } from '@apollo/client/react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -12,18 +13,20 @@ import { client } from './src/graphql/client';
 
 export default function App() {
   return (
-    <ApolloProvider client={client}>
-      <AuthProvider>
-        <SafeAreaProvider>
-          <NavigationContainer>
-            <StatusBar
-              barStyle="dark-content"
-              backgroundColor={colors.background}
-            />
-            <AppNavigator />
-          </NavigationContainer>
-        </SafeAreaProvider>
-      </AuthProvider>
-    </ApolloProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ApolloProvider client={client}>
+        <AuthProvider>
+          <SafeAreaProvider>
+            <NavigationContainer>
+              <StatusBar
+                barStyle="dark-content"
+                backgroundColor={colors.background}
+              />
+              <AppNavigator />
+            </NavigationContainer>
+          </SafeAreaProvider>
+        </AuthProvider>
+      </ApolloProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -134,6 +134,12 @@ export const COMPLETE_CARE_SESSION = gql`
   }
 `;
 
+export const DELETE_ACTIVITY = gql`
+  mutation DeleteActivity($activityId: ID!) {
+    deleteActivity(activityId: $activityId)
+  }
+`;
+
 export const END_ACTIVITY = gql`
   mutation EndActivity($activityId: ID!, $endTime: DateTime) {
     endActivity(activityId: $activityId, endTime: $endTime) {

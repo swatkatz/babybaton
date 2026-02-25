@@ -7,7 +7,7 @@ import {
   Animated,
   Platform,
 } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import { Swipeable, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
 import { Utensils, Droplets, Moon } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
@@ -150,12 +150,12 @@ export function ActivityItem({
           },
         ]}
       >
-        <TouchableOpacity
+        <GHTouchableOpacity
           style={styles.deleteButton}
           onPress={() => onDelete?.(activity.id)}
         >
           <Text style={styles.deleteButtonText}>Delete</Text>
-        </TouchableOpacity>
+        </GHTouchableOpacity>
       </Animated.View>
     );
   };
