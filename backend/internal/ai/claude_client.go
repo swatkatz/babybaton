@@ -49,7 +49,7 @@ func (c *ClaudeClient) ParseVoiceInput(text string, currentTime time.Time, timez
 	prompt := buildVoiceParsingPrompt(text, currentTime, timezone)
 	
 	reqBody := claudeRequest{
-		Model:     "claude-sonnet-4-6-20250514",
+		Model:     "claude-sonnet-4-6",
 		MaxTokens: 2000,
 		Messages: []claudeMessage{
 			{
