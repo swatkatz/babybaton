@@ -24,7 +24,7 @@ jest.mock('lucide-react-native', () => ({
 
 // Mock react-native-gesture-handler — render right actions inline so delete button is accessible
 jest.mock('react-native-gesture-handler', () => {
-  const { View } = require('react-native');
+  const { View, TouchableOpacity } = require('react-native');
   return {
     Swipeable: ({ children, renderRightActions }: any) => {
       const actions = renderRightActions?.(
@@ -39,6 +39,7 @@ jest.mock('react-native-gesture-handler', () => {
       );
     },
     GestureHandlerRootView: View,
+    TouchableOpacity,
   };
 });
 
