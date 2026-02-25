@@ -34,8 +34,10 @@ jobs:
       - name: Check if native build needed
         id: fingerprint
         run: |
-          current=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | grep -E '^\{' | jq -r '.hash')
-          latest=$(eas build:list --platform ios --profile preview --status finished --limit 1 --json 2>/dev/null | jq -r '.[0].runtimeVersion // ""')
+          raw_fingerprint=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null || true)
+          current=$(echo "$raw_fingerprint" | grep -E '^\{' | jq -r '.hash // empty' 2>/dev/null || echo "")
+          raw_builds=$(eas build:list --platform ios --profile preview --status finished --limit 1 --json 2>/dev/null || true)
+          latest=$(echo "$raw_builds" | grep -E '^\[' | jq -r '.[0].runtimeVersion // empty' 2>/dev/null || echo "")
           echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "latest=$latest" >> "$GITHUB_OUTPUT"
           echo "Current fingerprint: $current"
