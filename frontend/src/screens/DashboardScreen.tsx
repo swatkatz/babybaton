@@ -17,6 +17,7 @@ import { CurrentSessionCard } from '../components/CurrentSessionCard';
 import { RecentSessionCard } from '../components/RecentSessionCard';
 import { VoiceInputModal } from '../components/VoiceInputModal';
 import { ActivityConfirmationModal } from '../components/ActivityConfirmationModal';
+import { ManualEntryModal } from '../components/ManualEntryModal';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import {
@@ -24,6 +25,7 @@ import {
   GetCurrentSessionDocument,
   GetRecentSessionsDocument,
   AddActivitiesDocument,
+  ActivityInput,
 } from '../types/__generated__/graphql';
 
 /**
@@ -36,6 +38,7 @@ type Props = StackScreenProps<RootStackParamList, 'Dashboard'>;
 
 export function DashboardScreen({ navigation }: Props) {
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  const [manualEntryVisible, setManualEntryVisible] = useState(false);
   const [confirmationModalVisible, setConfirmationModalVisible] =
     useState(false);
   const [parsedResult, setParsedResult] = useState<any>(null);
@@ -143,6 +146,33 @@ export function DashboardScreen({ navigation }: Props) {
     setParsedResult(null);
   };
 
+  const handleManualEntryPress = () => {
+    setManualEntryVisible(true);
+  };
+
+  const handleManualEntrySave = async (activities: ActivityInput[]) => {
+    try {
+      const { data } = await addActivities({
+        variables: { activities },
+        refetchQueries: [{ query: GetCurrentSessionDocument }],
+      });
+
+      setManualEntryVisible(false);
+
+      if (data?.addActivities) {
+        Alert.alert('Success', 'Activity saved successfully!');
+      }
+    } catch (error) {
+      console.error('Error saving activity:', error);
+      Alert.alert('Error', 'Failed to save activity. Please try again.');
+    }
+  };
+
+  const handleSwitchToManualEntry = () => {
+    setVoiceModalVisible(false);
+    setManualEntryVisible(true);
+  };
+
   const currentSession = sessionData?.getCurrentSession;
   const recentSessions = recentSessionsData?.getRecentCareSessions ?? [];
 
@@ -198,21 +228,40 @@ export function DashboardScreen({ navigation }: Props) {
         ))}
       </ScrollView>
 
-      {/* Sticky Voice Input Button */}
-      <TouchableOpacity
-        style={styles.voiceButton}
-        onPress={handleVoiceButtonPress}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.voiceButtonIcon}>🎤</Text>
-        <Text style={styles.voiceButtonText}>Add Activity</Text>
-      </TouchableOpacity>
+      {/* Sticky Bottom Bar */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={styles.voiceButton}
+          onPress={handleVoiceButtonPress}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.voiceButtonIcon}>🎤</Text>
+          <Text style={styles.voiceButtonText}>Voice</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.manualButton}
+          onPress={handleManualEntryPress}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.manualButtonIcon}>✏️</Text>
+          <Text style={styles.manualButtonText}>Manual</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Voice Input Modal */}
       <VoiceInputModal
         visible={voiceModalVisible}
         onClose={() => setVoiceModalVisible(false)}
         onActivitiesParsed={handleActivitiesParsed}
+        onSwitchToManualEntry={handleSwitchToManualEntry}
+      />
+
+      {/* Manual Entry Modal */}
+      <ManualEntryModal
+        visible={manualEntryVisible}
+        onClose={() => setManualEntryVisible(false)}
+        onSave={handleManualEntrySave}
+        saving={addingActivities}
       />
 
       {/* Activity Confirmation Modal */}
@@ -246,29 +295,49 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
-  voiceButton: {
+  bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.primary,
-    height: 70,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    height: 70,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 8,
   },
+  voiceButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   voiceButtonIcon: {
-    fontSize: 28,
-    marginRight: spacing.sm,
+    fontSize: 24,
+    marginRight: spacing.xs,
   },
   voiceButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  manualButton: {
+    flex: 1,
+    backgroundColor: colors.primaryDark,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manualButtonIcon: {
+    fontSize: 24,
+    marginRight: spacing.xs,
+  },
+  manualButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });
