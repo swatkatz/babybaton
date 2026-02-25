@@ -6,6 +6,42 @@ GITHUB_USER="$(gh api user --jq '.login')"
 
 cd "$REPO_DIR"
 
+# Retry wrapper for claude CLI calls that may hit transient API errors (500, 429, 529)
+# Usage: claude_with_retry <claude args...>
+claude_with_retry() {
+  local max_attempts=5
+  local attempt=1
+  local backoff=30
+
+  while true; do
+    local output
+    local exit_code=0
+    output=$(claude "$@" 2>&1) || exit_code=$?
+
+    if [ "$exit_code" -eq 0 ]; then
+      echo "$output"
+      return 0
+    fi
+
+    # Check if the error is a retryable API error (500, 429, 529)
+    if echo "$output" | grep -qE 'API Error: (500|429|529)'; then
+      if [ "$attempt" -ge "$max_attempts" ]; then
+        echo "ERROR: Claude API failed after ${max_attempts} attempts. Last output:"
+        echo "$output"
+        return 1
+      fi
+      echo "  Claude API error (attempt ${attempt}/${max_attempts}). Retrying in ${backoff}s..."
+      sleep "$backoff"
+      attempt=$((attempt + 1))
+      backoff=$((backoff * 2))
+    else
+      # Non-retryable error — fail immediately
+      echo "$output"
+      return "$exit_code"
+    fi
+  done
+}
+
 echo "Starting autodev loop as @${GITHUB_USER} in ${REPO_DIR}"
 
 while true; do
@@ -57,7 +93,7 @@ while true; do
   git pull --ff-only
   git checkout -b "$branch_name"
 
-  claude -p "$(cat <<EOF
+  claude_with_retry -p "$(cat <<EOF
 You are implementing GitHub issue #${issue_number}: "${issue_title}"
 URL: ${issue_url}
 
@@ -156,7 +192,7 @@ EOF
     git checkout "$branch_name"
     git pull --ff-only origin "$branch_name"
 
-    claude -p "$(cat <<EOF
+    claude_with_retry -p "$(cat <<EOF
 The CI checks on PR #${pr_number} (for issue #${issue_number}) have failed.
 
 Steps:
