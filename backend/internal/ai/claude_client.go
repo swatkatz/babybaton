@@ -49,7 +49,7 @@ func (c *ClaudeClient) ParseVoiceInput(text string, currentTime time.Time, timez
 	prompt := buildVoiceParsingPrompt(text, currentTime, timezone)
 	
 	reqBody := claudeRequest{
-		Model:     "claude-sonnet-4-20250514",
+		Model:     "claude-sonnet-4-6-20250514",
 		MaxTokens: 2000,
 		Messages: []claudeMessage{
 			{
@@ -73,20 +73,39 @@ func (c *ClaudeClient) ParseVoiceInput(text string, currentTime time.Time, timez
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to call Claude API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("Claude API error (status %d): %s", resp.StatusCode, string(body))
-	}
-
 	var claudeResp claudeResponse
-	if err := json.NewDecoder(resp.Body).Decode(&claudeResp); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
+	maxRetries := 3
+	for attempt := range maxRetries {
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("failed to call Claude API: %w", err)
+		}
+
+		if resp.StatusCode == 429 || resp.StatusCode == 529 {
+			resp.Body.Close()
+			if attempt < maxRetries-1 {
+				time.Sleep(time.Duration(1<<uint(attempt)) * time.Second)
+				req, _ = http.NewRequest("POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(jsonData))
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("x-api-key", c.apiKey)
+				req.Header.Set("anthropic-version", "2023-06-01")
+				continue
+			}
+			return "", fmt.Errorf("Claude API overloaded after %d retries", maxRetries)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return "", fmt.Errorf("Claude API error (status %d): %s", resp.StatusCode, string(body))
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&claudeResp); err != nil {
+			resp.Body.Close()
+			return "", fmt.Errorf("failed to decode response: %w", err)
+		}
+		resp.Body.Close()
+		break
 	}
 
 	if len(claudeResp.Content) == 0 {
