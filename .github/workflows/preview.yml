@@ -29,7 +29,69 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
+
+      # --- Fingerprint check ---
+      - name: Check if native build needed
+        id: fingerprint
+        run: |
+          current=$(npx expo-updates fingerprint:generate --platform ios | jq -r '.hash')
+          latest=$(eas build:list --platform ios --profile preview --status finished --limit 1 --json 2>/dev/null | jq -r '.[0].runtimeVersion // ""')
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "Current fingerprint: $current"
+          echo "Latest build fingerprint: $latest"
+          if [ "$current" != "$latest" ]; then
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # --- Conditional native build ---
+      - name: Build new native app (fingerprint changed)
+        if: steps.fingerprint.outputs.needs_build == 'true'
+        id: build
+        run: |
+          echo "Fingerprint changed, triggering new build..."
+          build_json=$(eas build --platform ios --profile preview --non-interactive --wait --json)
+          build_url=$(echo "$build_json" | jq -r '.[0].artifacts.buildUrl // empty')
+          build_id=$(echo "$build_json" | jq -r '.[0].id // empty')
+          echo "build_url=$build_url" >> "$GITHUB_OUTPUT"
+          echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
+
+      # --- Always publish the OTA update + QR code ---
       - uses: expo/expo-github-action/preview@v8
         with:
           command: eas update --auto
           working-directory: frontend
+
+      # --- Add install instructions if build was needed ---
+      - name: Comment with build install link
+        if: steps.fingerprint.outputs.needs_build == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const buildUrl = '${{ steps.build.outputs.build_url }}';
+            const installUrl = buildUrl || 'https://expo.dev/accounts/swatkatz/projects/baby-baton/builds';
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(installUrl)}`;
+            const body = [
+              '⚠️ **Native dependencies changed — new build required**',
+              '',
+              '### Steps to test this PR on your device:',
+              '',
+              '**Step 1: Install the new build** (scan this QR with your iPhone camera)',
+              '',
+              `<img src="${qrUrl}" width="250" />`,
+              '',
+              buildUrl ? `Or [tap here to install](${buildUrl})` : `Or go to [EAS Builds](https://expo.dev/accounts/swatkatz/projects/baby-baton/builds)`,
+              '',
+              '> You may need to trust the developer certificate in **Settings → General → VPN & Device Management**',
+              '',
+              '**Step 2: Scan the update QR code** above to load the PR code',
+              '',
+              '> The update QR code alone won\'t work until you install the new build — the native fingerprint has changed.',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
