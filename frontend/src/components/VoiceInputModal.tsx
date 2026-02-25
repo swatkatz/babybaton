@@ -20,16 +20,19 @@ interface VoiceInputModalProps {
   visible: boolean;
   onClose: () => void;
   onActivitiesParsed: (result: any) => void;
+  onSwitchToManualEntry?: () => void;
 }
 
 export function VoiceInputModal({
   visible,
   onClose,
   onActivitiesParsed,
+  onSwitchToManualEntry,
 }: VoiceInputModalProps) {
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [parseError, setParseError] = useState(false);
   const [waveAnimation] = useState(new Animated.Value(0));
 
   const [parseVoiceInput] = useMutation(ParseVoiceInputDocument);
@@ -131,10 +134,7 @@ export function VoiceInputModal({
       // Check for GraphQL errors
       if (result.error) {
         console.error('GraphQL error:', result.error);
-        Alert.alert(
-          'Backend Error',
-          'Failed to parse voice input. Please check the backend logs.'
-        );
+        setParseError(true);
         return;
       }
 
@@ -149,13 +149,14 @@ export function VoiceInputModal({
       }
     } catch (error: any) {
       console.error('Error uploading/parsing audio:', error);
-      Alert.alert('Error', 'Failed to process audio: ' + (error.message || 'Unknown error'));
       setIsProcessing(false);
+      setParseError(true);
     }
   };
 
   const handleClose = () => {
     setIsProcessing(false);
+    setParseError(false);
     onClose();
   };
 
@@ -197,6 +198,33 @@ export function VoiceInputModal({
                 <Text style={styles.processingText}>
                   Processing audio...
                 </Text>
+              </View>
+            ) : parseError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorIcon}>⚠️</Text>
+                <Text style={styles.errorTitle}>Voice processing unavailable</Text>
+                <Text style={styles.errorMessage}>
+                  The AI service is currently unavailable. You can log activities manually instead.
+                </Text>
+                {onSwitchToManualEntry && (
+                  <TouchableOpacity
+                    style={styles.manualEntryButton}
+                    onPress={() => {
+                      setParseError(false);
+                      onSwitchToManualEntry();
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.manualEntryButtonText}>Log Manually</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => setParseError(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.retryButtonText}>Try Again</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <>
@@ -357,5 +385,52 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: spacing.md,
     textAlign: 'center',
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
+  manualEntryButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: 8,
+    marginBottom: spacing.sm,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  manualEntryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  retryButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '500' as const,
   },
 });
