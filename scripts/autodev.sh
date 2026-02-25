@@ -79,38 +79,44 @@ EOF
     --output-format text
 
   # -------------------------------------------------------
-  # Step 6 & 7: Create a PR
+  # Step 6 & 7: Create a PR directly with gh
   # -------------------------------------------------------
   echo "=== Creating PR for issue #${issue_number}... ==="
 
   git push -u origin "$branch_name"
 
-  pr_url=$(
-    claude -p "$(cat <<EOF
-Create a GitHub pull request for the current branch (${branch_name}).
+  # Build PR body from the commits on this branch
+  commit_log=$(git log main.."$branch_name" --pretty=format:"- %s" 2>/dev/null || echo "- Implementation for #${issue_number}")
 
-The PR should:
-- Have a clear, concise title (under 70 characters)
-- Reference issue #${issue_number} in the body with "Closes #${issue_number}"
-- Include a summary of changes and a test plan
-- Use: gh pr create --base main --head ${branch_name}
+  pr_url=$(gh pr create \
+    --base main \
+    --head "$branch_name" \
+    --title "Fix #${issue_number}: ${issue_title}" \
+    --body "$(cat <<EOF
+## Summary
 
-Print ONLY the PR URL as the very last line of your output, with no other text on that line.
+Closes #${issue_number}
+
+${commit_log}
+
+## Test plan
+
+- [ ] Verify the changes address the issue requirements
+- [ ] CI checks pass
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
-)" \
-    --allowedTools "Bash(gh *),Bash(git *),Read" \
-    --output-format text \
-  | tail -1
-  )
+)")
 
   echo "PR created: ${pr_url}"
+
+  pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
 
   # -------------------------------------------------------
   # Step 8 & 9: Poll CI and iterate until it passes
   # -------------------------------------------------------
-  echo "=== Waiting for CI checks on ${pr_url}... ==="
+  echo "=== Waiting for CI checks on PR #${pr_number}... ==="
 
-  pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
   max_fix_attempts=3
   fix_attempt=0
 
