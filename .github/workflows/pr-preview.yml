@@ -52,7 +52,7 @@ jobs:
         if: steps.build-info.outputs.runtime_version != ''
         uses: expo/expo-github-action/preview@v8
         with:
-          command: eas update --branch pr-${{ github.event.pull_request.number }}
+          command: eas update --branch pr-${{ github.event.pull_request.number }} --message pr-${{ github.event.pull_request.number }}
           working-directory: frontend
 
       # --- Warn if native deps may have changed ---
