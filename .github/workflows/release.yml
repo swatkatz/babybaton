@@ -1,0 +1,95 @@
+# .github/workflows/release.yml
+name: Create Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 1.2.3) — leave empty to auto-increment patch'
+        required: false
+        default: ''
+        type: string
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options: [all, ios, android]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          INPUT_VERSION="${{ inputs.version }}"
+          # Strip leading 'v' if present
+          INPUT_VERSION="${INPUT_VERSION#v}"
+
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+            if [ -n "$LATEST_TAG" ]; then
+              # Strip leading 'v' and increment patch
+              LATEST="${LATEST_TAG#v}"
+              MAJOR=$(echo "$LATEST" | cut -d. -f1)
+              MINOR=$(echo "$LATEST" | cut -d. -f2)
+              PATCH=$(echo "$LATEST" | cut -d. -f3)
+              VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+            else
+              VERSION="1.0.0"
+            fi
+          fi
+
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG"
+
+      - name: Bump version in app.json
+        run: |
+          jq --arg v "${{ steps.version.outputs.version }}" \
+            '.expo.version = $v' frontend/app.json > frontend/app.json.tmp \
+            && mv frontend/app.json.tmp frontend/app.json
+          echo "app.json version: $(jq -r '.expo.version' frontend/app.json)"
+
+      - name: Bump version in package.json
+        run: |
+          jq --arg v "${{ steps.version.outputs.version }}" \
+            '.version = $v' frontend/package.json > frontend/package.json.tmp \
+            && mv frontend/package.json.tmp frontend/package.json
+          echo "package.json version: $(jq -r '.version' frontend/package.json)"
+
+      - name: Commit version bump and create tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/app.json frontend/package.json
+          git commit -m "release: ${{ steps.version.outputs.tag }}"
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin main --tags
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --generate-notes
+
+      - name: Trigger EAS build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run eas-build.yml \
+            -f platform=${{ inputs.platform }} \
+            -f profile=preview
