@@ -34,7 +34,8 @@ jobs:
       - name: Get latest build runtimeVersion
         id: build-info
         run: |
-          runtime_version=$(eas build:list --platform ios --profile preview --status finished --limit 1 --json 2>/dev/null | jq -r '.[0].runtimeVersion // empty')
+          raw=$(eas build:list --platform ios --profile preview --status finished --limit 1 --json 2>/dev/null || true)
+          runtime_version=$(echo "$raw" | jq -r '.[0].runtimeVersion // empty' 2>/dev/null || true)
           echo "runtime_version=$runtime_version" >> "$GITHUB_OUTPUT"
           echo "Latest preview build runtimeVersion: $runtime_version"
 
