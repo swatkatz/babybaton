@@ -147,12 +147,54 @@ export function ManualEntryModal({
     }
   };
 
+  const toDatetimeLocalValue = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   const renderTimePicker = (
     label: string,
     value: Date,
     setter: (date: Date) => void,
     pickerKey: string,
   ) => {
+    if (Platform.OS === 'web') {
+      return (
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>{label}</Text>
+          <input
+            type="datetime-local"
+            value={toDatetimeLocalValue(value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val) {
+                setter(new Date(val));
+              }
+            }}
+            style={{
+              height: 56,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderStyle: 'solid',
+              borderColor: colors.border,
+              borderRadius: layout.radiusMedium,
+              paddingLeft: spacing.md,
+              paddingRight: spacing.md,
+              fontSize: typography.base,
+              color: colors.textPrimary,
+              boxSizing: 'border-box' as const,
+              outline: 'none',
+              fontFamily: 'inherit',
+            }}
+          />
+        </View>
+      );
+    }
+
     if (Platform.OS === 'ios') {
       return (
         <View style={styles.inputGroup}>
