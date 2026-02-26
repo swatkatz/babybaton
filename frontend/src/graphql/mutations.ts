@@ -140,6 +140,46 @@ export const DELETE_ACTIVITY = gql`
   }
 `;
 
+export const UPDATE_ACTIVITY = gql`
+  mutation UpdateActivity($activityId: ID!, $input: ActivityInput!) {
+    updateActivity(activityId: $activityId, input: $input) {
+      ... on FeedActivity {
+        id
+        activityType
+        createdAt
+        feedDetails {
+          startTime
+          endTime
+          amountMl
+          feedType
+          durationMinutes
+        }
+      }
+      ... on DiaperActivity {
+        id
+        activityType
+        createdAt
+        diaperDetails {
+          changedAt
+          hadPoop
+          hadPee
+        }
+      }
+      ... on SleepActivity {
+        id
+        activityType
+        createdAt
+        sleepDetails {
+          startTime
+          endTime
+          durationMinutes
+          isActive
+        }
+      }
+    }
+  }
+`;
+
 export const END_ACTIVITY = gql`
   mutation EndActivity($activityId: ID!, $endTime: DateTime) {
     endActivity(activityId: $activityId, endTime: $endTime) {

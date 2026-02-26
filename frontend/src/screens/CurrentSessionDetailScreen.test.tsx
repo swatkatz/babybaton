@@ -61,6 +61,18 @@ jest.mock('../theme/colors', () => ({
   getCaregiverColor: jest.fn(() => ({ bg: '#CFE2FF', text: '#0D6EFD' })),
 }));
 
+// Mock datetimepicker
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View, Text } = require('react-native');
+  const MockDateTimePicker = (props: { value?: Date }) => (
+    <View testID="datetime-picker">
+      <Text>{props.value?.toISOString?.() ?? ''}</Text>
+    </View>
+  );
+  return { __esModule: true, default: MockDateTimePicker };
+});
+
 // Mock time utils
 jest.mock('../utils/time', () => ({
   formatTime: jest.fn(() => '10:00 AM'),
@@ -217,5 +229,26 @@ describe('CurrentSessionDetailScreen - delete activity', () => {
     });
 
     alertSpy.mockRestore();
+  });
+
+  it('opens edit modal when activity is tapped', async () => {
+    const mocks = [
+      {
+        request: { query: GetCurrentSessionDocument },
+        result: { data: { getCurrentSession: mockSession } },
+      },
+    ];
+
+    const { findByText } = renderScreen(mocks);
+
+    // Wait for initial render
+    expect(await findByText(/Fed 120ml/)).toBeTruthy();
+
+    // Tap on the activity to open edit modal
+    fireEvent.press(await findByText(/Fed 120ml/));
+
+    // Edit modal should open with "Edit Feed" title
+    expect(await findByText('Edit Feed')).toBeTruthy();
+    expect(await findByText('Save Changes')).toBeTruthy();
   });
 });

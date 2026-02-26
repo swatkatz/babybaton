@@ -23,6 +23,7 @@ type Activity = CurrentSession['activities'][number];
 interface ActivityItemProps {
   activity: Activity;
   onDelete?: (activityId: string) => void;
+  onEdit?: (activity: Activity) => void;
   onMarkAwake?: (activityId: string) => void;
   markAwakeLoading?: boolean;
 }
@@ -30,6 +31,7 @@ interface ActivityItemProps {
 export function ActivityItem({
   activity,
   onDelete,
+  onEdit,
   onMarkAwake,
   markAwakeLoading,
 }: ActivityItemProps) {
@@ -160,19 +162,31 @@ export function ActivityItem({
     );
   };
 
-  const cardContent = (
-    <View style={styles.container}>
-      <View style={styles.horizontalLayout}>
-        <View
-          style={[
-            styles.iconContainer,
-            { backgroundColor: getIconBackgroundColor() },
-          ]}
-        >
-          {getActivityIcon()}
-        </View>
-        <View style={styles.contentWrapper}>{renderActivityContent()}</View>
+  const innerContent = (
+    <View style={styles.horizontalLayout}>
+      <View
+        style={[
+          styles.iconContainer,
+          { backgroundColor: getIconBackgroundColor() },
+        ]}
+      >
+        {getActivityIcon()}
       </View>
+      <View style={styles.contentWrapper}>{renderActivityContent()}</View>
+    </View>
+  );
+
+  const cardContent = onEdit ? (
+    <TouchableOpacity
+      style={styles.container}
+      onPress={() => onEdit(activity)}
+      activeOpacity={0.7}
+    >
+      {innerContent}
+    </TouchableOpacity>
+  ) : (
+    <View style={styles.container}>
+      {innerContent}
     </View>
   );
 

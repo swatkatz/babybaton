@@ -181,13 +181,61 @@ func (s *PostgresStore) GetRecentFeedDetailsForFamily(ctx context.Context, famil
 	return details, nil
 }
 
-// UpdateSleepDetails updates sleep details (for marking sleep as complete)
+// UpdateFeedDetails updates feed details for an activity
+func (s *PostgresStore) UpdateFeedDetails(ctx context.Context, details *domain.FeedDetails) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE feed_details
+		SET start_time = $1, end_time = $2, amount_ml = $3, feed_type = $4, updated_at = $5
+		WHERE id = $6
+	`, details.StartTime, details.EndTime, details.AmountMl, details.FeedType, details.UpdatedAt, details.ID)
+
+	if err != nil {
+		return fmt.Errorf("failed to update feed details: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("feed details not found: %s", details.ID)
+	}
+
+	return nil
+}
+
+// UpdateDiaperDetails updates diaper details for an activity
+func (s *PostgresStore) UpdateDiaperDetails(ctx context.Context, details *domain.DiaperDetails) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE diaper_details
+		SET changed_at = $1, had_poop = $2, had_pee = $3, updated_at = $4
+		WHERE id = $5
+	`, details.ChangedAt, details.HadPoop, details.HadPee, details.UpdatedAt, details.ID)
+
+	if err != nil {
+		return fmt.Errorf("failed to update diaper details: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("diaper details not found: %s", details.ID)
+	}
+
+	return nil
+}
+
+// UpdateSleepDetails updates sleep details (for marking sleep as complete or editing)
 func (s *PostgresStore) UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE sleep_details
-		SET end_time = $1, duration_minutes = $2, updated_at = $3
-		WHERE id = $4
-	`, details.EndTime, details.DurationMinutes, details.UpdatedAt, details.ID)
+		SET start_time = $1, end_time = $2, duration_minutes = $3, updated_at = $4
+		WHERE id = $5
+	`, details.StartTime, details.EndTime, details.DurationMinutes, details.UpdatedAt, details.ID)
 
 	if err != nil {
 		return fmt.Errorf("failed to update sleep details: %w", err)
