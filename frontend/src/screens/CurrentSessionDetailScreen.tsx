@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,14 @@ import {
   CompleteCareSessionDocument,
   DeleteActivityDocument,
   EndActivityDocument,
+  UpdateActivityDocument,
   Activity,
+  ActivityInput,
 } from '../types/__generated__/graphql';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { ActivityItem } from '../components/ActivityItem';
+import { EditActivityModal } from '../components/EditActivityModal';
 import { formatDuration, formatTime } from '../utils/time';
 
 type Props = StackScreenProps<RootStackParamList, 'CurrentSessionDetail'>;
@@ -42,20 +45,44 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
   const [deleteActivity] = useMutation(DeleteActivityDocument, {
     refetchQueries: [GetCurrentSessionDocument],
   });
+  const [updateActivity, { loading: updatingActivity }] = useMutation(
+    UpdateActivityDocument,
+    {
+      refetchQueries: [GetCurrentSessionDocument],
+    },
+  );
+
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+
+  const handleEditActivity = (activity: Activity) => {
+    setEditingActivity(activity);
+  };
+
+  const handleSaveEdit = async (activityId: string, input: ActivityInput) => {
+    try {
+      await updateActivity({ variables: { activityId, input } });
+      setEditingActivity(null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to update activity';
+      Alert.alert('Error', message);
+    }
+  };
 
   const handleDeleteActivity = async (activityId: string) => {
     try {
       await deleteActivity({ variables: { activityId } });
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to delete activity');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to delete activity';
+      Alert.alert('Error', message);
     }
   };
 
   const handleMarkAwake = async (activityId: string) => {
     try {
       await endActivity({ variables: { activityId } });
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to mark as awake');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to mark as awake';
+      Alert.alert('Error', message);
     }
   };
 
@@ -63,8 +90,9 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
     try {
       await completeCareSession();
       navigation.goBack();
-    } catch (e: any) {
-      console.error('Failed to complete session:', e.message);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to complete session';
+      console.error('Failed to complete session:', message);
     }
   };
 
@@ -138,6 +166,7 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
                 key={activity.id}
                 activity={activity}
                 onDelete={handleDeleteActivity}
+                onEdit={handleEditActivity}
                 onMarkAwake={handleMarkAwake}
                 markAwakeLoading={endingActivity}
               />
@@ -187,6 +216,14 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <EditActivityModal
+        visible={editingActivity !== null}
+        activity={editingActivity}
+        onClose={() => setEditingActivity(null)}
+        onSave={handleSaveEdit}
+        saving={updatingActivity}
+      />
     </View>
   );
 }

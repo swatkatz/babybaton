@@ -631,6 +631,137 @@ func (r *mutationResolver) DeleteActivity(ctx context.Context, activityID string
 	return true, nil
 }
 
+// UpdateActivity is the resolver for the updateActivity field.
+func (r *mutationResolver) UpdateActivity(ctx context.Context, activityID string, input model.ActivityInput) (model.Activity, error) {
+	// Require authentication
+	_, _, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	activityUUID, err := uuid.Parse(activityID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid activity ID: %w", err)
+	}
+
+	// Get the existing activity
+	activity, err := r.store.GetActivityByID(ctx, activityUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get activity: %w", err)
+	}
+
+	now := time.Now()
+
+	switch activity.ActivityType {
+	case domain.ActivityTypeFeed:
+		if input.FeedDetails == nil {
+			return nil, fmt.Errorf("feed activity requires feedDetails")
+		}
+
+		feedDetails, err := r.store.GetFeedDetails(ctx, activityUUID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get feed details: %w", err)
+		}
+
+		// Update fields
+		feedDetails.StartTime = input.FeedDetails.StartTime
+		feedDetails.EndTime = input.FeedDetails.EndTime
+
+		if input.FeedDetails.AmountMl != nil {
+			val := int(*input.FeedDetails.AmountMl)
+			feedDetails.AmountMl = &val
+		} else {
+			feedDetails.AmountMl = nil
+		}
+
+		if input.FeedDetails.FeedType != nil {
+			ft := domain.FeedType(strings.ToLower(string(*input.FeedDetails.FeedType)))
+			feedDetails.FeedType = &ft
+		} else {
+			feedDetails.FeedType = nil
+		}
+
+		feedDetails.UpdatedAt = now
+
+		if err := r.store.UpdateFeedDetails(ctx, feedDetails); err != nil {
+			return nil, fmt.Errorf("failed to update feed details: %w", err)
+		}
+
+		return &model.FeedActivity{
+			ID:           activity.ID.String(),
+			ActivityType: model.ActivityType(strings.ToUpper(string(activity.ActivityType))),
+			CreatedAt:    activity.CreatedAt,
+			FeedDetails:  mapper.FeedDetailsToGraphQL(feedDetails),
+		}, nil
+
+	case domain.ActivityTypeDiaper:
+		if input.DiaperDetails == nil {
+			return nil, fmt.Errorf("diaper activity requires diaperDetails")
+		}
+
+		diaperDetails, err := r.store.GetDiaperDetails(ctx, activityUUID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get diaper details: %w", err)
+		}
+
+		// Update fields
+		diaperDetails.ChangedAt = input.DiaperDetails.ChangedAt
+		diaperDetails.HadPoop = input.DiaperDetails.HadPoop
+		if input.DiaperDetails.HadPee != nil {
+			diaperDetails.HadPee = *input.DiaperDetails.HadPee
+		}
+		diaperDetails.UpdatedAt = now
+
+		if err := r.store.UpdateDiaperDetails(ctx, diaperDetails); err != nil {
+			return nil, fmt.Errorf("failed to update diaper details: %w", err)
+		}
+
+		return &model.DiaperActivity{
+			ID:            activity.ID.String(),
+			ActivityType:  model.ActivityType(strings.ToUpper(string(activity.ActivityType))),
+			CreatedAt:     activity.CreatedAt,
+			DiaperDetails: mapper.DiaperDetailsToGraphQL(diaperDetails),
+		}, nil
+
+	case domain.ActivityTypeSleep:
+		if input.SleepDetails == nil {
+			return nil, fmt.Errorf("sleep activity requires sleepDetails")
+		}
+
+		sleepDetails, err := r.store.GetSleepDetails(ctx, activityUUID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sleep details: %w", err)
+		}
+
+		// Update fields
+		sleepDetails.StartTime = input.SleepDetails.StartTime
+		sleepDetails.EndTime = input.SleepDetails.EndTime
+
+		if sleepDetails.EndTime != nil {
+			duration := int(sleepDetails.EndTime.Sub(sleepDetails.StartTime).Minutes())
+			sleepDetails.DurationMinutes = &duration
+		} else {
+			sleepDetails.DurationMinutes = nil
+		}
+
+		sleepDetails.UpdatedAt = now
+
+		if err := r.store.UpdateSleepDetails(ctx, sleepDetails); err != nil {
+			return nil, fmt.Errorf("failed to update sleep details: %w", err)
+		}
+
+		return &model.SleepActivity{
+			ID:           activity.ID.String(),
+			ActivityType: model.ActivityType(strings.ToUpper(string(activity.ActivityType))),
+			CreatedAt:    activity.CreatedAt,
+			SleepDetails: mapper.SleepDetailsToGraphQL(sleepDetails),
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("unknown activity type: %s", activity.ActivityType)
+	}
+}
+
 // CheckFamilyNameAvailable is the resolver for the checkFamilyNameAvailable field.
 func (r *queryResolver) CheckFamilyNameAvailable(ctx context.Context, name string) (bool, error) {
 	exists, err := r.store.FamilyNameExists(ctx, name)
@@ -668,122 +799,6 @@ func (r *queryResolver) GetMyCaregiver(ctx context.Context) (*model.Caregiver, e
 	}
 
 	return mapper.CaregiverToGraphQL(caregiver), nil
-}
-
-// loadCareSessionWithActivities loads all activities and details for a care session
-func (r *queryResolver) loadCareSessionWithActivities(ctx context.Context, session *domain.CareSession) (*model.CareSession, error) {
-	// Get all activities for the session
-	activities, err := r.store.GetActivitiesForSession(ctx, session.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get activities: %w", err)
-	}
-
-	fmt.Printf("📋 Loading %d activities for session %s\n", len(activities), session.ID)
-
-	// Load details for each activity and convert to GraphQL types
-	graphQLActivities := make([]model.Activity, 0, len(activities))
-
-	// Variables for summary calculation
-	var totalFeeds, totalMl, totalDiaperChanges, totalSleepMinutes int32
-	var lastFeedTime, lastSleepTime *time.Time
-	var currentlyAsleep bool
-
-	for _, activity := range activities {
-		fmt.Printf("   🔍 Processing activity %s (type: %s)\n", activity.ID, activity.ActivityType)
-		switch activity.ActivityType {
-		case domain.ActivityTypeFeed:
-			fmt.Printf("   📥 Loading feed details for activity %s\n", activity.ID)
-			feedDetails, err := r.store.GetFeedDetails(ctx, activity.ID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get feed details: %w", err)
-			}
-			fmt.Printf("   ✅ Feed details loaded successfully\n")
-
-			graphQLActivities = append(graphQLActivities, &model.FeedActivity{
-				ID:           activity.ID.String(),
-				ActivityType: model.ActivityType(strings.ToUpper(string(activity.ActivityType))),
-				CreatedAt:    activity.CreatedAt,
-				FeedDetails:  mapper.FeedDetailsToGraphQL(feedDetails),
-			})
-
-			// Update summary
-			totalFeeds++
-			if feedDetails.AmountMl != nil {
-				totalMl += int32(*feedDetails.AmountMl)
-			}
-			feedTime := feedDetails.StartTime
-			if lastFeedTime == nil || feedTime.After(*lastFeedTime) {
-				lastFeedTime = &feedTime
-			}
-
-		case domain.ActivityTypeDiaper:
-			diaperDetails, err := r.store.GetDiaperDetails(ctx, activity.ID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get diaper details: %w", err)
-			}
-
-			graphQLActivities = append(graphQLActivities, &model.DiaperActivity{
-				ID:            activity.ID.String(),
-				ActivityType:  model.ActivityType(strings.ToUpper(string(activity.ActivityType))),
-				CreatedAt:     activity.CreatedAt,
-				DiaperDetails: mapper.DiaperDetailsToGraphQL(diaperDetails),
-			})
-
-			// Update summary
-			totalDiaperChanges++
-
-		case domain.ActivityTypeSleep:
-			sleepDetails, err := r.store.GetSleepDetails(ctx, activity.ID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get sleep details: %w", err)
-			}
-
-			graphQLActivities = append(graphQLActivities, &model.SleepActivity{
-				ID:           activity.ID.String(),
-				ActivityType: model.ActivityType(strings.ToUpper(string(activity.ActivityType))),
-				CreatedAt:    activity.CreatedAt,
-				SleepDetails: mapper.SleepDetailsToGraphQL(sleepDetails),
-			})
-
-			// Update summary
-			sleepTime := sleepDetails.StartTime
-			if lastSleepTime == nil || sleepTime.After(*lastSleepTime) {
-				lastSleepTime = &sleepTime
-			}
-			if sleepDetails.DurationMinutes != nil {
-				totalSleepMinutes += int32(*sleepDetails.DurationMinutes)
-			}
-			if sleepDetails.EndTime == nil {
-				currentlyAsleep = true
-			}
-		}
-	}
-
-	// Get caregiver
-	caregiver, err := r.store.GetCaregiverByID(ctx, session.CaregiverID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get caregiver: %w", err)
-	}
-
-	// Build GraphQL response
-	return &model.CareSession{
-		ID:          session.ID.String(),
-		Caregiver:   mapper.CaregiverToGraphQL(caregiver),
-		Status:      model.CareSessionStatus(strings.ToUpper(string(session.Status))),
-		StartedAt:   session.StartedAt,
-		CompletedAt: session.CompletedAt,
-		Activities:  graphQLActivities,
-		Notes:       session.Notes,
-		Summary: &model.CareSessionSummary{
-			TotalFeeds:         totalFeeds,
-			TotalMl:            totalMl,
-			TotalDiaperChanges: totalDiaperChanges,
-			TotalSleepMinutes:  totalSleepMinutes,
-			LastFeedTime:       lastFeedTime,
-			LastSleepTime:      lastSleepTime,
-			CurrentlyAsleep:    currentlyAsleep,
-		},
-	}, nil
 }
 
 // GetRecentCareSessions is the resolver for the getRecentCareSessions field.
@@ -871,3 +886,4 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+

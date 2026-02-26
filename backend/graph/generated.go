@@ -132,6 +132,7 @@ type ComplexityRoot struct {
 		LeaveFamily         func(childComplexity int) int
 		ParseVoiceInput     func(childComplexity int, audioFile graphql.Upload) int
 		StartCareSession    func(childComplexity int) int
+		UpdateActivity      func(childComplexity int, activityID string, input model.ActivityInput) int
 		UpdateBabyName      func(childComplexity int, babyName string) int
 	}
 
@@ -192,6 +193,7 @@ type MutationResolver interface {
 	EndActivity(ctx context.Context, activityID string, endTime *time.Time) (model.Activity, error)
 	CompleteCareSession(ctx context.Context, notes *string) (*model.CareSession, error)
 	DeleteActivity(ctx context.Context, activityID string) (bool, error)
+	UpdateActivity(ctx context.Context, activityID string, input model.ActivityInput) (model.Activity, error)
 }
 type QueryResolver interface {
 	CheckFamilyNameAvailable(ctx context.Context, name string) (bool, error)
@@ -608,6 +610,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.StartCareSession(childComplexity), true
+	case "Mutation.updateActivity":
+		if e.complexity.Mutation.UpdateActivity == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateActivity_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateActivity(childComplexity, args["activityId"].(string), args["input"].(model.ActivityInput)), true
 	case "Mutation.updateBabyName":
 		if e.complexity.Mutation.UpdateBabyName == nil {
 			break
@@ -1130,6 +1143,8 @@ type Mutation {
   completeCareSession(notes: String): CareSession!
 
   deleteActivity(activityId: ID!): Boolean!
+
+  updateActivity(activityId: ID!, input: ActivityInput!): Activity!
 }
 `, BuiltIn: false},
 }
@@ -1263,6 +1278,22 @@ func (ec *executionContext) field_Mutation_parseVoiceInput_args(ctx context.Cont
 		return nil, err
 	}
 	args["audioFile"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateActivity_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "activityId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["activityId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNActivityInput2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐActivityInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
 	return args, nil
 }
 
@@ -3341,6 +3372,47 @@ func (ec *executionContext) fieldContext_Mutation_deleteActivity(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_deleteActivity_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateActivity(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updateActivity,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UpdateActivity(ctx, fc.Args["activityId"].(string), fc.Args["input"].(model.ActivityInput))
+		},
+		nil,
+		ec.marshalNActivity2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐActivity,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateActivity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Activity does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateActivity_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6670,6 +6742,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateActivity":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateActivity(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -7515,6 +7594,11 @@ func (ec *executionContext) marshalNActivity2ᚕgithubᚗcomᚋswatkatzᚋbabyba
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalNActivityInput2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐActivityInput(ctx context.Context, v any) (model.ActivityInput, error) {
+	res, err := ec.unmarshalInputActivityInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNActivityInput2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐActivityInputᚄ(ctx context.Context, v any) ([]*model.ActivityInput, error) {

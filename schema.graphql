@@ -216,4 +216,6 @@ type Mutation {
   completeCareSession(notes: String): CareSession!
 
   deleteActivity(activityId: ID!): Boolean!
+
+  updateActivity(activityId: ID!, input: ActivityInput!): Activity!
 }

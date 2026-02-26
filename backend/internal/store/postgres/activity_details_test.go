@@ -118,6 +118,32 @@ func TestActivityDetailsOperations(t *testing.T) {
 			t.Error("Feed type mismatch")
 		}
 		t.Logf("✓ Retrieved feed details: %dml %s", *retrieved.AmountMl, *retrieved.FeedType)
+
+		// Update
+		newAmount := 200
+		newFeedType := domain.FeedTypeBreastMilk
+		newStartTime := startTime.Add(-10 * time.Minute)
+		feedDetails.StartTime = newStartTime
+		feedDetails.AmountMl = &newAmount
+		feedDetails.FeedType = &newFeedType
+		feedDetails.UpdatedAt = time.Now()
+
+		err = store.UpdateFeedDetails(ctx, feedDetails)
+		if err != nil {
+			t.Fatalf("Failed to update feed details: %v", err)
+		}
+
+		updated, err := store.GetFeedDetails(ctx, feedActivity.ID)
+		if err != nil {
+			t.Fatalf("Failed to get updated feed details: %v", err)
+		}
+		if updated.AmountMl == nil || *updated.AmountMl != 200 {
+			t.Errorf("Expected amount 200, got %v", updated.AmountMl)
+		}
+		if updated.FeedType == nil || *updated.FeedType != domain.FeedTypeBreastMilk {
+			t.Errorf("Expected feed type breast_milk, got %v", updated.FeedType)
+		}
+		t.Logf("✓ Updated feed details: %dml %s", *updated.AmountMl, *updated.FeedType)
 	})
 
 	// Test Diaper Details
@@ -153,6 +179,29 @@ func TestActivityDetailsOperations(t *testing.T) {
 			t.Error("Diaper details mismatch")
 		}
 		t.Logf("✓ Retrieved diaper details: poop=%v pee=%v", retrieved.HadPoop, retrieved.HadPee)
+
+		// Update
+		diaperDetails.HadPoop = false
+		diaperDetails.HadPee = true
+		diaperDetails.ChangedAt = time.Now()
+		diaperDetails.UpdatedAt = time.Now()
+
+		err = store.UpdateDiaperDetails(ctx, diaperDetails)
+		if err != nil {
+			t.Fatalf("Failed to update diaper details: %v", err)
+		}
+
+		updated, err := store.GetDiaperDetails(ctx, diaperActivity.ID)
+		if err != nil {
+			t.Fatalf("Failed to get updated diaper details: %v", err)
+		}
+		if updated.HadPoop {
+			t.Error("Expected hadPoop to be false after update")
+		}
+		if !updated.HadPee {
+			t.Error("Expected hadPee to be true after update")
+		}
+		t.Logf("✓ Updated diaper details: poop=%v pee=%v", updated.HadPoop, updated.HadPee)
 	})
 
 	// Test Sleep Details
@@ -209,5 +258,23 @@ func TestActivityDetailsOperations(t *testing.T) {
 			t.Error("Duration mismatch")
 		}
 		t.Logf("✓ Updated sleep details: %d minutes", *updated.DurationMinutes)
+
+		// Update start_time (extended behavior)
+		newStartTime := startTime.Add(-30 * time.Minute)
+		sleepDetails.StartTime = newStartTime
+		durationMinutes = 120
+		sleepDetails.DurationMinutes = &durationMinutes
+		sleepDetails.UpdatedAt = time.Now()
+
+		err = store.UpdateSleepDetails(ctx, sleepDetails)
+		if err != nil {
+			t.Fatalf("Failed to update sleep start_time: %v", err)
+		}
+
+		updatedAgain, _ := store.GetSleepDetails(ctx, sleepActivity.ID)
+		if updatedAgain.DurationMinutes == nil || *updatedAgain.DurationMinutes != 120 {
+			t.Errorf("Expected duration 120 after start_time update, got %v", updatedAgain.DurationMinutes)
+		}
+		t.Logf("✓ Updated sleep start_time: %d minutes", *updatedAgain.DurationMinutes)
 	})
 }

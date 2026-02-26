@@ -4,12 +4,12 @@ go 1.25.3
 
 require (
 	github.com/99designs/gqlgen v0.17.81
+	github.com/openai/openai-go v1.12.0
 	github.com/rs/cors v1.11.1
 	github.com/vektah/gqlparser/v2 v2.5.30
 )
 
 require (
-	github.com/openai/openai-go v1.12.0 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
