@@ -30,71 +30,77 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
 
-      # --- Fingerprint check ---
-      - name: Check if native build needed
-        id: fingerprint
+      # --- Get the runtimeVersion from the latest preview build ---
+      - name: Get latest build runtimeVersion
+        id: build-info
         run: |
-          raw_fingerprint=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null || true)
-          current=$(echo "$raw_fingerprint" | grep -E '^\{' | jq -r '.hash // empty' 2>/dev/null || echo "")
-          raw_builds=$(eas build:list --platform ios --profile preview --status finished --limit 1 --json 2>/dev/null || true)
-          latest=$(echo "$raw_builds" | grep -E '^\[' | jq -r '.[0].runtimeVersion // empty' 2>/dev/null || echo "")
-          echo "current=$current" >> "$GITHUB_OUTPUT"
-          echo "latest=$latest" >> "$GITHUB_OUTPUT"
-          echo "Current fingerprint: $current"
-          echo "Latest build fingerprint: $latest"
-          if [ "$current" != "$latest" ]; then
-            echo "needs_build=true" >> "$GITHUB_OUTPUT"
-          fi
+          runtime_version=$(eas build:list --platform ios --profile preview --status finished --limit 1 --json 2>/dev/null | jq -r '.[0].runtimeVersion // empty')
+          echo "runtime_version=$runtime_version" >> "$GITHUB_OUTPUT"
+          echo "Latest preview build runtimeVersion: $runtime_version"
 
-      # --- Conditional native build ---
-      - name: Build new native app (fingerprint changed)
-        if: steps.fingerprint.outputs.needs_build == 'true'
-        id: build
-        continue-on-error: true
-        run: |
-          echo "Fingerprint changed, triggering new build..."
-          build_json=$(eas build --platform ios --profile preview --non-interactive --wait --json)
-          build_url=$(echo "$build_json" | jq -r '.[0].artifacts.buildUrl // empty')
-          build_id=$(echo "$build_json" | jq -r '.[0].id // empty')
-          echo "build_url=$build_url" >> "$GITHUB_OUTPUT"
-          echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
-
-      # --- Always publish the OTA update + QR code ---
-      - uses: expo/expo-github-action/preview@v8
+      # --- Publish update pinned to the build's runtimeVersion ---
+      - name: Publish preview update
+        if: steps.build-info.outputs.runtime_version != ''
+        uses: expo/expo-github-action/preview@v8
         with:
-          command: eas update --auto
+          command: eas update --branch pr-${{ github.event.pull_request.number }} --runtime-version ${{ steps.build-info.outputs.runtime_version }} --message "PR #${{ github.event.pull_request.number }}"
           working-directory: frontend
 
-      # --- Add install instructions if build was needed ---
-      - name: Comment with build install link
-        if: steps.fingerprint.outputs.needs_build == 'true' && steps.build.outcome == 'success'
+      # --- Warn if native deps may have changed ---
+      - name: Check for native dependency changes
+        if: steps.build-info.outputs.runtime_version != ''
+        id: native-check
+        run: |
+          native_changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- package.json package-lock.json app.json eas.json ios/ android/ | head -1)
+          if [ -n "$native_changed" ]; then
+            echo "native_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Warn about native changes
+        if: steps.native-check.outputs.native_changed == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            const buildUrl = '${{ steps.build.outputs.build_url }}';
-            const installUrl = buildUrl || 'https://expo.dev/accounts/swatkatz/projects/baby-baton/builds';
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(installUrl)}`;
-            const body = [
-              '⚠️ **Native dependencies changed — new build required**',
-              '',
-              '### Steps to test this PR on your device:',
-              '',
-              '**Step 1: Install the new build** (scan this QR with your iPhone camera)',
-              '',
-              `<img src="${qrUrl}" width="250" />`,
-              '',
-              buildUrl ? `Or [tap here to install](${buildUrl})` : `Or go to [EAS Builds](https://expo.dev/accounts/swatkatz/projects/baby-baton/builds)`,
-              '',
-              '> You may need to trust the developer certificate in **Settings → General → VPN & Device Management**',
-              '',
-              '**Step 2: Scan the update QR code** above to load the PR code',
-              '',
-              '> The update QR code alone won\'t work until you install the new build — the native fingerprint has changed.',
-            ].join('\n');
-
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body,
+              body: [
+                '⚠️ **This PR may include native dependency changes**',
+                '',
+                'If the app crashes after scanning the QR code, you need a new native build:',
+                '',
+                '```',
+                'eas build --platform ios --profile preview',
+                '```',
+                '',
+                'Or trigger one from the [EAS Build workflow](https://github.com/${{ github.repository }}/actions/workflows/eas-build.yml).',
+                '',
+                'Once the build finishes and is installed on your device, re-run this workflow.',
+              ].join('\n'),
+            });
+
+      # --- Fallback if no preview build exists yet ---
+      - name: No preview build found
+        if: steps.build-info.outputs.runtime_version == ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '⚠️ **No preview build found — QR code not available**',
+                '',
+                'No iOS preview build exists yet. Run a build first:',
+                '',
+                '```',
+                'eas build --platform ios --profile preview',
+                '```',
+                '',
+                'Or trigger one from the [EAS Build workflow](https://github.com/${{ github.repository }}/actions/workflows/eas-build.yml).',
+                '',
+                'Once the build finishes, re-run this workflow and the QR code will work.',
+              ].join('\n'),
             });
