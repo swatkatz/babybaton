@@ -10,7 +10,7 @@ export const colors = {
   primaryDark: '#2E6FA8',
 
   // Accent (warm peach/coral)
-  accent: '#FFB6A3',
+  accent: '#FFB6A3', // warm peach,
 
   // Functional colors
   success: '#7BC96F', // Green for confirm actions
