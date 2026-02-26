@@ -3,7 +3,7 @@
     "name": "baby-baton",
     "slug": "baby-baton",
     "owner": "swatkatz",
-    "version": "1.0.1-test",
+    "version": "1.0.2-test",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
