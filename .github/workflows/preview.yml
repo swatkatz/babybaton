@@ -39,12 +39,20 @@ jobs:
           echo "runtime_version=$runtime_version" >> "$GITHUB_OUTPUT"
           echo "Latest preview build runtimeVersion: $runtime_version"
 
+      # --- Pin runtimeVersion in app.json to match the installed build ---
+      - name: Override runtimeVersion in app.json
+        if: steps.build-info.outputs.runtime_version != ''
+        run: |
+          jq --arg rv "${{ steps.build-info.outputs.runtime_version }}" \
+            '.expo.runtimeVersion = $rv' app.json > app.json.tmp && mv app.json.tmp app.json
+          echo "Set runtimeVersion to: $(jq -r '.expo.runtimeVersion' app.json)"
+
       # --- Publish update pinned to the build's runtimeVersion ---
       - name: Publish preview update
         if: steps.build-info.outputs.runtime_version != ''
         uses: expo/expo-github-action/preview@v8
         with:
-          command: eas update --branch pr-${{ github.event.pull_request.number }} --runtime-version ${{ steps.build-info.outputs.runtime_version }} --message "PR #${{ github.event.pull_request.number }}"
+          command: eas update --branch pr-${{ github.event.pull_request.number }} --message "${{ format('PR #{0}', github.event.pull_request.number) }}"
           working-directory: frontend
 
       # --- Warn if native deps may have changed ---
