@@ -51,7 +51,7 @@ Be thorough — read the actual code, don't just list file names.
 Draft a plan using this structure:
 
 ```markdown
-## Implementation Plan for #<number>: <title>
+## Implementation Plan (TDD) for #<number>: <title>
 
 ### Overview
 Brief summary of the approach — 2-3 sentences on the strategy.
@@ -64,20 +64,33 @@ List the existing files that will be modified and any new files to create, with 
 | `path/to/file.ts` | Modify | Add new handler for X |
 | `path/to/new-file.ts` | Create | New service for Y |
 
-### Implementation TODO
-A detailed, ordered checklist of implementation steps. Each item should be a concrete, actionable task.
+### Implementation (TDD)
+Group changes into logical phases. Each phase follows Red-Green:
+write failing tests first, then implement to make them pass.
 
-- [ ] **Step 1 title**: Description of what to do and why
-- [ ] **Step 2 title**: Description of what to do and why
-- [ ] ...
+#### Phase 1: <name>
+
+**Red — Write failing tests:**
+- [ ] Test: `TestName` — description of what it asserts
+- [ ] Test: `TestName2` — description of what it asserts
+- [ ] Run tests — confirm they fail
+
+**Green — Implement:**
+- [ ] Implementation step 1
+- [ ] Implementation step 2
+- [ ] Run tests — confirm they pass
+
+#### Phase 2: <name>
+(Repeat Red-Green pattern for each logical group of changes)
 
 ### Edge Cases & Error Handling
 - List edge cases to handle
 - Error states and how to handle them
 
-### Testing Plan
-- What to test and how
-- Key test scenarios
+### Final Verification
+- [ ] Run full test suite — all tests pass (new + existing)
+- [ ] Build succeeds
+- [ ] Manual smoke test steps if applicable
 
 ### Open Questions
 (If any) Questions that need answering before or during implementation.
