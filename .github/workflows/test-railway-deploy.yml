@@ -1,0 +1,24 @@
+name: Test Railway Deploy
+on:
+  workflow_dispatch:
+
+jobs:
+  test-deploy:
+    name: Test Railway Deploy Trigger
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Test database connection
+        run: psql "${{ secrets.DATABASE_PUBLIC_URL }}" -c "SELECT 1 AS connection_test;"
+
+      - name: Redeploy backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway redeploy --service ${{ secrets.BACKEND_SERVICE_ID }} --yes
+
+      - name: Redeploy frontend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway redeploy --service ${{ secrets.FRONTEND_SERVICE_ID }} --yes
