@@ -86,10 +86,11 @@ jobs:
             --title "${{ steps.version.outputs.tag }}" \
             --generate-notes
 
-      - name: Trigger EAS build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh workflow run eas-build.yml \
-            -f platform=${{ inputs.platform }} \
-            -f profile=preview
+  build:
+    name: EAS Build
+    needs: release
+    uses: ./.github/workflows/eas-build.yml
+    with:
+      platform: ${{ inputs.platform }}
+      profile: preview
+    secrets: inherit

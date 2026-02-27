@@ -15,6 +15,14 @@ on:
         default: 'preview'
         type: choice
         options: [preview, production]
+  workflow_call:
+    inputs:
+      platform:
+        type: string
+        required: true
+      profile:
+        type: string
+        required: true
 
 jobs:
   build:
