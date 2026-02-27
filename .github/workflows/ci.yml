@@ -55,9 +55,7 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Run migrations
-        run: |
-          PGPASSWORD=postgres psql -h localhost -U postgres -d baby_baton_test -f ../migrations/001_init_schema.sql
-          PGPASSWORD=postgres psql -h localhost -U postgres -d baby_baton_test -f ../migrations/002_add_password_to_families.sql
+        run: ../scripts/migrate.sh "postgres://postgres:postgres@localhost:5432/baby_baton_test?sslmode=disable" ../migrations
 
       - run: go build ./...
       - run: go test -v -count=1 ./...
