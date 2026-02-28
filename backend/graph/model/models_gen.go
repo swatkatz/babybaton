@@ -99,18 +99,24 @@ type FeedActivity struct {
 func (FeedActivity) IsActivity() {}
 
 type FeedDetails struct {
-	StartTime       time.Time  `json:"startTime"`
-	EndTime         *time.Time `json:"endTime,omitempty"`
-	AmountMl        *int32     `json:"amountMl,omitempty"`
-	FeedType        *FeedType  `json:"feedType,omitempty"`
-	DurationMinutes *int32     `json:"durationMinutes,omitempty"`
+	StartTime       time.Time   `json:"startTime"`
+	EndTime         *time.Time  `json:"endTime,omitempty"`
+	AmountMl        *int32      `json:"amountMl,omitempty"`
+	FeedType        *FeedType   `json:"feedType,omitempty"`
+	DurationMinutes *int32      `json:"durationMinutes,omitempty"`
+	FoodName        *string     `json:"foodName,omitempty"`
+	Quantity        *float64    `json:"quantity,omitempty"`
+	QuantityUnit    *SolidsUnit `json:"quantityUnit,omitempty"`
 }
 
 type FeedDetailsInput struct {
-	StartTime time.Time  `json:"startTime"`
-	EndTime   *time.Time `json:"endTime,omitempty"`
-	AmountMl  *int32     `json:"amountMl,omitempty"`
-	FeedType  *FeedType  `json:"feedType,omitempty"`
+	StartTime    time.Time   `json:"startTime"`
+	EndTime      *time.Time  `json:"endTime,omitempty"`
+	AmountMl     *int32      `json:"amountMl,omitempty"`
+	FeedType     *FeedType   `json:"feedType,omitempty"`
+	FoodName     *string     `json:"foodName,omitempty"`
+	Quantity     *float64    `json:"quantity,omitempty"`
+	QuantityUnit *SolidsUnit `json:"quantityUnit,omitempty"`
 }
 
 type Mutation struct {
@@ -278,16 +284,18 @@ type FeedType string
 const (
 	FeedTypeBreastMilk FeedType = "BREAST_MILK"
 	FeedTypeFormula    FeedType = "FORMULA"
+	FeedTypeSolids     FeedType = "SOLIDS"
 )
 
 var AllFeedType = []FeedType{
 	FeedTypeBreastMilk,
 	FeedTypeFormula,
+	FeedTypeSolids,
 }
 
 func (e FeedType) IsValid() bool {
 	switch e {
-	case FeedTypeBreastMilk, FeedTypeFormula:
+	case FeedTypeBreastMilk, FeedTypeFormula, FeedTypeSolids:
 		return true
 	}
 	return false
@@ -380,6 +388,65 @@ func (e *PredictionConfidence) UnmarshalJSON(b []byte) error {
 }
 
 func (e PredictionConfidence) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type SolidsUnit string
+
+const (
+	SolidsUnitSpoons   SolidsUnit = "SPOONS"
+	SolidsUnitBowls    SolidsUnit = "BOWLS"
+	SolidsUnitPieces   SolidsUnit = "PIECES"
+	SolidsUnitPortions SolidsUnit = "PORTIONS"
+)
+
+var AllSolidsUnit = []SolidsUnit{
+	SolidsUnitSpoons,
+	SolidsUnitBowls,
+	SolidsUnitPieces,
+	SolidsUnitPortions,
+}
+
+func (e SolidsUnit) IsValid() bool {
+	switch e {
+	case SolidsUnitSpoons, SolidsUnitBowls, SolidsUnitPieces, SolidsUnitPortions:
+		return true
+	}
+	return false
+}
+
+func (e SolidsUnit) String() string {
+	return string(e)
+}
+
+func (e *SolidsUnit) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SolidsUnit(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SolidsUnit", str)
+	}
+	return nil
+}
+
+func (e SolidsUnit) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *SolidsUnit) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e SolidsUnit) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

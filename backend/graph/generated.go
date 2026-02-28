@@ -119,6 +119,9 @@ type ComplexityRoot struct {
 		DurationMinutes func(childComplexity int) int
 		EndTime         func(childComplexity int) int
 		FeedType        func(childComplexity int) int
+		FoodName        func(childComplexity int) int
+		Quantity        func(childComplexity int) int
+		QuantityUnit    func(childComplexity int) int
 		StartTime       func(childComplexity int) int
 	}
 
@@ -514,6 +517,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.FeedDetails.FeedType(childComplexity), true
+	case "FeedDetails.foodName":
+		if e.complexity.FeedDetails.FoodName == nil {
+			break
+		}
+
+		return e.complexity.FeedDetails.FoodName(childComplexity), true
+	case "FeedDetails.quantity":
+		if e.complexity.FeedDetails.Quantity == nil {
+			break
+		}
+
+		return e.complexity.FeedDetails.Quantity(childComplexity), true
+	case "FeedDetails.quantityUnit":
+		if e.complexity.FeedDetails.QuantityUnit == nil {
+			break
+		}
+
+		return e.complexity.FeedDetails.QuantityUnit(childComplexity), true
 	case "FeedDetails.startTime":
 		if e.complexity.FeedDetails.StartTime == nil {
 			break
@@ -943,6 +964,14 @@ enum ActivityType {
 enum FeedType {
   BREAST_MILK
   FORMULA
+  SOLIDS
+}
+
+enum SolidsUnit {
+  SPOONS
+  BOWLS
+  PIECES
+  PORTIONS
 }
 
 enum PredictionConfidence {
@@ -1000,6 +1029,9 @@ type FeedDetails {
   amountMl: Int
   feedType: FeedType
   durationMinutes: Int
+  foodName: String
+  quantity: Float
+  quantityUnit: SolidsUnit
 }
 
 type DiaperDetails {
@@ -1078,6 +1110,9 @@ input FeedDetailsInput {
   endTime: DateTime
   amountMl: Int
   feedType: FeedType
+  foodName: String
+  quantity: Float
+  quantityUnit: SolidsUnit
 }
 
 input DiaperDetailsInput {
@@ -2736,6 +2771,12 @@ func (ec *executionContext) fieldContext_FeedActivity_feedDetails(_ context.Cont
 				return ec.fieldContext_FeedDetails_feedType(ctx, field)
 			case "durationMinutes":
 				return ec.fieldContext_FeedDetails_durationMinutes(ctx, field)
+			case "foodName":
+				return ec.fieldContext_FeedDetails_foodName(ctx, field)
+			case "quantity":
+				return ec.fieldContext_FeedDetails_quantity(ctx, field)
+			case "quantityUnit":
+				return ec.fieldContext_FeedDetails_quantityUnit(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FeedDetails", field.Name)
 		},
@@ -2883,6 +2924,93 @@ func (ec *executionContext) fieldContext_FeedDetails_durationMinutes(_ context.C
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedDetails_foodName(ctx context.Context, field graphql.CollectedField, obj *model.FeedDetails) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FeedDetails_foodName,
+		func(ctx context.Context) (any, error) {
+			return obj.FoodName, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_FeedDetails_foodName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedDetails_quantity(ctx context.Context, field graphql.CollectedField, obj *model.FeedDetails) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FeedDetails_quantity,
+		func(ctx context.Context) (any, error) {
+			return obj.Quantity, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_FeedDetails_quantity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedDetails_quantityUnit(ctx context.Context, field graphql.CollectedField, obj *model.FeedDetails) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FeedDetails_quantityUnit,
+		func(ctx context.Context) (any, error) {
+			return obj.QuantityUnit, nil
+		},
+		nil,
+		ec.marshalOSolidsUnit2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐSolidsUnit,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_FeedDetails_quantityUnit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SolidsUnit does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3598,6 +3726,12 @@ func (ec *executionContext) fieldContext_ParsedActivity_feedDetails(_ context.Co
 				return ec.fieldContext_FeedDetails_feedType(ctx, field)
 			case "durationMinutes":
 				return ec.fieldContext_FeedDetails_durationMinutes(ctx, field)
+			case "foodName":
+				return ec.fieldContext_FeedDetails_foodName(ctx, field)
+			case "quantity":
+				return ec.fieldContext_FeedDetails_quantity(ctx, field)
+			case "quantityUnit":
+				return ec.fieldContext_FeedDetails_quantityUnit(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FeedDetails", field.Name)
 		},
@@ -6036,7 +6170,7 @@ func (ec *executionContext) unmarshalInputFeedDetailsInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"startTime", "endTime", "amountMl", "feedType"}
+	fieldsInOrder := [...]string{"startTime", "endTime", "amountMl", "feedType", "foodName", "quantity", "quantityUnit"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -6071,6 +6205,27 @@ func (ec *executionContext) unmarshalInputFeedDetailsInput(ctx context.Context, 
 				return it, err
 			}
 			it.FeedType = data
+		case "foodName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("foodName"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.FoodName = data
+		case "quantity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantity"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Quantity = data
+		case "quantityUnit":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantityUnit"))
+			data, err := ec.unmarshalOSolidsUnit2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐSolidsUnit(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.QuantityUnit = data
 		}
 	}
 
@@ -6630,6 +6785,12 @@ func (ec *executionContext) _FeedDetails(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = ec._FeedDetails_feedType(ctx, field, obj)
 		case "durationMinutes":
 			out.Values[i] = ec._FeedDetails_durationMinutes(ctx, field, obj)
+		case "foodName":
+			out.Values[i] = ec._FeedDetails_foodName(ctx, field, obj)
+		case "quantity":
+			out.Values[i] = ec._FeedDetails_quantity(ctx, field, obj)
+		case "quantityUnit":
+			out.Values[i] = ec._FeedDetails_quantityUnit(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8347,6 +8508,23 @@ func (ec *executionContext) marshalOFeedType2ᚖgithubᚗcomᚋswatkatzᚋbabyba
 	return v
 }
 
+func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel ast.SelectionSet, v *float64) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	res := graphql.MarshalFloatContext(*v)
+	return graphql.WrapContextMarshaler(ctx, res)
+}
+
 func (ec *executionContext) unmarshalOInt2ᚖint32(ctx context.Context, v any) (*int32, error) {
 	if v == nil {
 		return nil, nil
@@ -8378,6 +8556,22 @@ func (ec *executionContext) unmarshalOSleepDetailsInput2ᚖgithubᚗcomᚋswatka
 	}
 	res, err := ec.unmarshalInputSleepDetailsInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOSolidsUnit2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐSolidsUnit(ctx context.Context, v any) (*model.SolidsUnit, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.SolidsUnit)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOSolidsUnit2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐSolidsUnit(ctx context.Context, sel ast.SelectionSet, v *model.SolidsUnit) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {

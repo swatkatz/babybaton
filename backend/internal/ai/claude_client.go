@@ -133,15 +133,25 @@ Voice input: "%s"
 Rules:
 1. "now" or "right now" = current local time
 2. Relative times like "at 2:30" are absolute within today in the user's timezone
-3. Default feed type to "FORMULA" if not specified
+3. Default feed type to "FORMULA" if not specified (for liquid feeds)
 4. "pooped" means had_poop=true for diaper change
 5. "peed" means had_pee=true for diaper change
 6. ALL timestamps MUST use the user's timezone offset (e.g. -05:00), NEVER use "Z"
+7. If the caregiver mentions solid food (e.g. carrots, avocado, banana, rice cereal, puree), set feed_type to "SOLIDS". Extract food_name, quantity, and quantity_unit if mentioned.
 
-FEED ACTIVITIES:
+FEED ACTIVITIES (FORMULA/BREAST_MILK):
 - MUST have: start_time, amount_ml, feed_type
+- amount_ml should be set; food_name/quantity/quantity_unit should be null
 - If end_time provided: use it
 - If end_time NOT provided: set to null (will auto-calculate as start_time + 45 minutes)
+
+FEED ACTIVITIES (SOLIDS):
+- MUST have: start_time, feed_type ("SOLIDS"), food_name
+- quantity and quantity_unit are optional (use if mentioned)
+- quantity_unit must be one of: "SPOONS", "BOWLS", "PIECES", "PORTIONS"
+- amount_ml should be null for solids
+- If end_time provided: use it
+- If end_time NOT provided: set to null
 
 SLEEP ACTIVITIES:
 - MUST have: start_time
@@ -156,18 +166,39 @@ Extract all activities mentioned. Return ONLY valid JSON array (no markdown, no 
 
 [
   {
-    "activity_type": "FEED|DIAPER|SLEEP",
+    "activity_type": "FEED",
     "feed_details": {
       "start_time": "2024-01-15T14:30:00-05:00",
       "end_time": null,
       "amount_ml": 60,
-      "feed_type": "FORMULA"
-    },
+      "feed_type": "FORMULA",
+      "food_name": null,
+      "quantity": null,
+      "quantity_unit": null
+    }
+  },
+  {
+    "activity_type": "FEED",
+    "feed_details": {
+      "start_time": "2024-01-15T12:00:00-05:00",
+      "end_time": null,
+      "amount_ml": null,
+      "feed_type": "SOLIDS",
+      "food_name": "mushed carrots",
+      "quantity": 10,
+      "quantity_unit": "SPOONS"
+    }
+  },
+  {
+    "activity_type": "DIAPER",
     "diaper_details": {
       "changed_at": "2024-01-15T14:55:00-05:00",
       "had_poop": true,
       "had_pee": true
-    },
+    }
+  },
+  {
+    "activity_type": "SLEEP",
     "sleep_details": {
       "start_time": "2024-01-15T15:00:00-05:00",
       "end_time": null

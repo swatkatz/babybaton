@@ -277,4 +277,166 @@ func TestActivityDetailsOperations(t *testing.T) {
 		}
 		t.Logf("✓ Updated sleep start_time: %d minutes", *updatedAgain.DurationMinutes)
 	})
+
+	// Test Solids Feed Details
+	t.Run("CreateFeedDetails_Solids", func(t *testing.T) {
+		solidsActivity := &domain.Activity{
+			ID:            uuid.New(),
+			CareSessionID: session.ID,
+			ActivityType:  domain.ActivityTypeFeed,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+		if err := store.CreateActivity(ctx, solidsActivity); err != nil {
+			t.Fatalf("Failed to create solids activity: %v", err)
+		}
+
+		startTime := time.Now()
+		feedType := domain.FeedTypeSolids
+		foodName := "mushed carrots"
+		quantity := 10.0
+		quantityUnit := "spoons"
+
+		solidsDetails := &domain.FeedDetails{
+			ID:           uuid.New(),
+			ActivityID:   solidsActivity.ID,
+			StartTime:    startTime,
+			FeedType:     &feedType,
+			FoodName:     &foodName,
+			Quantity:     &quantity,
+			QuantityUnit: &quantityUnit,
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+		}
+
+		err := store.CreateFeedDetails(ctx, solidsDetails)
+		if err != nil {
+			t.Fatalf("Failed to create solids feed details: %v", err)
+		}
+
+		retrieved, err := store.GetFeedDetails(ctx, solidsActivity.ID)
+		if err != nil {
+			t.Fatalf("Failed to get solids feed details: %v", err)
+		}
+		if retrieved.FeedType == nil || *retrieved.FeedType != domain.FeedTypeSolids {
+			t.Errorf("Expected feed type solids, got %v", retrieved.FeedType)
+		}
+		if retrieved.FoodName == nil || *retrieved.FoodName != "mushed carrots" {
+			t.Errorf("Expected food name 'mushed carrots', got %v", retrieved.FoodName)
+		}
+		if retrieved.Quantity == nil || *retrieved.Quantity != 10.0 {
+			t.Errorf("Expected quantity 10, got %v", retrieved.Quantity)
+		}
+		if retrieved.QuantityUnit == nil || *retrieved.QuantityUnit != "spoons" {
+			t.Errorf("Expected quantity unit 'spoons', got %v", retrieved.QuantityUnit)
+		}
+		if retrieved.AmountMl != nil {
+			t.Errorf("Expected amount_ml to be nil for solids, got %v", retrieved.AmountMl)
+		}
+		t.Logf("✓ Created and retrieved solids feed: %s (%v %s)", *retrieved.FoodName, *retrieved.Quantity, *retrieved.QuantityUnit)
+	})
+
+	// Test Solids Feed Details with minimal fields (food name only)
+	t.Run("CreateFeedDetails_Solids_MinimalFields", func(t *testing.T) {
+		minimalActivity := &domain.Activity{
+			ID:            uuid.New(),
+			CareSessionID: session.ID,
+			ActivityType:  domain.ActivityTypeFeed,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+		if err := store.CreateActivity(ctx, minimalActivity); err != nil {
+			t.Fatalf("Failed to create minimal solids activity: %v", err)
+		}
+
+		startTime := time.Now()
+		feedType := domain.FeedTypeSolids
+		foodName := "avocado"
+
+		minimalDetails := &domain.FeedDetails{
+			ID:         uuid.New(),
+			ActivityID: minimalActivity.ID,
+			StartTime:  startTime,
+			FeedType:   &feedType,
+			FoodName:   &foodName,
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		}
+
+		err := store.CreateFeedDetails(ctx, minimalDetails)
+		if err != nil {
+			t.Fatalf("Failed to create minimal solids feed details: %v", err)
+		}
+
+		retrieved, err := store.GetFeedDetails(ctx, minimalActivity.ID)
+		if err != nil {
+			t.Fatalf("Failed to get minimal solids feed details: %v", err)
+		}
+		if retrieved.FoodName == nil || *retrieved.FoodName != "avocado" {
+			t.Errorf("Expected food name 'avocado', got %v", retrieved.FoodName)
+		}
+		if retrieved.Quantity != nil {
+			t.Errorf("Expected quantity to be nil, got %v", retrieved.Quantity)
+		}
+		if retrieved.QuantityUnit != nil {
+			t.Errorf("Expected quantity unit to be nil, got %v", retrieved.QuantityUnit)
+		}
+		t.Logf("✓ Created and retrieved minimal solids feed: %s (no quantity)", *retrieved.FoodName)
+	})
+
+	// Regression: Formula feed still works unchanged
+	t.Run("CreateFeedDetails_Formula_Unchanged", func(t *testing.T) {
+		formulaActivity := &domain.Activity{
+			ID:            uuid.New(),
+			CareSessionID: session.ID,
+			ActivityType:  domain.ActivityTypeFeed,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+		if err := store.CreateActivity(ctx, formulaActivity); err != nil {
+			t.Fatalf("Failed to create formula activity: %v", err)
+		}
+
+		startTime := time.Now()
+		endTime := startTime.Add(15 * time.Minute)
+		amountMl := 150
+		feedType := domain.FeedTypeFormula
+
+		formulaDetails := &domain.FeedDetails{
+			ID:         uuid.New(),
+			ActivityID: formulaActivity.ID,
+			StartTime:  startTime,
+			EndTime:    &endTime,
+			AmountMl:   &amountMl,
+			FeedType:   &feedType,
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		}
+
+		err := store.CreateFeedDetails(ctx, formulaDetails)
+		if err != nil {
+			t.Fatalf("Failed to create formula feed details: %v", err)
+		}
+
+		retrieved, err := store.GetFeedDetails(ctx, formulaActivity.ID)
+		if err != nil {
+			t.Fatalf("Failed to get formula feed details: %v", err)
+		}
+		if retrieved.FeedType == nil || *retrieved.FeedType != domain.FeedTypeFormula {
+			t.Errorf("Expected feed type formula, got %v", retrieved.FeedType)
+		}
+		if retrieved.AmountMl == nil || *retrieved.AmountMl != 150 {
+			t.Errorf("Expected amount 150ml, got %v", retrieved.AmountMl)
+		}
+		if retrieved.FoodName != nil {
+			t.Errorf("Expected food name to be nil for formula, got %v", retrieved.FoodName)
+		}
+		if retrieved.Quantity != nil {
+			t.Errorf("Expected quantity to be nil for formula, got %v", retrieved.Quantity)
+		}
+		if retrieved.QuantityUnit != nil {
+			t.Errorf("Expected quantity unit to be nil for formula, got %v", retrieved.QuantityUnit)
+		}
+		t.Logf("✓ Formula feed unchanged: %dml %s", *retrieved.AmountMl, *retrieved.FeedType)
+	})
 }
