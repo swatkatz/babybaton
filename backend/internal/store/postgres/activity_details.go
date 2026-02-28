@@ -16,9 +16,9 @@ import (
 // CreateFeedDetails creates feed details for an activity
 func (s *PostgresStore) CreateFeedDetails(ctx context.Context, details *domain.FeedDetails) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO feed_details (id, activity_id, start_time, end_time, amount_ml, feed_type, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, details.ID, details.ActivityID, details.StartTime, details.EndTime, details.AmountMl, details.FeedType, details.CreatedAt, details.UpdatedAt)
+		INSERT INTO feed_details (id, activity_id, start_time, end_time, amount_ml, feed_type, food_name, quantity, quantity_unit, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`, details.ID, details.ActivityID, details.StartTime, details.EndTime, details.AmountMl, details.FeedType, details.FoodName, details.Quantity, details.QuantityUnit, details.CreatedAt, details.UpdatedAt)
 
 	if err != nil {
 		return fmt.Errorf("failed to create feed details: %w", err)
@@ -32,7 +32,7 @@ func (s *PostgresStore) GetFeedDetails(ctx context.Context, activityID uuid.UUID
 	details := &domain.FeedDetails{}
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, activity_id, start_time, end_time, amount_ml, feed_type, created_at, updated_at
+		SELECT id, activity_id, start_time, end_time, amount_ml, feed_type, food_name, quantity, quantity_unit, created_at, updated_at
 		FROM feed_details
 		WHERE activity_id = $1
 	`, activityID).Scan(
@@ -42,6 +42,9 @@ func (s *PostgresStore) GetFeedDetails(ctx context.Context, activityID uuid.UUID
 		&details.EndTime,
 		&details.AmountMl,
 		&details.FeedType,
+		&details.FoodName,
+		&details.Quantity,
+		&details.QuantityUnit,
 		&details.CreatedAt,
 		&details.UpdatedAt,
 	)
@@ -147,7 +150,7 @@ func (s *PostgresStore) GetSleepDetails(ctx context.Context, activityID uuid.UUI
 // GetRecentFeedDetailsForFamily retrieves recent feed details across all sessions for a family
 func (s *PostgresStore) GetRecentFeedDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.FeedDetails, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT fd.id, fd.activity_id, fd.start_time, fd.end_time, fd.amount_ml, fd.feed_type, fd.created_at, fd.updated_at
+		SELECT fd.id, fd.activity_id, fd.start_time, fd.end_time, fd.amount_ml, fd.feed_type, fd.food_name, fd.quantity, fd.quantity_unit, fd.created_at, fd.updated_at
 		FROM feed_details fd
 		JOIN activities a ON fd.activity_id = a.id
 		JOIN care_sessions cs ON a.care_session_id = cs.id
@@ -166,7 +169,8 @@ func (s *PostgresStore) GetRecentFeedDetailsForFamily(ctx context.Context, famil
 		d := &domain.FeedDetails{}
 		err := rows.Scan(
 			&d.ID, &d.ActivityID, &d.StartTime, &d.EndTime,
-			&d.AmountMl, &d.FeedType, &d.CreatedAt, &d.UpdatedAt,
+			&d.AmountMl, &d.FeedType, &d.FoodName, &d.Quantity, &d.QuantityUnit,
+			&d.CreatedAt, &d.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan feed details: %w", err)
@@ -185,9 +189,9 @@ func (s *PostgresStore) GetRecentFeedDetailsForFamily(ctx context.Context, famil
 func (s *PostgresStore) UpdateFeedDetails(ctx context.Context, details *domain.FeedDetails) error {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE feed_details
-		SET start_time = $1, end_time = $2, amount_ml = $3, feed_type = $4, updated_at = $5
-		WHERE id = $6
-	`, details.StartTime, details.EndTime, details.AmountMl, details.FeedType, details.UpdatedAt, details.ID)
+		SET start_time = $1, end_time = $2, amount_ml = $3, feed_type = $4, food_name = $5, quantity = $6, quantity_unit = $7, updated_at = $8
+		WHERE id = $9
+	`, details.StartTime, details.EndTime, details.AmountMl, details.FeedType, details.FoodName, details.Quantity, details.QuantityUnit, details.UpdatedAt, details.ID)
 
 	if err != nil {
 		return fmt.Errorf("failed to update feed details: %w", err)
