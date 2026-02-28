@@ -1,6 +1,8 @@
 package mapper
 
 import (
+	"strings"
+
 	"github.com/swatkatz/babybaton/backend/graph/model"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
 )
@@ -112,12 +114,21 @@ func FeedDetailsToGraphQL(fd *domain.FeedDetails) *model.FeedDetails {
 		amountMl = &amt
 	}
 
+	var quantityUnit *model.SolidsUnit
+	if fd.QuantityUnit != nil {
+		qu := model.SolidsUnit(strings.ToUpper(*fd.QuantityUnit))
+		quantityUnit = &qu
+	}
+
 	return &model.FeedDetails{
 		StartTime:       fd.StartTime,
 		EndTime:         fd.EndTime,
 		AmountMl:        amountMl,
 		FeedType:        feedType,
 		DurationMinutes: durationMinutes, // Calculated field
+		FoodName:        fd.FoodName,
+		Quantity:        fd.Quantity,
+		QuantityUnit:    quantityUnit,
 	}
 }
 

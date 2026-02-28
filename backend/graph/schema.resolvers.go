@@ -412,7 +412,7 @@ func (r *mutationResolver) AddActivities(ctx context.Context, activities []*mode
 				return nil, fmt.Errorf("feed activity requires feedDetails")
 			}
 
-			// Convert GraphQL FeedType (BREAST_MILK, FORMULA) to domain FeedType (breast_milk, formula)
+			// Convert GraphQL FeedType (BREAST_MILK, FORMULA, SOLIDS) to domain FeedType (breast_milk, formula, solids)
 			var feedType *domain.FeedType
 			if activityInput.FeedDetails.FeedType != nil {
 				ft := domain.FeedType(strings.ToLower(string(*activityInput.FeedDetails.FeedType)))
@@ -426,15 +426,25 @@ func (r *mutationResolver) AddActivities(ctx context.Context, activities []*mode
 				amountMl = &val
 			}
 
+			// Convert SolidsUnit to string for QuantityUnit
+			var quantityUnit *string
+			if activityInput.FeedDetails.QuantityUnit != nil {
+				qu := strings.ToLower(string(*activityInput.FeedDetails.QuantityUnit))
+				quantityUnit = &qu
+			}
+
 			details := &domain.FeedDetails{
-				ID:         uuid.New(),
-				ActivityID: activity.ID,
-				StartTime:  activityInput.FeedDetails.StartTime,
-				EndTime:    activityInput.FeedDetails.EndTime,
-				AmountMl:   amountMl,
-				FeedType:   feedType,
-				CreatedAt:  now,
-				UpdatedAt:  now,
+				ID:           uuid.New(),
+				ActivityID:   activity.ID,
+				StartTime:    activityInput.FeedDetails.StartTime,
+				EndTime:      activityInput.FeedDetails.EndTime,
+				AmountMl:     amountMl,
+				FeedType:     feedType,
+				FoodName:     activityInput.FeedDetails.FoodName,
+				Quantity:     activityInput.FeedDetails.Quantity,
+				QuantityUnit: quantityUnit,
+				CreatedAt:    now,
+				UpdatedAt:    now,
 			}
 			fmt.Printf("📝 Creating feed details for activity %s (feed_type: %v)\n", activity.ID, feedType)
 			if err := r.store.CreateFeedDetails(ctx, details); err != nil {
@@ -681,6 +691,16 @@ func (r *mutationResolver) UpdateActivity(ctx context.Context, activityID string
 			feedDetails.FeedType = nil
 		}
 
+		feedDetails.FoodName = input.FeedDetails.FoodName
+		feedDetails.Quantity = input.FeedDetails.Quantity
+
+		if input.FeedDetails.QuantityUnit != nil {
+			qu := strings.ToLower(string(*input.FeedDetails.QuantityUnit))
+			feedDetails.QuantityUnit = &qu
+		} else {
+			feedDetails.QuantityUnit = nil
+		}
+
 		feedDetails.UpdatedAt = now
 
 		if err := r.store.UpdateFeedDetails(ctx, feedDetails); err != nil {
@@ -886,4 +906,3 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
-

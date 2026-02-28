@@ -16,6 +16,14 @@ enum ActivityType {
 enum FeedType {
   BREAST_MILK
   FORMULA
+  SOLIDS
+}
+
+enum SolidsUnit {
+  SPOONS
+  BOWLS
+  PIECES
+  PORTIONS
 }
 
 enum PredictionConfidence {
@@ -73,6 +81,9 @@ type FeedDetails {
   amountMl: Int
   feedType: FeedType
   durationMinutes: Int
+  foodName: String
+  quantity: Float
+  quantityUnit: SolidsUnit
 }
 
 type DiaperDetails {
@@ -151,6 +162,9 @@ input FeedDetailsInput {
   endTime: DateTime
   amountMl: Int
   feedType: FeedType
+  foodName: String
+  quantity: Float
+  quantityUnit: SolidsUnit
 }
 
 input DiaperDetailsInput {

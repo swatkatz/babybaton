@@ -68,6 +68,19 @@ func parseFeedDetailsOutput(details map[string]interface{}) *model.FeedDetails {
 		fd.FeedType = &ft
 	}
 
+	if foodName, ok := details["food_name"].(string); ok {
+		fd.FoodName = &foodName
+	}
+
+	if quantity, ok := details["quantity"].(float64); ok {
+		fd.Quantity = &quantity
+	}
+
+	if quantityUnit, ok := details["quantity_unit"].(string); ok {
+		qu := model.SolidsUnit(quantityUnit)
+		fd.QuantityUnit = &qu
+	}
+
 	// Calculate duration if both times exist
 	if fd.EndTime != nil {
 		duration := int32(fd.EndTime.Sub(fd.StartTime).Minutes())
@@ -185,6 +198,19 @@ func parseFeedDetails(details map[string]interface{}) *model.FeedDetailsInput {
 	if feedType, ok := details["feed_type"].(string); ok {
 		ft := model.FeedType(feedType)
 		fd.FeedType = &ft
+	}
+
+	if foodName, ok := details["food_name"].(string); ok {
+		fd.FoodName = &foodName
+	}
+
+	if quantity, ok := details["quantity"].(float64); ok {
+		fd.Quantity = &quantity
+	}
+
+	if quantityUnit, ok := details["quantity_unit"].(string); ok {
+		qu := model.SolidsUnit(quantityUnit)
+		fd.QuantityUnit = &qu
 	}
 
 	return fd

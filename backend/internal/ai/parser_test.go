@@ -363,6 +363,220 @@ func TestConvertToActivityInputs_EmptyInput(t *testing.T) {
 	}
 }
 
+func TestConvertToParsedActivities_Solids(t *testing.T) {
+	activities := []map[string]interface{}{
+		{
+			"activity_type": "FEED",
+			"feed_details": map[string]interface{}{
+				"start_time":    "2024-01-01T12:00:00Z",
+				"feed_type":     "SOLIDS",
+				"food_name":     "mushed carrots",
+				"quantity":      float64(10),
+				"quantity_unit": "SPOONS",
+			},
+		},
+	}
+
+	result, errors := ConvertToParsedActivities(activities)
+
+	if len(errors) != 0 {
+		t.Fatalf("unexpected errors: %v", errors)
+	}
+	if len(result) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(result))
+	}
+
+	r := result[0]
+	if r.ActivityType != model.ActivityTypeFeed {
+		t.Errorf("ActivityType = %q, want %q", r.ActivityType, model.ActivityTypeFeed)
+	}
+	if r.FeedDetails == nil {
+		t.Fatal("expected FeedDetails to be set")
+	}
+	if r.FeedDetails.FeedType == nil || *r.FeedDetails.FeedType != model.FeedTypeSolids {
+		t.Errorf("FeedType = %v, want SOLIDS", r.FeedDetails.FeedType)
+	}
+	if r.FeedDetails.FoodName == nil || *r.FeedDetails.FoodName != "mushed carrots" {
+		t.Errorf("FoodName = %v, want 'mushed carrots'", r.FeedDetails.FoodName)
+	}
+	if r.FeedDetails.Quantity == nil || *r.FeedDetails.Quantity != 10.0 {
+		t.Errorf("Quantity = %v, want 10", r.FeedDetails.Quantity)
+	}
+	if r.FeedDetails.QuantityUnit == nil || *r.FeedDetails.QuantityUnit != model.SolidsUnitSpoons {
+		t.Errorf("QuantityUnit = %v, want SPOONS", r.FeedDetails.QuantityUnit)
+	}
+	if r.FeedDetails.AmountMl != nil {
+		t.Errorf("AmountMl = %v, want nil for solids", r.FeedDetails.AmountMl)
+	}
+}
+
+func TestConvertToParsedActivities_Solids_NoQuantity(t *testing.T) {
+	activities := []map[string]interface{}{
+		{
+			"activity_type": "FEED",
+			"feed_details": map[string]interface{}{
+				"start_time": "2024-01-01T12:00:00Z",
+				"feed_type":  "SOLIDS",
+				"food_name":  "banana",
+			},
+		},
+	}
+
+	result, errors := ConvertToParsedActivities(activities)
+
+	if len(errors) != 0 {
+		t.Fatalf("unexpected errors: %v", errors)
+	}
+
+	r := result[0]
+	if r.FeedDetails.FoodName == nil || *r.FeedDetails.FoodName != "banana" {
+		t.Errorf("FoodName = %v, want 'banana'", r.FeedDetails.FoodName)
+	}
+	if r.FeedDetails.Quantity != nil {
+		t.Errorf("Quantity = %v, want nil", r.FeedDetails.Quantity)
+	}
+	if r.FeedDetails.QuantityUnit != nil {
+		t.Errorf("QuantityUnit = %v, want nil", r.FeedDetails.QuantityUnit)
+	}
+}
+
+func TestConvertToParsedActivities_Formula_Unchanged(t *testing.T) {
+	activities := []map[string]interface{}{
+		{
+			"activity_type": "FEED",
+			"feed_details": map[string]interface{}{
+				"start_time": "2024-01-01T10:00:00Z",
+				"amount_ml":  float64(120),
+				"feed_type":  "FORMULA",
+			},
+		},
+	}
+
+	result, errors := ConvertToParsedActivities(activities)
+
+	if len(errors) != 0 {
+		t.Fatalf("unexpected errors: %v", errors)
+	}
+
+	r := result[0]
+	if r.FeedDetails.FeedType == nil || *r.FeedDetails.FeedType != model.FeedTypeFormula {
+		t.Errorf("FeedType = %v, want FORMULA", r.FeedDetails.FeedType)
+	}
+	if r.FeedDetails.AmountMl == nil || *r.FeedDetails.AmountMl != 120 {
+		t.Errorf("AmountMl = %v, want 120", r.FeedDetails.AmountMl)
+	}
+	if r.FeedDetails.FoodName != nil {
+		t.Errorf("FoodName = %v, want nil for formula", r.FeedDetails.FoodName)
+	}
+	if r.FeedDetails.Quantity != nil {
+		t.Errorf("Quantity = %v, want nil for formula", r.FeedDetails.Quantity)
+	}
+	if r.FeedDetails.QuantityUnit != nil {
+		t.Errorf("QuantityUnit = %v, want nil for formula", r.FeedDetails.QuantityUnit)
+	}
+}
+
+func TestConvertToActivityInputs_Solids(t *testing.T) {
+	activities := []map[string]interface{}{
+		{
+			"activity_type": "FEED",
+			"feed_details": map[string]interface{}{
+				"start_time":    "2024-01-01T12:00:00Z",
+				"feed_type":     "SOLIDS",
+				"food_name":     "mushed carrots",
+				"quantity":      float64(10),
+				"quantity_unit": "SPOONS",
+			},
+		},
+	}
+
+	result, errors := ConvertToActivityInputs(activities)
+
+	if len(errors) != 0 {
+		t.Fatalf("unexpected errors: %v", errors)
+	}
+	if len(result) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(result))
+	}
+
+	r := result[0]
+	if r.FeedDetails == nil {
+		t.Fatal("expected FeedDetails to be set")
+	}
+	if r.FeedDetails.FeedType == nil || *r.FeedDetails.FeedType != model.FeedTypeSolids {
+		t.Errorf("FeedType = %v, want SOLIDS", r.FeedDetails.FeedType)
+	}
+	if r.FeedDetails.FoodName == nil || *r.FeedDetails.FoodName != "mushed carrots" {
+		t.Errorf("FoodName = %v, want 'mushed carrots'", r.FeedDetails.FoodName)
+	}
+	if r.FeedDetails.Quantity == nil || *r.FeedDetails.Quantity != 10.0 {
+		t.Errorf("Quantity = %v, want 10", r.FeedDetails.Quantity)
+	}
+	if r.FeedDetails.QuantityUnit == nil || *r.FeedDetails.QuantityUnit != model.SolidsUnitSpoons {
+		t.Errorf("QuantityUnit = %v, want SPOONS", r.FeedDetails.QuantityUnit)
+	}
+}
+
+func TestConvertToActivityInputs_Solids_NoQuantity(t *testing.T) {
+	activities := []map[string]interface{}{
+		{
+			"activity_type": "FEED",
+			"feed_details": map[string]interface{}{
+				"start_time": "2024-01-01T12:00:00Z",
+				"feed_type":  "SOLIDS",
+				"food_name":  "banana",
+			},
+		},
+	}
+
+	result, errors := ConvertToActivityInputs(activities)
+
+	if len(errors) != 0 {
+		t.Fatalf("unexpected errors: %v", errors)
+	}
+
+	r := result[0]
+	if r.FeedDetails.FoodName == nil || *r.FeedDetails.FoodName != "banana" {
+		t.Errorf("FoodName = %v, want 'banana'", r.FeedDetails.FoodName)
+	}
+	if r.FeedDetails.Quantity != nil {
+		t.Errorf("Quantity = %v, want nil", r.FeedDetails.Quantity)
+	}
+	if r.FeedDetails.QuantityUnit != nil {
+		t.Errorf("QuantityUnit = %v, want nil", r.FeedDetails.QuantityUnit)
+	}
+}
+
+func TestConvertToActivityInputs_Formula_Unchanged(t *testing.T) {
+	activities := []map[string]interface{}{
+		{
+			"activity_type": "FEED",
+			"feed_details": map[string]interface{}{
+				"start_time": "2024-01-01T10:00:00Z",
+				"amount_ml":  float64(120),
+				"feed_type":  "FORMULA",
+			},
+		},
+	}
+
+	result, errors := ConvertToActivityInputs(activities)
+
+	if len(errors) != 0 {
+		t.Fatalf("unexpected errors: %v", errors)
+	}
+
+	r := result[0]
+	if r.FeedDetails.FeedType == nil || *r.FeedDetails.FeedType != model.FeedTypeFormula {
+		t.Errorf("FeedType = %v, want FORMULA", r.FeedDetails.FeedType)
+	}
+	if r.FeedDetails.AmountMl == nil || *r.FeedDetails.AmountMl != 120 {
+		t.Errorf("AmountMl = %v, want 120", r.FeedDetails.AmountMl)
+	}
+	if r.FeedDetails.FoodName != nil {
+		t.Errorf("FoodName = %v, want nil for formula", r.FeedDetails.FoodName)
+	}
+}
+
 func TestConvertToActivityInputs_FeedNoEndTime(t *testing.T) {
 	activities := []map[string]interface{}{
 		{
