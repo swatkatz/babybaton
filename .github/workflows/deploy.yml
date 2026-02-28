@@ -14,8 +14,8 @@ jobs:
       - name: Run pending migrations
         run: ./scripts/migrate.sh "${{ secrets.DATABASE_PUBLIC_URL }}" ./migrations
 
-      - name: Setup Railway CLI
-        uses: railwayapp/setup-cli@v1
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
       - name: Deploy backend
         env:
