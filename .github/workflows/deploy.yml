@@ -1,0 +1,28 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Migrate & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run pending migrations
+        run: ./scripts/migrate.sh "${{ secrets.DATABASE_PUBLIC_URL }}" ./migrations
+
+      - name: Setup Railway CLI
+        uses: railwayapp/setup-cli@v1
+
+      - name: Deploy backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --ci --service ${{ secrets.BACKEND_SERVICE_ID }}
+
+      - name: Deploy frontend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --ci --service ${{ secrets.FRONTEND_SERVICE_ID }}
