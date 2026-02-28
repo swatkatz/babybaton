@@ -35,6 +35,9 @@ export const GET_CURRENT_SESSION = gql`
             amountMl
             feedType
             durationMinutes
+            foodName
+            quantity
+            quantityUnit
           }
         }
         ... on DiaperActivity {
@@ -95,6 +98,9 @@ export const GET_RECENT_SESSIONS = gql`
             amountMl
             feedType
             durationMinutes
+            foodName
+            quantity
+            quantityUnit
           }
         }
         ... on DiaperActivity {
@@ -153,6 +159,9 @@ export const CARE_SESSION_FRAGMENT = gql`
           amountMl
           feedType
           durationMinutes
+          foodName
+          quantity
+          quantityUnit
         }
       }
       ... on DiaperActivity {

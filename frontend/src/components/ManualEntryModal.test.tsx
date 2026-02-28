@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { ManualEntryModal } from './ManualEntryModal';
-import { ActivityType, FeedType } from '../types/__generated__/graphql';
+import { ActivityType, FeedType, SolidsUnit } from '../types/__generated__/graphql';
 
 // Mock lucide icons
 jest.mock('lucide-react-native', () => ({
@@ -216,6 +216,85 @@ describe('ManualEntryModal', () => {
 
       const savedActivities = baseProps.onSave.mock.calls[0][0];
       expect(savedActivities[0].sleepDetails.endTime).toBeDefined();
+    });
+  });
+
+  describe('solids feed form', () => {
+    it('should render Solids chip in feed type selector', () => {
+      const { getByText } = render(<ManualEntryModal {...baseProps} />);
+      fireEvent.press(getByText('Feed'));
+      expect(getByText('Formula')).toBeTruthy();
+      expect(getByText('Breast Milk')).toBeTruthy();
+      expect(getByText('Solids')).toBeTruthy();
+    });
+
+    it('should show solids fields when Solids is selected', () => {
+      const { getByText, getByPlaceholderText, queryByPlaceholderText } = render(
+        <ManualEntryModal {...baseProps} />
+      );
+      fireEvent.press(getByText('Feed'));
+      fireEvent.press(getByText('Solids'));
+      expect(getByPlaceholderText('e.g., mushed carrots')).toBeTruthy();
+      expect(queryByPlaceholderText('e.g., 120')).toBeNull();
+    });
+
+    it('should show ml field when Formula is selected (regression)', () => {
+      const { getByText, getByPlaceholderText, queryByPlaceholderText } = render(
+        <ManualEntryModal {...baseProps} />
+      );
+      fireEvent.press(getByText('Feed'));
+      fireEvent.press(getByText('Formula'));
+      expect(getByPlaceholderText('e.g., 120')).toBeTruthy();
+      expect(queryByPlaceholderText('e.g., mushed carrots')).toBeNull();
+    });
+
+    it('should validate food name required for Solids', () => {
+      const { getByText } = render(<ManualEntryModal {...baseProps} />);
+      fireEvent.press(getByText('Feed'));
+      fireEvent.press(getByText('Solids'));
+      fireEvent.press(getByText('Save Activity'));
+
+      expect(getByText('Please enter a food name')).toBeTruthy();
+      expect(baseProps.onSave).not.toHaveBeenCalled();
+    });
+
+    it('should save Solids feed with all fields', () => {
+      const { getByText, getByPlaceholderText } = render(
+        <ManualEntryModal {...baseProps} />
+      );
+      fireEvent.press(getByText('Feed'));
+      fireEvent.press(getByText('Solids'));
+      fireEvent.changeText(getByPlaceholderText('e.g., mushed carrots'), 'mushed carrots');
+      fireEvent.changeText(getByPlaceholderText('e.g., 10'), '10');
+      fireEvent.press(getByText('Bowls'));
+      fireEvent.press(getByText('Save Activity'));
+
+      expect(baseProps.onSave).toHaveBeenCalledTimes(1);
+      const savedActivities = baseProps.onSave.mock.calls[0][0];
+      expect(savedActivities).toHaveLength(1);
+      expect(savedActivities[0].activityType).toBe(ActivityType.Feed);
+      expect(savedActivities[0].feedDetails.feedType).toBe(FeedType.Solids);
+      expect(savedActivities[0].feedDetails.foodName).toBe('mushed carrots');
+      expect(savedActivities[0].feedDetails.quantity).toBe(10);
+      expect(savedActivities[0].feedDetails.quantityUnit).toBe(SolidsUnit.Bowls);
+      expect(savedActivities[0].feedDetails.amountMl).toBeUndefined();
+    });
+
+    it('should save Solids feed with food name only', () => {
+      const { getByText, getByPlaceholderText } = render(
+        <ManualEntryModal {...baseProps} />
+      );
+      fireEvent.press(getByText('Feed'));
+      fireEvent.press(getByText('Solids'));
+      fireEvent.changeText(getByPlaceholderText('e.g., mushed carrots'), 'banana');
+      fireEvent.press(getByText('Save Activity'));
+
+      expect(baseProps.onSave).toHaveBeenCalledTimes(1);
+      const savedActivities = baseProps.onSave.mock.calls[0][0];
+      expect(savedActivities[0].feedDetails.feedType).toBe(FeedType.Solids);
+      expect(savedActivities[0].feedDetails.foodName).toBe('banana');
+      expect(savedActivities[0].feedDetails.quantity).toBeUndefined();
+      expect(savedActivities[0].feedDetails.quantityUnit).toBeUndefined();
     });
   });
 

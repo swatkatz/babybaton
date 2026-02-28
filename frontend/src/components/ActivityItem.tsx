@@ -12,7 +12,7 @@ import { Utensils, Droplets, Moon } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { formatDuration, formatTime } from '../utils/time';
-import { GetCurrentSessionQuery } from '../types/__generated__/graphql';
+import { FeedType, GetCurrentSessionQuery } from '../types/__generated__/graphql';
 /**
  * ActivityItem Component
  * Displays a single activity (feed, diaper, or sleep)
@@ -65,11 +65,18 @@ export function ActivityItem({
         const feedType = activity.feedDetails?.feedType;
         const feedStartTime = activity.feedDetails?.startTime;
         const feedEndTime = activity.feedDetails?.endTime;
+        const foodName = activity.feedDetails?.foodName;
+        const qty = activity.feedDetails?.quantity;
+        const qtyUnit = activity.feedDetails?.quantityUnit;
+
+        const feedDescription = feedType === FeedType.Solids
+          ? `Fed ${foodName}${qty && qtyUnit ? ` (${qty} ${qtyUnit.toLowerCase()})` : ''}`
+          : `Fed ${amountMl}ml ${feedType?.toLowerCase().replace('_', ' ')}`;
 
         return (
           <View style={styles.contentContainer}>
             <Text style={styles.mainText}>
-              Fed {amountMl}ml {feedType?.toLowerCase().replace('_', ' ')}
+              {feedDescription}
             </Text>
             <Text style={styles.timestampText}>
               {feedStartTime && formatTime(new Date(feedStartTime))}

@@ -15,7 +15,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { Utensils, Droplets, Moon } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { spacing, typography, layout } from '../theme/spacing';
-import { ActivityType, FeedType, ActivityInput } from '../types/__generated__/graphql';
+import { ActivityType, FeedType, SolidsUnit, ActivityInput } from '../types/__generated__/graphql';
 
 type SelectedActivityType = 'FEED' | 'DIAPER' | 'SLEEP';
 
@@ -38,6 +38,9 @@ export function ManualEntryModal({
   const [feedTime, setFeedTime] = useState(new Date());
   const [feedAmount, setFeedAmount] = useState('');
   const [feedType, setFeedType] = useState<FeedType>(FeedType.Formula);
+  const [foodName, setFoodName] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [quantityUnit, setQuantityUnit] = useState<SolidsUnit | null>(null);
 
   // Diaper state
   const [diaperTime, setDiaperTime] = useState(new Date());
@@ -60,6 +63,9 @@ export function ManualEntryModal({
     setFeedTime(new Date());
     setFeedAmount('');
     setFeedType(FeedType.Formula);
+    setFoodName('');
+    setQuantity('');
+    setQuantityUnit(null);
     setDiaperTime(new Date());
     setHadPoop(false);
     setHadPee(true);
@@ -79,8 +85,14 @@ export function ManualEntryModal({
     const newErrors: Record<string, string> = {};
 
     if (selectedType === 'FEED') {
-      if (!feedAmount.trim() || isNaN(Number(feedAmount)) || Number(feedAmount) <= 0) {
-        newErrors.feedAmount = 'Please enter a valid amount in ml';
+      if (feedType === FeedType.Solids) {
+        if (!foodName.trim()) {
+          newErrors.foodName = 'Please enter a food name';
+        }
+      } else {
+        if (!feedAmount.trim() || isNaN(Number(feedAmount)) || Number(feedAmount) <= 0) {
+          newErrors.feedAmount = 'Please enter a valid amount in ml';
+        }
       }
     }
 
@@ -103,11 +115,19 @@ export function ManualEntryModal({
       case 'FEED':
         activity = {
           activityType: ActivityType.Feed,
-          feedDetails: {
-            startTime: feedTime.toISOString(),
-            amountMl: Number(feedAmount),
-            feedType: feedType,
-          },
+          feedDetails: feedType === FeedType.Solids
+            ? {
+                startTime: feedTime.toISOString(),
+                feedType: FeedType.Solids,
+                foodName: foodName.trim(),
+                quantity: quantity.trim() ? Number(quantity) : undefined,
+                quantityUnit: quantityUnit ?? undefined,
+              }
+            : {
+                startTime: feedTime.toISOString(),
+                amountMl: Number(feedAmount),
+                feedType: feedType,
+              },
         };
         break;
       case 'DIAPER':
@@ -291,35 +311,104 @@ export function ManualEntryModal({
     </View>
   );
 
-  const renderFeedForm = () => (
-    <View style={styles.formSection}>
-      {renderTimePicker('Time', feedTime, setFeedTime, 'feedTime')}
+  const handleFeedTypeChange = (newFeedType: FeedType) => {
+    const wasSolids = feedType === FeedType.Solids;
+    const isSolids = newFeedType === FeedType.Solids;
+    setFeedType(newFeedType);
+    setErrors({});
+    if (wasSolids && !isSolids) {
+      setFoodName('');
+      setQuantity('');
+      setQuantityUnit(null);
+    } else if (!wasSolids && isSolids) {
+      setFeedAmount('');
+    }
+  };
+
+  const renderSolidsFields = () => (
+    <>
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Food Name</Text>
+        <TextInput
+          style={[styles.input, errors.foodName && styles.inputError]}
+          placeholder="e.g., mushed carrots"
+          placeholderTextColor={colors.textLight}
+          value={foodName}
+          onChangeText={(text) => {
+            setFoodName(text);
+            setErrors({ ...errors, foodName: '' });
+          }}
+          editable={!saving}
+        />
+        {errors.foodName ? (
+          <Text style={styles.errorText}>{errors.foodName}</Text>
+        ) : null}
+      </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Amount (ml)</Text>
+        <Text style={styles.label}>Quantity (optional)</Text>
         <TextInput
-          style={[styles.input, errors.feedAmount && styles.inputError]}
-          placeholder="e.g., 120"
+          style={styles.input}
+          placeholder="e.g., 10"
           placeholderTextColor={colors.textLight}
-          value={feedAmount}
-          onChangeText={(text) => {
-            setFeedAmount(text);
-            setErrors({ ...errors, feedAmount: '' });
-          }}
+          value={quantity}
+          onChangeText={setQuantity}
           keyboardType="numeric"
           editable={!saving}
         />
-        {errors.feedAmount ? (
-          <Text style={styles.errorText}>{errors.feedAmount}</Text>
-        ) : null}
       </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Unit (optional)</Text>
+        <View style={styles.chipsContainer}>
+          {[SolidsUnit.Spoons, SolidsUnit.Bowls, SolidsUnit.Pieces, SolidsUnit.Portions].map((unit) => (
+            <TouchableOpacity
+              key={unit}
+              style={[styles.chip, quantityUnit === unit && styles.chipSelected]}
+              onPress={() => setQuantityUnit(quantityUnit === unit ? null : unit)}
+              disabled={saving}
+            >
+              <Text style={[styles.chipText, quantityUnit === unit && styles.chipTextSelected]}>
+                {unit.charAt(0) + unit.slice(1).toLowerCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </>
+  );
+
+  const renderLiquidFields = () => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.label}>Amount (ml)</Text>
+      <TextInput
+        style={[styles.input, errors.feedAmount && styles.inputError]}
+        placeholder="e.g., 120"
+        placeholderTextColor={colors.textLight}
+        value={feedAmount}
+        onChangeText={(text) => {
+          setFeedAmount(text);
+          setErrors({ ...errors, feedAmount: '' });
+        }}
+        keyboardType="numeric"
+        editable={!saving}
+      />
+      {errors.feedAmount ? (
+        <Text style={styles.errorText}>{errors.feedAmount}</Text>
+      ) : null}
+    </View>
+  );
+
+  const renderFeedForm = () => (
+    <View style={styles.formSection}>
+      {renderTimePicker('Time', feedTime, setFeedTime, 'feedTime')}
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Feed Type</Text>
         <View style={styles.chipsContainer}>
           <TouchableOpacity
             style={[styles.chip, feedType === FeedType.Formula && styles.chipSelected]}
-            onPress={() => setFeedType(FeedType.Formula)}
+            onPress={() => handleFeedTypeChange(FeedType.Formula)}
             disabled={saving}
           >
             <Text style={[styles.chipText, feedType === FeedType.Formula && styles.chipTextSelected]}>
@@ -328,15 +417,26 @@ export function ManualEntryModal({
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.chip, feedType === FeedType.BreastMilk && styles.chipSelected]}
-            onPress={() => setFeedType(FeedType.BreastMilk)}
+            onPress={() => handleFeedTypeChange(FeedType.BreastMilk)}
             disabled={saving}
           >
             <Text style={[styles.chipText, feedType === FeedType.BreastMilk && styles.chipTextSelected]}>
               Breast Milk
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chip, feedType === FeedType.Solids && styles.chipSelected]}
+            onPress={() => handleFeedTypeChange(FeedType.Solids)}
+            disabled={saving}
+          >
+            <Text style={[styles.chipText, feedType === FeedType.Solids && styles.chipTextSelected]}>
+              Solids
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
+
+      {feedType === FeedType.Solids ? renderSolidsFields() : renderLiquidFields()}
     </View>
   );
 

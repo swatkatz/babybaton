@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { ActivityItem } from './ActivityItem';
-import { ActivityType, FeedType } from '../types/__generated__/graphql';
+import { ActivityType, FeedType, SolidsUnit } from '../types/__generated__/graphql';
 
 // Mock lucide icons
 jest.mock('lucide-react-native', () => ({
@@ -44,6 +44,9 @@ const makeFeedActivity = (overrides?: Partial<any>) => ({
     amountMl: 120,
     feedType: FeedType.BreastMilk,
     durationMinutes: 30,
+    foodName: null,
+    quantity: null,
+    quantityUnit: null,
   },
   ...overrides,
 });
@@ -96,6 +99,72 @@ describe('ActivityItem', () => {
       expect(getByText(/\d{1,2}:\d{2}\s*(AM|PM)\s*-\s*\d{1,2}:\d{2}\s*(AM|PM)/)).toBeTruthy();
     });
 
+    it('should display solids feed with quantity', () => {
+      const activity = makeFeedActivity({
+        feedDetails: {
+          __typename: 'FeedDetails',
+          startTime: '2025-01-15T15:00:00Z',
+          endTime: null,
+          amountMl: null,
+          feedType: FeedType.Solids,
+          durationMinutes: null,
+          foodName: 'mushed carrots',
+          quantity: 10,
+          quantityUnit: SolidsUnit.Spoons,
+        },
+      });
+
+      const { getByText } = render(
+        <ActivityItem activity={activity} />
+      );
+
+      expect(getByText(/Fed mushed carrots \(10 spoons\)/)).toBeTruthy();
+    });
+
+    it('should display solids feed without quantity', () => {
+      const activity = makeFeedActivity({
+        feedDetails: {
+          __typename: 'FeedDetails',
+          startTime: '2025-01-15T15:00:00Z',
+          endTime: null,
+          amountMl: null,
+          feedType: FeedType.Solids,
+          durationMinutes: null,
+          foodName: 'banana',
+          quantity: null,
+          quantityUnit: null,
+        },
+      });
+
+      const { getByText } = render(
+        <ActivityItem activity={activity} />
+      );
+
+      expect(getByText(/Fed banana/)).toBeTruthy();
+    });
+
+    it('should display formula feed unchanged', () => {
+      const activity = makeFeedActivity({
+        feedDetails: {
+          __typename: 'FeedDetails',
+          startTime: '2025-01-15T15:00:00Z',
+          endTime: null,
+          amountMl: 120,
+          feedType: FeedType.Formula,
+          durationMinutes: null,
+          foodName: null,
+          quantity: null,
+          quantityUnit: null,
+        },
+      });
+
+      const { getByText } = render(
+        <ActivityItem activity={activity} />
+      );
+
+      expect(getByText(/Fed 120ml formula/)).toBeTruthy();
+    });
+
     it('should handle feed without end time', () => {
       const activity = makeFeedActivity({
         feedDetails: {
@@ -105,6 +174,9 @@ describe('ActivityItem', () => {
           amountMl: 100,
           feedType: FeedType.Formula,
           durationMinutes: null,
+          foodName: null,
+          quantity: null,
+          quantityUnit: null,
         },
       });
 
