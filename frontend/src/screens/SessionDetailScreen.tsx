@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useQuery } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { GetCareSessionDocument, Activity } from '../types/__generated__/graphql';
+import { GetCareSessionDocument } from '../types/__generated__/graphql';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { ActivityItem } from '../components/ActivityItem';
@@ -75,7 +75,7 @@ export function SessionDetailScreen({ route }: Props) {
         <Text style={styles.sectionTitle}>
           Activities ({session.activities.length}):
         </Text>
-        {session.activities.map((activity: Activity) => (
+        {session.activities.map((activity) => (
           <ActivityItem key={activity.id} activity={activity} />
         ))}
 

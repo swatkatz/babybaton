@@ -159,6 +159,9 @@ export const CARE_SESSION_FRAGMENT = gql`
           amountMl
           feedType
           durationMinutes
+          foodName
+          quantity
+          quantityUnit
         }
       }
       ... on DiaperActivity {
