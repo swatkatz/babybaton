@@ -27,6 +27,7 @@ type FeedType string
 const (
 	FeedTypeBreastMilk FeedType = "breast_milk"
 	FeedTypeFormula    FeedType = "formula"
+	FeedTypeSolids     FeedType = "solids"
 )
 
 // Domain Models
@@ -72,14 +73,17 @@ type Activity struct {
 }
 
 type FeedDetails struct {
-	ID         uuid.UUID
-	ActivityID uuid.UUID
-	StartTime  time.Time
-	EndTime    *time.Time
-	AmountMl   *int
-	FeedType   *FeedType
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID           uuid.UUID
+	ActivityID   uuid.UUID
+	StartTime    time.Time
+	EndTime      *time.Time
+	AmountMl     *int
+	FeedType     *FeedType
+	FoodName     *string
+	Quantity     *float64
+	QuantityUnit *string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type DiaperDetails struct {
