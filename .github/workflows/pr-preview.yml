@@ -1,4 +1,9 @@
 # .github/workflows/pr-preview.yml
+#
+# Publishes a per-PR EAS update so reviewers can test frontend changes on a real
+# device before merging. Posts a QR code comment on the PR. Warns if native
+# dependencies changed (which means a new EAS Build is needed first).
+#
 name: PR Preview
 on:
   pull_request:

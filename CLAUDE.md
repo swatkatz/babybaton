@@ -155,8 +155,19 @@ Voice parsing depends on Anthropic and OpenAI APIs which can fail (rate limits, 
 - Frontend: `npm ci` -> `typecheck` -> `jest --ci` (Node 20)
 - Backend: `go build` -> `go test` with real PostgreSQL service container (Go 1.25.3, runs migrations first)
 
-**`deploy-frontend.yml`** — Runs on push to main when frontend/ changes:
-- Publishes an EAS Update to the `preview` channel so dev builds get the latest JS bundle OTA
+**`deploy.yml`** — Runs after CI passes on main (via `workflow_run`). Also supports manual trigger:
+1. Runs database migrations against production
+2. Deploys backend to Railway
+3. In parallel: deploys web frontend (Railway) and native frontend (EAS OTA to `preview` channel)
+
+```
+CI (passes on main)
+  └─→ Deploy:
+        1. Migrations + backend (Railway)
+        2. In parallel:
+           ├─ Frontend web (Railway)
+           └─ Frontend native (EAS OTA)
+```
 
 **`pr-preview.yml`** — Runs on PRs that touch frontend/:
 - Publishes a preview update on a per-PR branch (`pr-<number>`)
@@ -164,10 +175,14 @@ Voice parsing depends on Anthropic and OpenAI APIs which can fail (rate limits, 
 - Warns if native dependencies changed (requires a new EAS build)
 - Pins `runtimeVersion` to match the latest preview build to avoid crashes
 
-**`eas-build.yml`** — Manual trigger only (workflow_dispatch):
+**`eas-build.yml`** — Manual trigger only (workflow_dispatch), or called by Release:
 - Builds native iOS/Android apps via EAS Build
 - Supports `preview` and `production` profiles
 - Required when native dependencies change (new EAS build needed before OTA updates work)
+
+**`release.yml`** — Manual trigger only (workflow_dispatch):
+- Bumps version in app.json and package.json, creates git tag and GitHub release
+- Triggers EAS Build for native binaries
 
 ### Deployment
 - **Backend:** Deployed to Railway via `backend/Dockerfile`. Production URL: `babybaton-production.up.railway.app`
