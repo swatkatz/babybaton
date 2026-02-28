@@ -20,9 +20,9 @@ jobs:
       - name: Deploy backend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway redeploy --service ${{ secrets.BACKEND_SERVICE_ID }} --yes
+        run: railway up --ci --service ${{ secrets.BACKEND_SERVICE_ID }}
 
       - name: Deploy frontend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway redeploy --service ${{ secrets.FRONTEND_SERVICE_ID }} --yes
+        run: railway up --ci --service ${{ secrets.FRONTEND_SERVICE_ID }}
