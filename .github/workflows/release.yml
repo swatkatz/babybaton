@@ -1,4 +1,9 @@
 # .github/workflows/release.yml
+#
+# Bumps the version in app.json and package.json, creates a git tag and GitHub
+# release with auto-generated notes, then triggers an EAS Build for native
+# binaries. Triggered manually when you're ready to cut a release.
+#
 name: Create Release
 on:
   workflow_dispatch:

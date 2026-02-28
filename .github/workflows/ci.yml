@@ -1,3 +1,7 @@
+# Runs frontend (typecheck + tests) and backend (build + tests with real Postgres)
+# on every push to main and every PR. Gates code quality before merge. On main,
+# the Deploy workflow waits for CI to pass before deploying.
+#
 name: CI
 
 on:

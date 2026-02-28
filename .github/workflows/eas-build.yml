@@ -1,4 +1,10 @@
 # .github/workflows/eas-build.yml
+#
+# Builds a full native iOS/Android binary via EAS Build. Triggered manually when
+# native dependencies change (new native modules, SDK upgrades, etc.). OTA updates
+# can only push JS changes — if the native layer changed, you need a new binary.
+# Also called by the Release workflow.
+#
 name: EAS Build
 on:
   workflow_dispatch:
