@@ -1,6 +1,6 @@
 # Runs after CI passes on main. Runs database migrations, deploys the backend to
 # Railway, then deploys the web frontend (Railway) and native frontend (EAS OTA)
-# in parallel. Also supports manual trigger via workflow_dispatch.
+# in parallel if frontend/ changed. Also supports manual trigger via workflow_dispatch.
 #
 name: Deploy
 on:
@@ -15,8 +15,23 @@ jobs:
     name: Migrate & Deploy Backend
     if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    outputs:
+      frontend_changed: ${{ steps.changes.outputs.frontend_changed }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for frontend changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "frontend_changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only HEAD~1 HEAD | grep -q '^frontend/'; then
+            echo "frontend_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend_changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run pending migrations
         run: ./scripts/migrate.sh "${{ secrets.DATABASE_PUBLIC_URL }}" ./migrations
@@ -32,6 +47,7 @@ jobs:
   deploy-frontend-web:
     name: Deploy Frontend (Railway)
     needs: migrate-and-deploy-backend
+    if: needs.migrate-and-deploy-backend.outputs.frontend_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +63,7 @@ jobs:
   deploy-frontend-native:
     name: Deploy Frontend (EAS OTA)
     needs: migrate-and-deploy-backend
+    if: needs.migrate-and-deploy-backend.outputs.frontend_changed == 'true'
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
