@@ -21,6 +21,9 @@ interface ParsedActivity {
     amountMl?: number;
     feedType?: string;
     durationMinutes?: number;
+    foodName?: string;
+    quantity?: number;
+    quantityUnit?: string;
   };
   diaperDetails?: {
     changedAt: string;
@@ -82,6 +85,7 @@ export function ActivityConfirmationModal({
     if (activityType === 'FEED' && feedDetails) {
       icon = <Utensils size={28} color={colors.feed} />;
       iconBgColor = `${colors.feed}20`;
+      const isSolids = feedDetails.feedType === 'SOLIDS';
       content = (
         <View>
           <Text style={styles.activityTitle}>Feed</Text>
@@ -89,10 +93,18 @@ export function ActivityConfirmationModal({
             Time: {formatTime(feedDetails.startTime)}
             {feedDetails.endTime && ` - ${formatTime(feedDetails.endTime)}`}
           </Text>
-          {feedDetails.amountMl && (
+          {isSolids && feedDetails.foodName && (
+            <Text style={styles.activityDetail}>Food: {feedDetails.foodName}</Text>
+          )}
+          {isSolids && feedDetails.quantity && feedDetails.quantityUnit && (
+            <Text style={styles.activityDetail}>
+              Quantity: {feedDetails.quantity} {feedDetails.quantityUnit.toLowerCase()}
+            </Text>
+          )}
+          {!isSolids && feedDetails.amountMl && (
             <Text style={styles.activityDetail}>Amount: {feedDetails.amountMl}ml</Text>
           )}
-          {feedDetails.feedType && (
+          {feedDetails.feedType && !isSolids && (
             <Text style={styles.activityDetail}>
               Type: {feedDetails.feedType.replace('_', ' ').toLowerCase()}
             </Text>

@@ -41,6 +41,9 @@ const makeFeedActivity = () => ({
     amountMl: 120,
     feedType: FeedType.BreastMilk,
     durationMinutes: 30,
+    foodName: null,
+    quantity: null,
+    quantityUnit: null,
   },
 });
 

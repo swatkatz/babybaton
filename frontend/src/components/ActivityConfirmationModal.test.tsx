@@ -136,6 +136,54 @@ describe('ActivityConfirmationModal', () => {
     });
   });
 
+  describe('solids feed activity', () => {
+    it('should display parsed solids feed with quantity', () => {
+      const feedActivity = {
+        activityType: 'FEED',
+        feedDetails: {
+          startTime: '2025-01-15T15:00:00Z',
+          feedType: 'SOLIDS',
+          foodName: 'mushed carrots',
+          quantity: 10,
+          quantityUnit: 'SPOONS',
+        },
+      };
+
+      const { getByText } = render(
+        <ActivityConfirmationModal
+          {...baseProps}
+          parsedActivities={[feedActivity]}
+        />
+      );
+
+      expect(getByText('Feed')).toBeTruthy();
+      expect(getByText(/Food: mushed carrots/)).toBeTruthy();
+      expect(getByText(/Quantity: 10 spoons/)).toBeTruthy();
+    });
+
+    it('should display parsed solids feed without quantity', () => {
+      const feedActivity = {
+        activityType: 'FEED',
+        feedDetails: {
+          startTime: '2025-01-15T15:00:00Z',
+          feedType: 'SOLIDS',
+          foodName: 'banana',
+        },
+      };
+
+      const { getByText, queryByText } = render(
+        <ActivityConfirmationModal
+          {...baseProps}
+          parsedActivities={[feedActivity]}
+        />
+      );
+
+      expect(getByText('Feed')).toBeTruthy();
+      expect(getByText(/Food: banana/)).toBeTruthy();
+      expect(queryByText(/Quantity:/)).toBeNull();
+    });
+  });
+
   describe('diaper activity', () => {
     it('should render a diaper activity card with pee and poop', () => {
       const diaperActivity = {
