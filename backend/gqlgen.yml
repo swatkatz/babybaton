@@ -160,3 +160,9 @@ models:
   DateTime:
     model:
       - github.com/99designs/gqlgen/graphql.Time
+  FeedType:
+    model:
+      - github.com/swatkatz/babybaton/backend/graph/model.FeedType
+  SolidsUnit:
+    model:
+      - github.com/swatkatz/babybaton/backend/graph/model.SolidsUnit

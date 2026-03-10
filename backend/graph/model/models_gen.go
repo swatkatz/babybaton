@@ -279,63 +279,6 @@ func (e CareSessionStatus) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-type FeedType string
-
-const (
-	FeedTypeBreastMilk FeedType = "BREAST_MILK"
-	FeedTypeFormula    FeedType = "FORMULA"
-	FeedTypeSolids     FeedType = "SOLIDS"
-)
-
-var AllFeedType = []FeedType{
-	FeedTypeBreastMilk,
-	FeedTypeFormula,
-	FeedTypeSolids,
-}
-
-func (e FeedType) IsValid() bool {
-	switch e {
-	case FeedTypeBreastMilk, FeedTypeFormula, FeedTypeSolids:
-		return true
-	}
-	return false
-}
-
-func (e FeedType) String() string {
-	return string(e)
-}
-
-func (e *FeedType) UnmarshalGQL(v any) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = FeedType(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid FeedType", str)
-	}
-	return nil
-}
-
-func (e FeedType) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
-func (e *FeedType) UnmarshalJSON(b []byte) error {
-	s, err := strconv.Unquote(string(b))
-	if err != nil {
-		return err
-	}
-	return e.UnmarshalGQL(s)
-}
-
-func (e FeedType) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	e.MarshalGQL(&buf)
-	return buf.Bytes(), nil
-}
-
 type PredictionConfidence string
 
 const (
@@ -388,65 +331,6 @@ func (e *PredictionConfidence) UnmarshalJSON(b []byte) error {
 }
 
 func (e PredictionConfidence) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	e.MarshalGQL(&buf)
-	return buf.Bytes(), nil
-}
-
-type SolidsUnit string
-
-const (
-	SolidsUnitSpoons   SolidsUnit = "SPOONS"
-	SolidsUnitBowls    SolidsUnit = "BOWLS"
-	SolidsUnitPieces   SolidsUnit = "PIECES"
-	SolidsUnitPortions SolidsUnit = "PORTIONS"
-)
-
-var AllSolidsUnit = []SolidsUnit{
-	SolidsUnitSpoons,
-	SolidsUnitBowls,
-	SolidsUnitPieces,
-	SolidsUnitPortions,
-}
-
-func (e SolidsUnit) IsValid() bool {
-	switch e {
-	case SolidsUnitSpoons, SolidsUnitBowls, SolidsUnitPieces, SolidsUnitPortions:
-		return true
-	}
-	return false
-}
-
-func (e SolidsUnit) String() string {
-	return string(e)
-}
-
-func (e *SolidsUnit) UnmarshalGQL(v any) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = SolidsUnit(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid SolidsUnit", str)
-	}
-	return nil
-}
-
-func (e SolidsUnit) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
-func (e *SolidsUnit) UnmarshalJSON(b []byte) error {
-	s, err := strconv.Unquote(string(b))
-	if err != nil {
-		return err
-	}
-	return e.UnmarshalGQL(s)
-}
-
-func (e SolidsUnit) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

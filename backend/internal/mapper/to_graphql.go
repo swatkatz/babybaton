@@ -1,11 +1,41 @@
 package mapper
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/swatkatz/babybaton/backend/graph/model"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
 )
+
+// domainFeedTypeToGraphQL maps domain FeedType (lowercase) to GraphQL FeedType (uppercase).
+func domainFeedTypeToGraphQL(dt domain.FeedType) (model.FeedType, error) {
+	switch dt {
+	case domain.FeedTypeBreastMilk:
+		return model.FeedTypeBreastMilk, nil
+	case domain.FeedTypeFormula:
+		return model.FeedTypeFormula, nil
+	case domain.FeedTypeSolids:
+		return model.FeedTypeSolids, nil
+	default:
+		return "", fmt.Errorf("unknown domain FeedType: %q", dt)
+	}
+}
+
+// domainQuantityUnitToGraphQL maps a domain quantity unit string to GraphQL SolidsUnit.
+func domainQuantityUnitToGraphQL(unit string) (model.SolidsUnit, error) {
+	switch unit {
+	case "spoons":
+		return model.SolidsUnitSpoons, nil
+	case "bowls":
+		return model.SolidsUnitBowls, nil
+	case "pieces":
+		return model.SolidsUnitPieces, nil
+	case "portions":
+		return model.SolidsUnitPortions, nil
+	default:
+		return "", fmt.Errorf("unknown domain QuantityUnit: %q", unit)
+	}
+}
 
 // FamilyToGraphQL converts a domain Family to a GraphQL model
 func FamilyToGraphQL(f *domain.Family) *model.Family {
@@ -104,8 +134,10 @@ func FeedDetailsToGraphQL(fd *domain.FeedDetails) *model.FeedDetails {
 
 	var feedType *model.FeedType
 	if fd.FeedType != nil {
-		ft := model.FeedType(*fd.FeedType)
-		feedType = &ft
+		ft, err := domainFeedTypeToGraphQL(*fd.FeedType)
+		if err == nil {
+			feedType = &ft
+		}
 	}
 
 	var amountMl *int32
@@ -116,8 +148,10 @@ func FeedDetailsToGraphQL(fd *domain.FeedDetails) *model.FeedDetails {
 
 	var quantityUnit *model.SolidsUnit
 	if fd.QuantityUnit != nil {
-		qu := model.SolidsUnit(strings.ToUpper(*fd.QuantityUnit))
-		quantityUnit = &qu
+		qu, err := domainQuantityUnitToGraphQL(*fd.QuantityUnit)
+		if err == nil {
+			quantityUnit = &qu
+		}
 	}
 
 	return &model.FeedDetails{

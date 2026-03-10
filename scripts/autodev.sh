@@ -42,6 +42,63 @@ claude_with_retry() {
   done
 }
 
+# Pick the best issue to work on next, respecting dependency order.
+# Skips issues whose "Blocked by: #NN" references aren't all closed.
+# Among eligible issues, prefers the one that blocks the most other issues
+# (to unblock the most downstream work), then lowest issue number as tiebreaker.
+pick_next_issue() {
+  local candidates="$1"
+  local count
+  count=$(echo "$candidates" | jq 'length')
+
+  local best_number=""
+  local best_blocks_count=-1
+  local best_issue_number=999999
+
+  for i in $(seq 0 $((count - 1))); do
+    local num body
+    num=$(echo "$candidates" | jq -r ".[$i].number")
+    body=$(echo "$candidates" | jq -r ".[$i].body // \"\"")
+
+    # Extract issue numbers from "Blocked by:" line(s)
+    local blocked_by_nums
+    blocked_by_nums=$(echo "$body" | grep -i "blocked by:" | grep -oE '#[0-9]+' | sed 's/#//' || true)
+
+    # Check if all blockers are closed
+    local all_resolved=true
+    if [ -n "$blocked_by_nums" ]; then
+      for blocker in $blocked_by_nums; do
+        local state
+        state=$(gh issue view "$blocker" --json state --jq '.state' 2>/dev/null || echo "OPEN")
+        if [ "$state" != "CLOSED" ]; then
+          echo "  Skipping #${num}: blocked by open issue #${blocker}" >&2
+          all_resolved=false
+          break
+        fi
+      done
+    fi
+
+    if [ "$all_resolved" = false ]; then
+      continue
+    fi
+
+    # Count how many issues this one blocks (prefer issues that unblock more work)
+    local blocks_count
+    blocks_count=$(echo "$body" | grep -i "blocks:" | grep -oE '#[0-9]+' | wc -l)
+    blocks_count=$((blocks_count + 0))  # normalize to integer
+
+    # Pick this issue if it blocks more work, or same blocks but lower issue number
+    if [ "$blocks_count" -gt "$best_blocks_count" ] || \
+       { [ "$blocks_count" -eq "$best_blocks_count" ] && [ "$num" -lt "$best_issue_number" ]; }; then
+      best_blocks_count=$blocks_count
+      best_issue_number=$num
+      best_number=$num
+    fi
+  done
+
+  echo "$best_number"
+}
+
 echo "Starting autodev loop as @${GITHUB_USER} in ${REPO_DIR}"
 
 while true; do
@@ -55,7 +112,7 @@ while true; do
     gh issue list \
       --label "ready to implement" \
       --state open \
-      --json number,title,url,labels \
+      --json number,title,url,labels,body \
     | jq '[.[] | select(.labels | map(.name) | index("in development") | not)]'
   )
 
@@ -70,11 +127,23 @@ while true; do
     continue
   fi
 
-  issue_number=$(echo "$issue_json" | jq -r '.[0].number')
-  issue_title=$(echo "$issue_json" | jq -r '.[0].title')
-  issue_url=$(echo "$issue_json" | jq -r '.[0].url')
+  echo "Found ${issue_count} candidate issue(s). Checking dependencies..."
 
-  echo "Found issue #${issue_number}: ${issue_title}"
+  # -------------------------------------------------------
+  # Step 2b: Pick the best issue respecting dependency order
+  # -------------------------------------------------------
+  issue_number=$(pick_next_issue "$issue_json")
+
+  if [ -z "$issue_number" ]; then
+    echo "ALL ISSUES ARE BLOCKED by unresolved dependencies — sleeping 60s..."
+    sleep 60
+    continue
+  fi
+
+  issue_title=$(echo "$issue_json" | jq -r ".[] | select(.number == ${issue_number}) | .title")
+  issue_url=$(echo "$issue_json" | jq -r ".[] | select(.number == ${issue_number}) | .url")
+
+  echo "Selected issue #${issue_number}: ${issue_title}"
   echo "  ${issue_url}"
 
   # -------------------------------------------------------
@@ -160,7 +229,7 @@ EOF
     # Wait for checks to complete
     while true; do
       sleep 30
-      check_status=$(gh pr checks "$pr_number" --json name,state --jq '[.[].state] | unique | if all(. == "SUCCESS") then "pass" elif any(. == "PENDING") then "pending" else "fail" end' 2>/dev/null || echo "pending")
+      check_status=$(gh pr checks "$pr_number" --json name,state --jq 'if length == 0 then "pending" elif [.[].state] | all(. == "SUCCESS") then "pass" elif [.[].state] | all(. == "SUCCESS" or . == "FAILURE" or . == "CANCELLED" or . == "TIMED_OUT" or . == "SKIPPED" or . == "STALE" or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED" or . == "NEUTRAL") then "fail" else "pending" end' 2>/dev/null || echo "pending")
 
       echo "  CI status: ${check_status}"
 

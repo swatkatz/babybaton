@@ -257,7 +257,7 @@ func TestFeedDetailsToGraphQL_WithDuration(t *testing.T) {
 	if result.DurationMinutes == nil || *result.DurationMinutes != 30 {
 		t.Errorf("DurationMinutes = %v, want 30", result.DurationMinutes)
 	}
-	expectedFeedType := model.FeedType(domain.FeedTypeBreastMilk)
+	expectedFeedType := model.FeedTypeBreastMilk
 	if result.FeedType == nil || *result.FeedType != expectedFeedType {
 		t.Errorf("FeedType = %v, want %q", result.FeedType, expectedFeedType)
 	}
@@ -287,6 +287,123 @@ func TestFeedDetailsToGraphQL_Nil(t *testing.T) {
 	result := FeedDetailsToGraphQL(nil)
 	if result != nil {
 		t.Error("expected nil for nil input")
+	}
+}
+
+func TestDomainFeedTypeToGraphQL(t *testing.T) {
+	tests := []struct {
+		domain   domain.FeedType
+		expected model.FeedType
+	}{
+		{domain.FeedTypeBreastMilk, model.FeedTypeBreastMilk},
+		{domain.FeedTypeFormula, model.FeedTypeFormula},
+		{domain.FeedTypeSolids, model.FeedTypeSolids},
+	}
+
+	for _, tc := range tests {
+		t.Run(string(tc.domain), func(t *testing.T) {
+			result, err := domainFeedTypeToGraphQL(tc.domain)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tc.expected {
+				t.Errorf("got %q, want %q", result, tc.expected)
+			}
+			if !result.IsValid() {
+				t.Errorf("result %q is not a valid GraphQL FeedType", result)
+			}
+		})
+	}
+}
+
+func TestDomainFeedTypeToGraphQL_Unknown(t *testing.T) {
+	_, err := domainFeedTypeToGraphQL(domain.FeedType("unknown"))
+	if err == nil {
+		t.Error("expected error for unknown feed type, got nil")
+	}
+}
+
+func TestDomainQuantityUnitToGraphQL(t *testing.T) {
+	tests := []struct {
+		domain   string
+		expected model.SolidsUnit
+	}{
+		{"spoons", model.SolidsUnitSpoons},
+		{"bowls", model.SolidsUnitBowls},
+		{"pieces", model.SolidsUnitPieces},
+		{"portions", model.SolidsUnitPortions},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.domain, func(t *testing.T) {
+			result, err := domainQuantityUnitToGraphQL(tc.domain)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tc.expected {
+				t.Errorf("got %q, want %q", result, tc.expected)
+			}
+			if !result.IsValid() {
+				t.Errorf("result %q is not a valid GraphQL SolidsUnit", result)
+			}
+		})
+	}
+}
+
+func TestDomainQuantityUnitToGraphQL_Unknown(t *testing.T) {
+	_, err := domainQuantityUnitToGraphQL("cups")
+	if err == nil {
+		t.Error("expected error for unknown quantity unit, got nil")
+	}
+}
+
+func TestFeedDetailsToGraphQL_Solids(t *testing.T) {
+	start := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	feedType := domain.FeedTypeSolids
+	foodName := "avocado"
+	qty := 3.0
+	qtyUnit := "spoons"
+
+	fd := &domain.FeedDetails{
+		StartTime:    start,
+		FeedType:     &feedType,
+		FoodName:     &foodName,
+		Quantity:     &qty,
+		QuantityUnit: &qtyUnit,
+	}
+
+	result := FeedDetailsToGraphQL(fd)
+
+	if result.FeedType == nil || *result.FeedType != model.FeedTypeSolids {
+		t.Errorf("FeedType = %v, want SOLIDS", result.FeedType)
+	}
+	if result.FoodName == nil || *result.FoodName != "avocado" {
+		t.Errorf("FoodName = %v, want avocado", result.FoodName)
+	}
+	if result.Quantity == nil || *result.Quantity != 3.0 {
+		t.Errorf("Quantity = %v, want 3.0", result.Quantity)
+	}
+	if result.QuantityUnit == nil || *result.QuantityUnit != model.SolidsUnitSpoons {
+		t.Errorf("QuantityUnit = %v, want SPOONS", result.QuantityUnit)
+	}
+	if result.AmountMl != nil {
+		t.Errorf("AmountMl = %v, want nil for solids", result.AmountMl)
+	}
+}
+
+func TestFeedDetailsToGraphQL_UnknownFeedType(t *testing.T) {
+	start := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	feedType := domain.FeedType("unknown")
+
+	fd := &domain.FeedDetails{
+		StartTime: start,
+		FeedType:  &feedType,
+	}
+
+	result := FeedDetailsToGraphQL(fd)
+
+	if result.FeedType != nil {
+		t.Errorf("FeedType = %v, want nil for unknown domain feed type", result.FeedType)
 	}
 }
 
