@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/swatkatz/babybaton/backend/internal/domain"
 )
 
 func TestFamilyOperations(t *testing.T) {
@@ -84,6 +85,92 @@ func TestFamilyOperations(t *testing.T) {
 		}
 		
 		t.Logf("✓ Retrieved family by ID: %s", retrieved.ID)
+	})
+
+	// Test GetFamiliesByUserID
+	t.Run("GetFamiliesByUserID", func(t *testing.T) {
+		// Create a user
+		now := time.Now()
+		user := &domain.User{
+			ID:             uuid.New(),
+			SupabaseUserID: "supabase-fam-" + uuid.New().String()[:8],
+			Email:          "fam-test-" + uuid.New().String()[:8] + "@example.com",
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		}
+		err := store.CreateUser(ctx, user)
+		if err != nil {
+			t.Fatalf("Failed to create user: %v", err)
+		}
+		t.Cleanup(func() {
+			store.db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", user.ID)
+		})
+
+		// Link the test family's caregiver to the user
+		err = store.LinkCaregiverToUser(ctx, caregiver.ID, user.ID)
+		if err != nil {
+			t.Fatalf("Failed to link caregiver to user: %v", err)
+		}
+
+		// Create a second family with this user
+		family2, _, err := CreateTestFamily(ctx, store)
+		if err != nil {
+			t.Fatalf("Failed to create second family: %v", err)
+		}
+		t.Cleanup(func() {
+			store.DeleteFamily(ctx, family2.ID)
+		})
+
+		// Create a caregiver for user in family2
+		cg2 := &domain.Caregiver{
+			ID:        uuid.New(),
+			FamilyID:  family2.ID,
+			UserID:    &user.ID,
+			Name:      "User in Family2",
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		err = store.CreateCaregiver(ctx, cg2)
+		if err != nil {
+			t.Fatalf("Failed to create caregiver in second family: %v", err)
+		}
+
+		// Now query families by user
+		families, err := store.GetFamiliesByUserID(ctx, user.ID)
+		if err != nil {
+			t.Fatalf("Failed to get families by user: %v", err)
+		}
+		if len(families) != 2 {
+			t.Fatalf("Expected 2 families, got %d", len(families))
+		}
+
+		t.Logf("✓ GetFamiliesByUserID returned %d families", len(families))
+
+		// Test with user that has no families
+		noFamilyUser := &domain.User{
+			ID:             uuid.New(),
+			SupabaseUserID: "supabase-nofam-" + uuid.New().String()[:8],
+			Email:          "nofam-" + uuid.New().String()[:8] + "@example.com",
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		}
+		err = store.CreateUser(ctx, noFamilyUser)
+		if err != nil {
+			t.Fatalf("Failed to create user: %v", err)
+		}
+		t.Cleanup(func() {
+			store.db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", noFamilyUser.ID)
+		})
+
+		emptyFamilies, err := store.GetFamiliesByUserID(ctx, noFamilyUser.ID)
+		if err != nil {
+			t.Fatalf("Failed to get families for user with no families: %v", err)
+		}
+		if len(emptyFamilies) != 0 {
+			t.Errorf("Expected 0 families, got %d", len(emptyFamilies))
+		}
+
+		t.Logf("✓ GetFamiliesByUserID correctly returns empty for user with no families")
 	})
 
 	// Test UpdateFamily

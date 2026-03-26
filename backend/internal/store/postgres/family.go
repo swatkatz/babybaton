@@ -148,6 +148,46 @@ func (s *PostgresStore) DeleteFamily(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// GetFamiliesByUserID retrieves all families where the user has a caregiver
+func (s *PostgresStore) GetFamiliesByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Family, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT f.id, f.name, f.password_hash, f.password, f.baby_name, f.created_at, f.updated_at
+		FROM families f
+		INNER JOIN caregivers c ON c.family_id = f.id
+		WHERE c.user_id = $1
+		ORDER BY f.created_at ASC
+	`, userID)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query families by user: %w", err)
+	}
+	defer rows.Close()
+
+	var families []*domain.Family
+	for rows.Next() {
+		family := &domain.Family{}
+		err := rows.Scan(
+			&family.ID,
+			&family.Name,
+			&family.PasswordHash,
+			&family.Password,
+			&family.BabyName,
+			&family.CreatedAt,
+			&family.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan family: %w", err)
+		}
+		families = append(families, family)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating families: %w", err)
+	}
+
+	return families, nil
+}
+
 // FamilyNameExists checks if a family name already exists (case-insensitive)
 func (s *PostgresStore) FamilyNameExists(ctx context.Context, name string) (bool, error) {
 	var exists bool

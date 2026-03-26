@@ -55,6 +55,9 @@ func (m *mockStore) DeleteFamily(ctx context.Context, id uuid.UUID) error       
 func (m *mockStore) FamilyNameExists(ctx context.Context, name string) (bool, error) {
 	return false, nil
 }
+func (m *mockStore) GetFamiliesByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Family, error) {
+	return nil, nil
+}
 func (m *mockStore) CreateUser(ctx context.Context, user *domain.User) error { return nil }
 func (m *mockStore) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return nil, nil
