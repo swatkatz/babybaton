@@ -15,6 +15,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 	"github.com/swatkatz/babybaton/backend/graph"
+	"github.com/swatkatz/babybaton/backend/internal/auth"
 	"github.com/swatkatz/babybaton/backend/internal/middleware"
 	"github.com/swatkatz/babybaton/backend/internal/store/postgres"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -44,6 +45,18 @@ func main() {
 	}
 	defer store.Close()
 	log.Println("Successfully connected to database")
+
+	// Initialize auth verifier (optional — falls back to header-only auth if no JWT secret)
+	var authMiddleware func(http.Handler) http.Handler
+	if jwtSecret := os.Getenv("SUPABASE_JWT_SECRET"); jwtSecret != "" {
+		verifier := auth.NewSupabaseVerifier(jwtSecret)
+		dualAuth := middleware.NewDualAuthMiddleware(verifier, store)
+		authMiddleware = dualAuth.Handler
+		log.Println("Dual auth enabled (JWT + header-based)")
+	} else {
+		authMiddleware = middleware.AuthMiddleware
+		log.Println("Header-based auth only (SUPABASE_JWT_SECRET not set)")
+	}
 
 	// Create resolver with store
 	resolver := graph.NewResolver(store)
@@ -85,7 +98,7 @@ func main() {
 	})
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/query", c.Handler(middleware.AuthMiddleware(srv)))
+	http.Handle("/query", c.Handler(authMiddleware(srv)))
 
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
