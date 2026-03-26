@@ -27,11 +27,12 @@ func CreateTestFamily(ctx context.Context, store *PostgresStore) (*domain.Family
 		UpdatedAt:    time.Now(),
 	}
 
+	deviceID := "test-device-" + uuid.New().String()[:8]
 	caregiver := &domain.Caregiver{
 		ID:         uuid.New(),
 		FamilyID:   family.ID,
 		Name:       "Test Mom",
-		DeviceID:   "test-device-" + uuid.New().String()[:8],
+		DeviceID:   &deviceID,
 		DeviceName: stringPtr("Test iPhone"),
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),

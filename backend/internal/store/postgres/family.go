@@ -31,9 +31,9 @@ func (s *PostgresStore) CreateFamilyWithCaregiver(ctx context.Context, family *d
 
 	// Insert caregiver
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO caregivers (id, family_id, name, device_id, device_name, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, caregiver.ID, caregiver.FamilyID, caregiver.Name, caregiver.DeviceID, caregiver.DeviceName, caregiver.CreatedAt, caregiver.UpdatedAt)
+		INSERT INTO caregivers (id, family_id, user_id, name, device_id, device_name, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, caregiver.ID, caregiver.FamilyID, caregiver.UserID, caregiver.Name, caregiver.DeviceID, caregiver.DeviceName, caregiver.CreatedAt, caregiver.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert caregiver: %w", err)
 	}

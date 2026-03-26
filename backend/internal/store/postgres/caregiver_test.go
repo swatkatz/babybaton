@@ -32,11 +32,12 @@ func TestCaregiverOperations(t *testing.T) {
 	})
 
 	// Test data for additional caregiver
+	deviceID := "test-device-" + uuid.New().String()[:8]
 	caregiver := &domain.Caregiver{
 		ID:         uuid.New(),
 		FamilyID:   family.ID,
 		Name:       "Test Dad",
-		DeviceID:   "test-device-" + uuid.New().String()[:8],
+		DeviceID:   &deviceID,
 		DeviceName: stringPtr("Test Android"),
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
@@ -68,14 +69,14 @@ func TestCaregiverOperations(t *testing.T) {
 
 	// Test GetCaregiverByDeviceID
 	t.Run("GetCaregiverByDeviceID", func(t *testing.T) {
-		retrieved, err := store.GetCaregiverByDeviceID(ctx, caregiver.DeviceID)
+		retrieved, err := store.GetCaregiverByDeviceID(ctx, *caregiver.DeviceID)
 		if err != nil {
 			t.Fatalf("Failed to get caregiver by device ID: %v", err)
 		}
-		if retrieved.DeviceID != caregiver.DeviceID {
+		if *retrieved.DeviceID != *caregiver.DeviceID {
 			t.Error("Device ID mismatch")
 		}
-		t.Logf("✓ Retrieved caregiver by device ID: %s", retrieved.DeviceID)
+		t.Logf("✓ Retrieved caregiver by device ID: %s", *retrieved.DeviceID)
 	})
 
 	// Test GetCaregiversByFamily

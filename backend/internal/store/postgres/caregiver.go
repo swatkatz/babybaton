@@ -14,9 +14,9 @@ import (
 // CreateCaregiver creates a new caregiver
 func (s *PostgresStore) CreateCaregiver(ctx context.Context, caregiver *domain.Caregiver) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO caregivers (id, family_id, name, device_id, device_name, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, caregiver.ID, caregiver.FamilyID, caregiver.Name, caregiver.DeviceID, caregiver.DeviceName, caregiver.CreatedAt, caregiver.UpdatedAt)
+		INSERT INTO caregivers (id, family_id, user_id, name, device_id, device_name, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, caregiver.ID, caregiver.FamilyID, caregiver.UserID, caregiver.Name, caregiver.DeviceID, caregiver.DeviceName, caregiver.CreatedAt, caregiver.UpdatedAt)
 
 	if err != nil {
 		return fmt.Errorf("failed to create caregiver: %w", err)
@@ -30,12 +30,13 @@ func (s *PostgresStore) GetCaregiverByID(ctx context.Context, id uuid.UUID) (*do
 	caregiver := &domain.Caregiver{}
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, family_id, name, device_id, device_name, created_at, updated_at
+		SELECT id, family_id, user_id, name, device_id, device_name, created_at, updated_at
 		FROM caregivers
 		WHERE id = $1
 	`, id).Scan(
 		&caregiver.ID,
 		&caregiver.FamilyID,
+		&caregiver.UserID,
 		&caregiver.Name,
 		&caregiver.DeviceID,
 		&caregiver.DeviceName,
@@ -58,12 +59,13 @@ func (s *PostgresStore) GetCaregiverByDeviceID(ctx context.Context, deviceID str
 	caregiver := &domain.Caregiver{}
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, family_id, name, device_id, device_name, created_at, updated_at
+		SELECT id, family_id, user_id, name, device_id, device_name, created_at, updated_at
 		FROM caregivers
 		WHERE device_id = $1
 	`, deviceID).Scan(
 		&caregiver.ID,
 		&caregiver.FamilyID,
+		&caregiver.UserID,
 		&caregiver.Name,
 		&caregiver.DeviceID,
 		&caregiver.DeviceName,
@@ -81,10 +83,39 @@ func (s *PostgresStore) GetCaregiverByDeviceID(ctx context.Context, deviceID str
 	return caregiver, nil
 }
 
+// GetCaregiverByUserAndFamily retrieves a caregiver by user ID and family ID
+func (s *PostgresStore) GetCaregiverByUserAndFamily(ctx context.Context, userID uuid.UUID, familyID uuid.UUID) (*domain.Caregiver, error) {
+	caregiver := &domain.Caregiver{}
+
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, family_id, user_id, name, device_id, device_name, created_at, updated_at
+		FROM caregivers
+		WHERE user_id = $1 AND family_id = $2
+	`, userID, familyID).Scan(
+		&caregiver.ID,
+		&caregiver.FamilyID,
+		&caregiver.UserID,
+		&caregiver.Name,
+		&caregiver.DeviceID,
+		&caregiver.DeviceName,
+		&caregiver.CreatedAt,
+		&caregiver.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("caregiver not found for user %s in family %s", userID, familyID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get caregiver by user and family: %w", err)
+	}
+
+	return caregiver, nil
+}
+
 // GetCaregiversByFamily retrieves all caregivers for a family
 func (s *PostgresStore) GetCaregiversByFamily(ctx context.Context, familyID uuid.UUID) ([]*domain.Caregiver, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, family_id, name, device_id, device_name, created_at, updated_at
+		SELECT id, family_id, user_id, name, device_id, device_name, created_at, updated_at
 		FROM caregivers
 		WHERE family_id = $1
 		ORDER BY created_at ASC
@@ -101,6 +132,7 @@ func (s *PostgresStore) GetCaregiversByFamily(ctx context.Context, familyID uuid
 		err := rows.Scan(
 			&caregiver.ID,
 			&caregiver.FamilyID,
+			&caregiver.UserID,
 			&caregiver.Name,
 			&caregiver.DeviceID,
 			&caregiver.DeviceName,
@@ -139,6 +171,30 @@ func (s *PostgresStore) UpdateCaregiver(ctx context.Context, caregiver *domain.C
 
 	if rows == 0 {
 		return fmt.Errorf("caregiver not found: %s", caregiver.ID)
+	}
+
+	return nil
+}
+
+// LinkCaregiverToUser links an existing caregiver to a user
+func (s *PostgresStore) LinkCaregiverToUser(ctx context.Context, caregiverID uuid.UUID, userID uuid.UUID) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE caregivers
+		SET user_id = $1
+		WHERE id = $2
+	`, userID, caregiverID)
+
+	if err != nil {
+		return fmt.Errorf("failed to link caregiver to user: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("caregiver not found: %s", caregiverID)
 	}
 
 	return nil

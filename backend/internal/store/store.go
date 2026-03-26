@@ -17,12 +17,19 @@ type Store interface {
 	DeleteFamily(ctx context.Context, id uuid.UUID) error
 	FamilyNameExists(ctx context.Context, name string) (bool, error)
 
+	// User operations
+	CreateUser(ctx context.Context, user *domain.User) error
+	GetUserBySupabaseID(ctx context.Context, supabaseUserID string) (*domain.User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
+
 	// Caregiver operations
 	CreateCaregiver(ctx context.Context, caregiver *domain.Caregiver) error
 	GetCaregiverByID(ctx context.Context, id uuid.UUID) (*domain.Caregiver, error)
 	GetCaregiverByDeviceID(ctx context.Context, deviceID string) (*domain.Caregiver, error)
+	GetCaregiverByUserAndFamily(ctx context.Context, userID uuid.UUID, familyID uuid.UUID) (*domain.Caregiver, error)
 	GetCaregiversByFamily(ctx context.Context, familyID uuid.UUID) ([]*domain.Caregiver, error)
 	UpdateCaregiver(ctx context.Context, caregiver *domain.Caregiver) error
+	LinkCaregiverToUser(ctx context.Context, caregiverID uuid.UUID, userID uuid.UUID) error
 	DeleteCaregiver(ctx context.Context, id uuid.UUID) error
 
 	// Care Session operations

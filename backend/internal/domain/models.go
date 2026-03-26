@@ -42,11 +42,20 @@ type Family struct {
 	UpdatedAt    time.Time
 }
 
+type User struct {
+	ID             uuid.UUID
+	SupabaseUserID string
+	Email          string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
 type Caregiver struct {
 	ID         uuid.UUID
 	FamilyID   uuid.UUID
+	UserID     *uuid.UUID
 	Name       string
-	DeviceID   string
+	DeviceID   *string
 	DeviceName *string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
