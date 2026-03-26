@@ -59,11 +59,16 @@ func CaregiverToGraphQL(c *domain.Caregiver) *model.Caregiver {
 		return nil
 	}
 
+	var deviceID string
+	if c.DeviceID != nil {
+		deviceID = *c.DeviceID
+	}
+
 	return &model.Caregiver{
 		ID:         c.ID.String(),
 		FamilyID:   c.FamilyID.String(),
 		Name:       c.Name,
-		DeviceID:   c.DeviceID,
+		DeviceID:   deviceID,
 		DeviceName: c.DeviceName,
 		CreatedAt:  c.CreatedAt,
 	}

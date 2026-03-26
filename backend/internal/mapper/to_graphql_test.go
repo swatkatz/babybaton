@@ -53,11 +53,12 @@ func TestCaregiverToGraphQL(t *testing.T) {
 	familyID := uuid.New()
 	deviceName := "iPhone 15"
 
+	deviceID := "device-123"
 	c := &domain.Caregiver{
 		ID:         id,
 		FamilyID:   familyID,
 		Name:       "Alice",
-		DeviceID:   "device-123",
+		DeviceID:   &deviceID,
 		DeviceName: &deviceName,
 		CreatedAt:  now,
 	}
@@ -82,11 +83,12 @@ func TestCaregiverToGraphQL(t *testing.T) {
 }
 
 func TestCaregiverToGraphQL_NilDeviceName(t *testing.T) {
+	deviceID := "device-456"
 	c := &domain.Caregiver{
 		ID:       uuid.New(),
 		FamilyID: uuid.New(),
 		Name:     "Bob",
-		DeviceID: "device-456",
+		DeviceID: &deviceID,
 	}
 
 	result := CaregiverToGraphQL(c)
