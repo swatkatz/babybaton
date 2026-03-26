@@ -23,7 +23,7 @@ import (
 )
 
 // CreateFamily is the resolver for the createFamily field.
-func (r *mutationResolver) CreateFamily(ctx context.Context, familyName string, password string, babyName string, caregiverName string, deviceID string, deviceName *string) (*model.AuthResult, error) {
+func (r *mutationResolver) CreateFamily(ctx context.Context, familyName string, password string, babyName string, caregiverName string, deviceID *string, deviceName *string) (*model.AuthResult, error) {
 	// Validate password length
 	if len(password) < 6 {
 		return &model.AuthResult{
@@ -72,14 +72,30 @@ func (r *mutationResolver) CreateFamily(ctx context.Context, familyName string, 
 		UpdatedAt:    now,
 	}
 
+	// Determine auth path: JWT user-based or legacy device-based
+	userID, hasUser := middleware.GetUserID(ctx)
+
 	caregiver := &domain.Caregiver{
 		ID:         caregiverID,
 		FamilyID:   familyID,
 		Name:       caregiverName,
-		DeviceID:   &deviceID,
 		DeviceName: deviceName,
 		CreatedAt:  now,
 		UpdatedAt:  now,
+	}
+
+	if hasUser {
+		// User-based auth: link caregiver to user, ignore deviceId
+		caregiver.UserID = &userID
+	} else {
+		// Legacy device-based auth: deviceId is required
+		if deviceID == nil || *deviceID == "" {
+			return &model.AuthResult{
+				Success: false,
+				Error:   stringPtr("deviceId is required for device-based authentication"),
+			}, nil
+		}
+		caregiver.DeviceID = deviceID
 	}
 
 	// Create family and caregiver atomically
@@ -94,14 +110,14 @@ func (r *mutationResolver) CreateFamily(ctx context.Context, familyName string, 
 	// Convert to GraphQL types
 	return &model.AuthResult{
 		Success:   true,
-		Family:    mapper.FamilyToGraphQL(family),       // ← Use mapper
-		Caregiver: mapper.CaregiverToGraphQL(caregiver), // ← Use mapper
+		Family:    mapper.FamilyToGraphQL(family),
+		Caregiver: mapper.CaregiverToGraphQL(caregiver),
 		Error:     nil,
 	}, nil
 }
 
 // JoinFamily is the resolver for the joinFamily field.
-func (r *mutationResolver) JoinFamily(ctx context.Context, familyName string, password string, caregiverName string, deviceID string, deviceName *string) (*model.AuthResult, error) {
+func (r *mutationResolver) JoinFamily(ctx context.Context, familyName string, password string, caregiverName string, deviceID *string, deviceName *string) (*model.AuthResult, error) {
 	family, err := r.store.GetFamilyByName(ctx, familyName)
 	if err != nil {
 		return &model.AuthResult{
@@ -119,8 +135,63 @@ func (r *mutationResolver) JoinFamily(ctx context.Context, familyName string, pa
 		}, nil
 	}
 
+	// Determine auth path: JWT user-based or legacy device-based
+	userID, hasUser := middleware.GetUserID(ctx)
+
+	if hasUser {
+		// User-based auth path
+		// Check if user already has a caregiver in this family
+		existingCaregiver, err := r.store.GetCaregiverByUserAndFamily(ctx, userID, family.ID)
+		if err == nil && existingCaregiver != nil {
+			// Re-authentication: user already in this family
+			return &model.AuthResult{
+				Success:   true,
+				Family:    mapper.FamilyToGraphQL(family),
+				Caregiver: mapper.CaregiverToGraphQL(existingCaregiver),
+				Error:     nil,
+			}, nil
+		}
+
+		// Create new caregiver linked to user
+		caregiverID := uuid.New()
+		now := time.Now()
+
+		caregiver := &domain.Caregiver{
+			ID:         caregiverID,
+			FamilyID:   family.ID,
+			UserID:     &userID,
+			Name:       caregiverName,
+			DeviceName: deviceName,
+			CreatedAt:  now,
+			UpdatedAt:  now,
+		}
+
+		err = r.store.CreateCaregiver(ctx, caregiver)
+		if err != nil {
+			return &model.AuthResult{
+				Success: false,
+				Error:   stringPtr(fmt.Sprintf("Failed to join family: %v", err)),
+			}, nil
+		}
+
+		return &model.AuthResult{
+			Success:   true,
+			Family:    mapper.FamilyToGraphQL(family),
+			Caregiver: mapper.CaregiverToGraphQL(caregiver),
+			Error:     nil,
+		}, nil
+	}
+
+	// Legacy device-based auth path
+	if deviceID == nil || *deviceID == "" {
+		return &model.AuthResult{
+			Success: false,
+			Error:   stringPtr("deviceId is required for device-based authentication"),
+		}, nil
+	}
+
 	// Check if device already exists
-	existingCaregiver, err := r.store.GetCaregiverByDeviceID(ctx, deviceID)
+	existingCaregiver, err := r.store.GetCaregiverByDeviceID(ctx, *deviceID)
 
 	// Case 1: Device exists in THIS family → Re-authentication (allow it!)
 	if err == nil && existingCaregiver != nil && existingCaregiver.FamilyID == family.ID {
@@ -148,7 +219,7 @@ func (r *mutationResolver) JoinFamily(ctx context.Context, familyName string, pa
 		ID:         caregiverID,
 		FamilyID:   family.ID,
 		Name:       caregiverName,
-		DeviceID:   &deviceID,
+		DeviceID:   deviceID,
 		DeviceName: deviceName,
 		CreatedAt:  now,
 		UpdatedAt:  now,
@@ -168,6 +239,44 @@ func (r *mutationResolver) JoinFamily(ctx context.Context, familyName string, pa
 		Caregiver: mapper.CaregiverToGraphQL(caregiver),
 		Error:     nil,
 	}, nil
+}
+
+// LinkCaregiverToUser is the resolver for the linkCaregiverToUser field.
+func (r *mutationResolver) LinkCaregiverToUser(ctx context.Context, caregiverID string) (*model.Caregiver, error) {
+	// Require JWT-based user auth
+	userID, hasUser := middleware.GetUserID(ctx)
+	if !hasUser {
+		return nil, fmt.Errorf("authentication required: must be authenticated with a user account")
+	}
+
+	caregiverUUID, err := uuid.Parse(caregiverID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid caregiver ID: %w", err)
+	}
+
+	// Verify caregiver exists
+	caregiver, err := r.store.GetCaregiverByID(ctx, caregiverUUID)
+	if err != nil {
+		return nil, fmt.Errorf("caregiver not found: %w", err)
+	}
+
+	// Verify caregiver is not already linked to a user
+	if caregiver.UserID != nil {
+		return nil, fmt.Errorf("caregiver is already linked to a user")
+	}
+
+	// Link caregiver to user
+	if err := r.store.LinkCaregiverToUser(ctx, caregiverUUID, userID); err != nil {
+		return nil, fmt.Errorf("failed to link caregiver to user: %w", err)
+	}
+
+	// Reload to get updated state
+	caregiver, err = r.store.GetCaregiverByID(ctx, caregiverUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reload caregiver: %w", err)
+	}
+
+	return mapper.CaregiverToGraphQL(caregiver), nil
 }
 
 // UpdateBabyName is the resolver for the updateBabyName field.
@@ -819,6 +928,27 @@ func (r *queryResolver) GetMyCaregiver(ctx context.Context) (*model.Caregiver, e
 	}
 
 	return mapper.CaregiverToGraphQL(caregiver), nil
+}
+
+// GetMyFamilies is the resolver for the getMyFamilies field.
+func (r *queryResolver) GetMyFamilies(ctx context.Context) ([]*model.Family, error) {
+	// Require JWT-based user auth
+	userID, hasUser := middleware.GetUserID(ctx)
+	if !hasUser {
+		return nil, fmt.Errorf("authentication required: must be authenticated with a user account")
+	}
+
+	families, err := r.store.GetFamiliesByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get families: %w", err)
+	}
+
+	result := make([]*model.Family, len(families))
+	for i, f := range families {
+		result[i] = mapper.FamilyToGraphQL(f)
+	}
+
+	return result, nil
 }
 
 // GetRecentCareSessions is the resolver for the getRecentCareSessions field.

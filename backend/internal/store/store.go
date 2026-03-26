@@ -16,6 +16,7 @@ type Store interface {
 	UpdateFamily(ctx context.Context, family *domain.Family) error
 	DeleteFamily(ctx context.Context, id uuid.UUID) error
 	FamilyNameExists(ctx context.Context, name string) (bool, error)
+	GetFamiliesByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Family, error)
 
 	// User operations
 	CreateUser(ctx context.Context, user *domain.User) error

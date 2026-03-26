@@ -184,6 +184,7 @@ type Query {
   checkFamilyNameAvailable(name: String!): Boolean!
   getMyFamily: Family
   getMyCaregiver: Caregiver
+  getMyFamilies: [Family!]!
 
   # Care Sessions (automatically scoped to authenticated caregiver's family)
   getRecentCareSessions(limit: Int): [CareSession!]!
@@ -202,7 +203,7 @@ type Mutation {
     password: String!
     babyName: String!
     caregiverName: String!
-    deviceId: String!
+    deviceId: String
     deviceName: String
   ): AuthResult!
 
@@ -210,9 +211,11 @@ type Mutation {
     familyName: String!
     password: String!
     caregiverName: String!
-    deviceId: String!
+    deviceId: String
     deviceName: String
   ): AuthResult!
+
+  linkCaregiverToUser(caregiverId: ID!): Caregiver!
 
   updateBabyName(babyName: String!): Family!
 

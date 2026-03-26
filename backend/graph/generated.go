@@ -128,11 +128,12 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddActivities       func(childComplexity int, activities []*model.ActivityInput) int
 		CompleteCareSession func(childComplexity int, notes *string) int
-		CreateFamily        func(childComplexity int, familyName string, password string, babyName string, caregiverName string, deviceID string, deviceName *string) int
+		CreateFamily        func(childComplexity int, familyName string, password string, babyName string, caregiverName string, deviceID *string, deviceName *string) int
 		DeleteActivity      func(childComplexity int, activityID string) int
 		EndActivity         func(childComplexity int, activityID string, endTime *time.Time) int
-		JoinFamily          func(childComplexity int, familyName string, password string, caregiverName string, deviceID string, deviceName *string) int
+		JoinFamily          func(childComplexity int, familyName string, password string, caregiverName string, deviceID *string, deviceName *string) int
 		LeaveFamily         func(childComplexity int) int
+		LinkCaregiverToUser func(childComplexity int, caregiverID string) int
 		ParseVoiceInput     func(childComplexity int, audioFile graphql.Upload) int
 		StartCareSession    func(childComplexity int) int
 		UpdateActivity      func(childComplexity int, activityID string, input model.ActivityInput) int
@@ -165,6 +166,7 @@ type ComplexityRoot struct {
 		GetCareSession           func(childComplexity int, id string) int
 		GetCurrentSession        func(childComplexity int) int
 		GetMyCaregiver           func(childComplexity int) int
+		GetMyFamilies            func(childComplexity int) int
 		GetMyFamily              func(childComplexity int) int
 		GetRecentCareSessions    func(childComplexity int, limit *int32) int
 		PredictNextFeed          func(childComplexity int) int
@@ -186,8 +188,9 @@ type ComplexityRoot struct {
 }
 
 type MutationResolver interface {
-	CreateFamily(ctx context.Context, familyName string, password string, babyName string, caregiverName string, deviceID string, deviceName *string) (*model.AuthResult, error)
-	JoinFamily(ctx context.Context, familyName string, password string, caregiverName string, deviceID string, deviceName *string) (*model.AuthResult, error)
+	CreateFamily(ctx context.Context, familyName string, password string, babyName string, caregiverName string, deviceID *string, deviceName *string) (*model.AuthResult, error)
+	JoinFamily(ctx context.Context, familyName string, password string, caregiverName string, deviceID *string, deviceName *string) (*model.AuthResult, error)
+	LinkCaregiverToUser(ctx context.Context, caregiverID string) (*model.Caregiver, error)
 	UpdateBabyName(ctx context.Context, babyName string) (*model.Family, error)
 	LeaveFamily(ctx context.Context) (bool, error)
 	StartCareSession(ctx context.Context) (*model.CareSession, error)
@@ -202,6 +205,7 @@ type QueryResolver interface {
 	CheckFamilyNameAvailable(ctx context.Context, name string) (bool, error)
 	GetMyFamily(ctx context.Context) (*model.Family, error)
 	GetMyCaregiver(ctx context.Context) (*model.Caregiver, error)
+	GetMyFamilies(ctx context.Context) ([]*model.Family, error)
 	GetRecentCareSessions(ctx context.Context, limit *int32) ([]*model.CareSession, error)
 	GetCurrentSession(ctx context.Context) (*model.CareSession, error)
 	GetCareSession(ctx context.Context, id string) (*model.CareSession, error)
@@ -574,7 +578,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateFamily(childComplexity, args["familyName"].(string), args["password"].(string), args["babyName"].(string), args["caregiverName"].(string), args["deviceId"].(string), args["deviceName"].(*string)), true
+		return e.complexity.Mutation.CreateFamily(childComplexity, args["familyName"].(string), args["password"].(string), args["babyName"].(string), args["caregiverName"].(string), args["deviceId"].(*string), args["deviceName"].(*string)), true
 	case "Mutation.deleteActivity":
 		if e.complexity.Mutation.DeleteActivity == nil {
 			break
@@ -607,13 +611,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.JoinFamily(childComplexity, args["familyName"].(string), args["password"].(string), args["caregiverName"].(string), args["deviceId"].(string), args["deviceName"].(*string)), true
+		return e.complexity.Mutation.JoinFamily(childComplexity, args["familyName"].(string), args["password"].(string), args["caregiverName"].(string), args["deviceId"].(*string), args["deviceName"].(*string)), true
 	case "Mutation.leaveFamily":
 		if e.complexity.Mutation.LeaveFamily == nil {
 			break
 		}
 
 		return e.complexity.Mutation.LeaveFamily(childComplexity), true
+	case "Mutation.linkCaregiverToUser":
+		if e.complexity.Mutation.LinkCaregiverToUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_linkCaregiverToUser_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.LinkCaregiverToUser(childComplexity, args["caregiverId"].(string)), true
 	case "Mutation.parseVoiceInput":
 		if e.complexity.Mutation.ParseVoiceInput == nil {
 			break
@@ -763,6 +778,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.GetMyCaregiver(childComplexity), true
+	case "Query.getMyFamilies":
+		if e.complexity.Query.GetMyFamilies == nil {
+			break
+		}
+
+		return e.complexity.Query.GetMyFamilies(childComplexity), true
 	case "Query.getMyFamily":
 		if e.complexity.Query.GetMyFamily == nil {
 			break
@@ -1132,6 +1153,7 @@ type Query {
   checkFamilyNameAvailable(name: String!): Boolean!
   getMyFamily: Family
   getMyCaregiver: Caregiver
+  getMyFamilies: [Family!]!
 
   # Care Sessions (automatically scoped to authenticated caregiver's family)
   getRecentCareSessions(limit: Int): [CareSession!]!
@@ -1150,7 +1172,7 @@ type Mutation {
     password: String!
     babyName: String!
     caregiverName: String!
-    deviceId: String!
+    deviceId: String
     deviceName: String
   ): AuthResult!
 
@@ -1158,9 +1180,11 @@ type Mutation {
     familyName: String!
     password: String!
     caregiverName: String!
-    deviceId: String!
+    deviceId: String
     deviceName: String
   ): AuthResult!
+
+  linkCaregiverToUser(caregiverId: ID!): Caregiver!
 
   updateBabyName(babyName: String!): Family!
 
@@ -1234,7 +1258,7 @@ func (ec *executionContext) field_Mutation_createFamily_args(ctx context.Context
 		return nil, err
 	}
 	args["caregiverName"] = arg3
-	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "deviceId", ec.unmarshalNString2string)
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "deviceId", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
@@ -1292,7 +1316,7 @@ func (ec *executionContext) field_Mutation_joinFamily_args(ctx context.Context, 
 		return nil, err
 	}
 	args["caregiverName"] = arg2
-	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "deviceId", ec.unmarshalNString2string)
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "deviceId", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
@@ -1302,6 +1326,17 @@ func (ec *executionContext) field_Mutation_joinFamily_args(ctx context.Context, 
 		return nil, err
 	}
 	args["deviceName"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_linkCaregiverToUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "caregiverId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["caregiverId"] = arg0
 	return args, nil
 }
 
@@ -3024,7 +3059,7 @@ func (ec *executionContext) _Mutation_createFamily(ctx context.Context, field gr
 		ec.fieldContext_Mutation_createFamily,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().CreateFamily(ctx, fc.Args["familyName"].(string), fc.Args["password"].(string), fc.Args["babyName"].(string), fc.Args["caregiverName"].(string), fc.Args["deviceId"].(string), fc.Args["deviceName"].(*string))
+			return ec.resolvers.Mutation().CreateFamily(ctx, fc.Args["familyName"].(string), fc.Args["password"].(string), fc.Args["babyName"].(string), fc.Args["caregiverName"].(string), fc.Args["deviceId"].(*string), fc.Args["deviceName"].(*string))
 		},
 		nil,
 		ec.marshalNAuthResult2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐAuthResult,
@@ -3075,7 +3110,7 @@ func (ec *executionContext) _Mutation_joinFamily(ctx context.Context, field grap
 		ec.fieldContext_Mutation_joinFamily,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().JoinFamily(ctx, fc.Args["familyName"].(string), fc.Args["password"].(string), fc.Args["caregiverName"].(string), fc.Args["deviceId"].(string), fc.Args["deviceName"].(*string))
+			return ec.resolvers.Mutation().JoinFamily(ctx, fc.Args["familyName"].(string), fc.Args["password"].(string), fc.Args["caregiverName"].(string), fc.Args["deviceId"].(*string), fc.Args["deviceName"].(*string))
 		},
 		nil,
 		ec.marshalNAuthResult2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐAuthResult,
@@ -3112,6 +3147,61 @@ func (ec *executionContext) fieldContext_Mutation_joinFamily(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_joinFamily_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_linkCaregiverToUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_linkCaregiverToUser,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().LinkCaregiverToUser(ctx, fc.Args["caregiverId"].(string))
+		},
+		nil,
+		ec.marshalNCaregiver2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCaregiver,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_linkCaregiverToUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Caregiver_id(ctx, field)
+			case "familyId":
+				return ec.fieldContext_Caregiver_familyId(ctx, field)
+			case "name":
+				return ec.fieldContext_Caregiver_name(ctx, field)
+			case "deviceId":
+				return ec.fieldContext_Caregiver_deviceId(ctx, field)
+			case "deviceName":
+				return ec.fieldContext_Caregiver_deviceName(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Caregiver_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Caregiver", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_linkCaregiverToUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4063,6 +4153,49 @@ func (ec *executionContext) fieldContext_Query_getMyCaregiver(_ context.Context,
 				return ec.fieldContext_Caregiver_createdAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Caregiver", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_getMyFamilies(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_getMyFamilies,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().GetMyFamilies(ctx)
+		},
+		nil,
+		ec.marshalNFamily2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFamilyᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_getMyFamilies(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Family_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Family_name(ctx, field)
+			case "babyName":
+				return ec.fieldContext_Family_babyName(ctx, field)
+			case "password":
+				return ec.fieldContext_Family_password(ctx, field)
+			case "caregivers":
+				return ec.fieldContext_Family_caregivers(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Family_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Family", field.Name)
 		},
 	}
 	return fc, nil
@@ -6847,6 +6980,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "linkCaregiverToUser":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_linkCaregiverToUser(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "updateBabyName":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateBabyName(ctx, field)
@@ -7150,6 +7290,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_getMyCaregiver(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getMyFamilies":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getMyFamilies(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -7900,6 +8062,10 @@ func (ec *executionContext) marshalNCareSessionSummary2ᚖgithubᚗcomᚋswatkat
 	return ec._CareSessionSummary(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNCaregiver2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCaregiver(ctx context.Context, sel ast.SelectionSet, v model.Caregiver) graphql.Marshaler {
+	return ec._Caregiver(ctx, sel, &v)
+}
+
 func (ec *executionContext) marshalNCaregiver2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCaregiverᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Caregiver) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -7972,6 +8138,50 @@ func (ec *executionContext) marshalNDateTime2timeᚐTime(ctx context.Context, se
 
 func (ec *executionContext) marshalNFamily2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFamily(ctx context.Context, sel ast.SelectionSet, v model.Family) graphql.Marshaler {
 	return ec._Family(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNFamily2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFamilyᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Family) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNFamily2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFamily(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNFamily2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFamily(ctx context.Context, sel ast.SelectionSet, v *model.Family) graphql.Marshaler {
