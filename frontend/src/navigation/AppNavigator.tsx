@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Image, ActivityIndicator, StyleSheet } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { SessionDetailScreen } from '../screens/SessionDetailScreen';
@@ -52,7 +53,16 @@ export function AppNavigator() {
 
   if (isLoading) {
     console.log('AppNavigator: Showing loading state...');
-    return null;
+    return (
+      <View style={splashStyles.container}>
+        <Image
+          source={require('../../assets/splash-icon.png')}
+          style={splashStyles.icon}
+          resizeMode="contain"
+        />
+        <ActivityIndicator testID="splash-spinner" size="small" color="#FFFFFF" style={splashStyles.spinner} />
+      </View>
+    );
   }
 
   // Determine which navigation state to show:
@@ -192,3 +202,19 @@ export function AppNavigator() {
     </Stack.Navigator>
   );
 }
+
+const splashStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#5B9BD5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  icon: {
+    width: 120,
+    height: 120,
+  },
+  spinner: {
+    marginTop: 24,
+  },
+});

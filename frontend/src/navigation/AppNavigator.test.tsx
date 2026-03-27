@@ -104,9 +104,9 @@ describe('AppNavigator', () => {
       legacyAuthData: null,
     });
 
-    const { toJSON } = renderNavigator();
-    // NavigationContainer renders but AppNavigator returns null
-    expect(toJSON()).toBeNull();
+    const { getByTestId } = renderNavigator();
+    // Should show splash screen with spinner while loading
+    expect(getByTestId('splash-spinner')).toBeTruthy();
   });
 
   it('shows Welcome screen when unauthenticated (no Supabase, no device auth)', () => {
