@@ -82,7 +82,7 @@ export function MigrationScreen({ navigation }: Props) {
       });
 
       if (data?.linkCaregiverToUser) {
-        // Step 3: Update auth data and clear legacy
+        // Step 3: Update auth data (keep family data in storage — the app needs it)
         await login({
           familyId: legacyAuthData.familyId,
           caregiverId: data.linkCaregiverToUser.id,
@@ -90,7 +90,6 @@ export function MigrationScreen({ navigation }: Props) {
           familyName: legacyAuthData.familyName,
           babyName: legacyAuthData.babyName,
         });
-        await clearLegacyAuth();
       }
     } catch (error) {
       console.error('Migration error:', error);
