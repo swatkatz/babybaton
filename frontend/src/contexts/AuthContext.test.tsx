@@ -63,6 +63,8 @@ function TestConsumer({
         onPress={() => auth.login(mockAuthData)}
       />
       <TouchableOpacity testID="logout" onPress={() => auth.logout()} />
+      <TouchableOpacity testID="signOut" onPress={() => auth.signOut()} />
+      <TouchableOpacity testID="leaveFamily" onPress={() => auth.leaveFamily()} />
       <TouchableOpacity testID="clearLegacy" onPress={() => auth.clearLegacyAuth()} />
     </>
   );
@@ -283,6 +285,74 @@ describe('AuthContext', () => {
     expect(capturedAuth!.legacyAuthData).toBeNull();
     // Supabase session should still be there
     expect(capturedAuth!.supabaseSession).toBeTruthy();
+  });
+
+  it('should clear all state on signOut (same as logout)', async () => {
+    (authService.getAuth as jest.Mock).mockResolvedValue(mockAuthData);
+    mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
+
+    let capturedAuth: ReturnType<typeof useAuth> | undefined;
+    render(
+      <AuthProvider>
+        <TestConsumer
+          onRender={(ctx) => {
+            capturedAuth = ctx;
+          }}
+        />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedAuth!.isAuthenticated).toBe(true);
+    });
+
+    await act(async () => {
+      await capturedAuth!.signOut();
+    });
+
+    expect(authService.clearAuth).toHaveBeenCalled();
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(capturedAuth!.isAuthenticated).toBe(false);
+    expect(capturedAuth!.hasFamily).toBe(false);
+    expect(capturedAuth!.supabaseSession).toBeNull();
+    expect(capturedAuth!.legacyAuthData).toBeNull();
+  });
+
+  it('should clear family data but keep Supabase session on leaveFamily', async () => {
+    (authService.getAuth as jest.Mock).mockResolvedValue(mockAuthData);
+    mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
+
+    let capturedAuth: ReturnType<typeof useAuth> | undefined;
+    render(
+      <AuthProvider>
+        <TestConsumer
+          onRender={(ctx) => {
+            capturedAuth = ctx;
+          }}
+        />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedAuth!.isAuthenticated).toBe(true);
+      expect(capturedAuth!.hasFamily).toBe(true);
+    });
+
+    await act(async () => {
+      await capturedAuth!.leaveFamily();
+    });
+
+    expect(authService.clearAuth).toHaveBeenCalled();
+    // Supabase session should be retained
+    expect(capturedAuth!.supabaseSession).toBeTruthy();
+    // But family data should be cleared
+    expect(capturedAuth!.hasFamily).toBe(false);
+    expect(capturedAuth!.authData).toBeNull();
+    expect(capturedAuth!.legacyAuthData).toBeNull();
+    // Still authenticated via Supabase
+    expect(capturedAuth!.isAuthenticated).toBe(true);
+    // signOut should NOT have been called on Supabase
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 
   it('should listen for Supabase auth state changes', async () => {

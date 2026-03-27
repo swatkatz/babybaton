@@ -13,6 +13,10 @@ interface AuthContextType {
   legacyAuthData: AuthData | null;
   login: (data: AuthData) => Promise<void>;
   logout: () => Promise<void>;
+  /** Sign out: clears Supabase session and all local state, returns to Sign In */
+  signOut: () => Promise<void>;
+  /** Leave family: clears family data but keeps Supabase session, returns to Create/Join Family */
+  leaveFamily: () => Promise<void>;
   clearLegacyAuth: () => Promise<void>;
   refreshFamily: () => Promise<void>;
 }
@@ -98,6 +102,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     console.log('AuthProvider: Auth state cleared');
   }
 
+  async function signOut() {
+    console.log('AuthProvider: signOut called — clearing Supabase session and all local state');
+    await authService.clearAuth();
+    await supabase.auth.signOut();
+    setAuthData(null);
+    setSupabaseSession(null);
+    setLegacyAuthData(null);
+    console.log('AuthProvider: Signed out');
+  }
+
+  async function leaveFamilyAuth() {
+    console.log('AuthProvider: leaveFamily called — clearing family data, keeping Supabase session');
+    await authService.clearAuth();
+    setAuthData(null);
+    setLegacyAuthData(null);
+    // Keep supabaseSession intact so user stays authenticated
+    console.log('AuthProvider: Family data cleared, Supabase session retained');
+  }
+
   async function clearLegacyAuth() {
     console.log('AuthProvider: Clearing legacy device auth');
     await authService.clearAuth();
@@ -127,6 +150,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     legacyAuthData,
     login,
     logout,
+    signOut,
+    leaveFamily: leaveFamilyAuth,
     clearLegacyAuth,
     refreshFamily,
   };
