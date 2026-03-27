@@ -153,9 +153,8 @@ describe('MigrationScreen', () => {
     });
 
     await waitFor(() => {
-      // Step 3: Update auth and clear legacy
+      // Step 3: Update auth (family data is preserved in storage)
       expect(mockLogin).toHaveBeenCalled();
-      expect(mockClearLegacyAuth).toHaveBeenCalled();
     });
   });
 
