@@ -67,7 +67,11 @@ export function SettingsScreen({ navigation }: Props) {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
-            await client.clearStore();
+            try {
+              await client.clearStore();
+            } catch (e) {
+              // clearStore can fail if there are active queries — ignore
+            }
             await signOut();
           },
         },
