@@ -37,27 +37,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const client = useApolloClient();
 
   useEffect(() => {
-    loadAuth();
+    let initialLoadDone = false;
+    loadAuth().then(() => { initialLoadDone = true; });
 
     // Listen for Supabase auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log('AuthContext: Supabase auth state changed:', _event, session ? 'has session' : 'no session');
       setSupabaseSession(session);
+
+      // After initial load, fetch family data when session changes (e.g. sign in)
+      if (initialLoadDone && session) {
+        setIsLoading(true);
+        fetchFamilyFromServer().finally(() => setIsLoading(false));
+      }
     });
 
     return () => {
       subscription.unsubscribe();
     };
   }, []);
-
-  // When Supabase session changes after initial load (e.g. sign in/out),
-  // re-fetch family data from server
-  useEffect(() => {
-    if (supabaseSession && !isLoading) {
-      setIsLoading(true);
-      fetchFamilyFromServer().finally(() => setIsLoading(false));
-    }
-  }, [supabaseSession]);
 
   async function fetchFamilyFromServer() {
     try {
