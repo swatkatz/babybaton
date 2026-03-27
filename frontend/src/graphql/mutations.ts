@@ -6,7 +6,7 @@ export const CREATE_FAMILY = gql`
     $password: String!
     $babyName: String!
     $caregiverName: String!
-    $deviceId: String!
+    $deviceId: String
     $deviceName: String
   ) {
     createFamily(
@@ -40,7 +40,7 @@ export const JOIN_FAMILY = gql`
     $familyName: String!
     $password: String!
     $caregiverName: String!
-    $deviceId: String!
+    $deviceId: String
     $deviceName: String
   ) {
     joinFamily(
