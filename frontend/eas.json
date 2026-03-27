@@ -6,7 +6,9 @@
       "distribution": "internal",
       "channel": "development",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://localhost:8080"
+        "EXPO_PUBLIC_API_URL": "http://localhost:8080",
+        "EXPO_PUBLIC_SUPABASE_URL": "http://localhost:54321",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-local-anon-key"
       }
     },
     "preview": {
@@ -14,13 +16,17 @@
       "channel": "preview",
       "android": { "buildType": "apk" },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://babybaton-production.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://babybaton-production.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-supabase-anon-key"
       }
     },
     "production": {
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://babybaton-production.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://babybaton-production.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-supabase-anon-key"
       }
     }
   }

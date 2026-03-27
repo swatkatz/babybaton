@@ -6,6 +6,8 @@ import { PredictionDetailScreen } from '../screens/PredictionDetailScreen';
 import { CurrentSessionDetailScreen } from '../screens/CurrentSessionDetailScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
+import { SignInScreen } from '../screens/SignInScreen';
+import { SignUpScreen } from '../screens/SignUpScreen';
 import { CreateFamilyScreen } from '../screens/CreateFamilyScreen';
 import { JoinFamilyScreen } from '../screens/JoinFamilyScreen';
 import { CustomHeader } from '../components/CustomHeader';
@@ -15,6 +17,8 @@ import { useAuth } from '../hooks/useAuth';
 // Define the route params for type safety
 export type RootStackParamList = {
   Welcome: undefined;
+  SignIn: undefined;
+  SignUp: undefined;
   CreateFamily: undefined;
   JoinFamily: undefined;
   Dashboard: undefined;
@@ -70,6 +74,16 @@ export function AppNavigator() {
             name="Welcome"
             component={WelcomeScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="SignIn"
+            component={SignInScreen}
+            options={{ title: 'Sign In' }}
+          />
+          <Stack.Screen
+            name="SignUp"
+            component={SignUpScreen}
+            options={{ title: 'Sign Up' }}
           />
           <Stack.Screen
             name="CreateFamily"

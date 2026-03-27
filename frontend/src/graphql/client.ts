@@ -6,6 +6,7 @@ import * as Localization from 'expo-localization';
 import { Platform } from 'react-native';
 import { API_URL } from '../config';
 import authService from '../services/authService';
+import { supabase } from '../services/supabase';
 
 // React Native file uploads use {uri, name, type} objects instead of File/Blob
 function isExtractableFile(value: unknown): value is { uri: string; name: string; type: string } {
@@ -36,13 +37,26 @@ const uploadLink = new UploadHttpLink({
 // Middleware to add authentication and timezone headers to every request
 const authLink = setContext(async (_, { headers }) => {
   try {
-    const authData = await authService.getAuth();
-
     // Get device timezone (e.g., "America/New_York", "Europe/London")
     const timezone = Localization.getCalendars()[0]?.timeZone ?? 'UTC';
 
+    // Try Supabase session first (new auth)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      console.log('Apollo: Using Supabase Bearer token');
+      return {
+        headers: {
+          ...headers,
+          'Authorization': `Bearer ${session.access_token}`,
+          'X-Timezone': timezone,
+        },
+      };
+    }
+
+    // Fall back to device-based auth headers (migration compatibility)
+    const authData = await authService.getAuth();
     if (authData) {
-      console.log('Apollo: Added auth headers -', {
+      console.log('Apollo: Falling back to device-based auth headers -', {
         familyId: authData.familyId,
         caregiverId: authData.caregiverId,
         timezone: timezone,
@@ -56,15 +70,15 @@ const authLink = setContext(async (_, { headers }) => {
           'X-Timezone': timezone,
         },
       };
-    } else {
-      console.log('Apollo: No auth data, adding timezone only');
-      return {
-        headers: {
-          ...headers,
-          'X-Timezone': timezone,
-        }
-      };
     }
+
+    console.log('Apollo: No auth data, adding timezone only');
+    return {
+      headers: {
+        ...headers,
+        'X-Timezone': timezone,
+      }
+    };
   } catch (error) {
     console.warn('Apollo: Failed to read auth data, continuing without headers:', error);
     return { headers };
