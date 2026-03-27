@@ -20,10 +20,12 @@ import { GetFamilySettingsDocument, LeaveFamilyDocument } from '../types/__gener
 type Props = StackScreenProps<RootStackParamList, 'Settings'>;
 
 export function SettingsScreen({ navigation }: Props) {
-  const { authData, logout } = useAuth();
+  const { authData, signOut, leaveFamily: leaveFamilyAuth, supabaseSession } = useAuth();
   const client = useApolloClient();
   const { data, loading, error } = useQuery(GetFamilySettingsDocument);
-  const [leaveFamily] = useMutation(LeaveFamilyDocument);
+  const [leaveFamilyMutation] = useMutation(LeaveFamilyDocument);
+
+  const userEmail = supabaseSession?.user?.email;
 
   const handleCopyPassword = () => {
     if (data?.getMyFamily?.password) {
@@ -35,7 +37,7 @@ export function SettingsScreen({ navigation }: Props) {
   const handleLeaveFamily = () => {
     Alert.alert(
       'Leave Family',
-      'Are you sure? This will remove you from the family.',
+      'Are you sure? This will remove you from the family. Your account will remain active.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -43,12 +45,30 @@ export function SettingsScreen({ navigation }: Props) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await leaveFamily();
+              await leaveFamilyMutation();
             } catch (e) {
-              // Mutation failed (e.g. caregiver already deleted) — still log out
+              // Mutation failed (e.g. caregiver already deleted) — still clear family
             }
             await client.clearStore();
-            await logout();
+            await leaveFamilyAuth();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await client.clearStore();
+            await signOut();
           },
         },
       ]
@@ -80,10 +100,10 @@ export function SettingsScreen({ navigation }: Props) {
             style={[styles.leaveFamilyButton, { marginTop: spacing.md }]}
             onPress={async () => {
               await client.clearStore();
-              await logout();
+              await signOut();
             }}
           >
-            <Text style={styles.leaveFamilyButtonText}>Log Out</Text>
+            <Text style={styles.leaveFamilyButtonText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -99,6 +119,18 @@ export function SettingsScreen({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.content}>
+          {/* Account Section */}
+          {userEmail && (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.infoLabel}>Account</Text>
+                <Text style={styles.infoValue}>{userEmail}</Text>
+              </View>
+
+              <View style={styles.divider} />
+            </>
+          )}
+
           {/* Family Info Section */}
           <View style={styles.section}>
             <Text style={styles.infoLabel}>Family</Text>
@@ -147,17 +179,10 @@ export function SettingsScreen({ navigation }: Props) {
             </Text>
 
             <View style={styles.caregiverList}>
-              {family.caregivers.map((caregiver: { id: string; name: string; deviceName?: string | null }) => (
+              {family.caregivers.map((caregiver: { id: string; name: string }) => (
                 <View key={caregiver.id} style={styles.caregiverItem}>
                   <Text style={styles.caregiverBullet}>•</Text>
-                  <View style={styles.caregiverInfo}>
-                    <Text style={styles.caregiverName}>{caregiver.name}</Text>
-                    {caregiver.deviceName && (
-                      <Text style={styles.caregiverDevice}>
-                        ({caregiver.deviceName})
-                      </Text>
-                    )}
-                  </View>
+                  <Text style={styles.caregiverName}>{caregiver.name}</Text>
                 </View>
               ))}
             </View>
@@ -171,6 +196,14 @@ export function SettingsScreen({ navigation }: Props) {
             onPress={handleLeaveFamily}
           >
             <Text style={styles.leaveFamilyButtonText}>Leave Family</Text>
+          </TouchableOpacity>
+
+          {/* Sign Out Button */}
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={handleSignOut}
+          >
+            <Text style={styles.signOutButtonText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -293,20 +326,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: typography.lg * 1.2,
   },
-  caregiverInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
   caregiverName: {
     fontSize: typography.base,
     color: colors.textPrimary,
     fontWeight: '500' as const,
-  },
-  caregiverDevice: {
-    fontSize: typography.base,
-    color: colors.textSecondary,
   },
   leaveFamilyButton: {
     backgroundColor: colors.error,
@@ -319,5 +342,18 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     fontWeight: '600' as const,
     color: '#FFFFFF',
+  },
+  signOutButton: {
+    paddingVertical: spacing.md,
+    borderRadius: layout.radiusMedium,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  signOutButtonText: {
+    fontSize: typography.base,
+    fontWeight: '600' as const,
+    color: colors.textSecondary,
   },
 });

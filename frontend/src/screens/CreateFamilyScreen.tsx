@@ -26,7 +26,7 @@ type Props = StackScreenProps<RootStackParamList, 'CreateFamily'>;
 const QUICK_NAMES = ['Mom', 'Dad', 'Grandma', 'Grandpa', 'Nanny'];
 
 export function CreateFamilyScreen({ navigation }: Props) {
-  const { login } = useAuth();
+  const { login, supabaseSession } = useAuth();
   const familyNameRef = useRef<TextInput>(null);
   const [familyName, setFamilyName] = useState('');
   const [babyName, setBabyName] = useState('');
@@ -62,8 +62,9 @@ export function CreateFamilyScreen({ navigation }: Props) {
     }
 
     try {
-      const deviceId = await deviceService.getDeviceId();
-      const deviceName = await deviceService.getDeviceName();
+      // Only send device info when not using Supabase auth
+      const deviceId = supabaseSession ? undefined : await deviceService.getDeviceId();
+      const deviceName = supabaseSession ? undefined : await deviceService.getDeviceName();
 
       const { data } = await createFamily({
         variables: {
