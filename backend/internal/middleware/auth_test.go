@@ -26,10 +26,14 @@ func (m *mockVerifier) VerifyToken(ctx context.Context, token string) (string, s
 // --- Mock Store (only methods needed by middleware) ---
 
 type mockStore struct {
-	user      *domain.User
-	userErr   error
-	caregiver *domain.Caregiver
-	cgErr     error
+	user           *domain.User
+	userErr        error
+	caregiver      *domain.Caregiver
+	cgErr          error
+	families       []*domain.Family
+	familiesErr    error
+	createdUser    *domain.User
+	createUserErr  error
 }
 
 func (m *mockStore) GetUserBySupabaseID(ctx context.Context, supabaseUserID string) (*domain.User, error) {
@@ -56,9 +60,12 @@ func (m *mockStore) FamilyNameExists(ctx context.Context, name string) (bool, er
 	return false, nil
 }
 func (m *mockStore) GetFamiliesByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Family, error) {
-	return nil, nil
+	return m.families, m.familiesErr
 }
-func (m *mockStore) CreateUser(ctx context.Context, user *domain.User) error { return nil }
+func (m *mockStore) CreateUser(ctx context.Context, user *domain.User) error {
+	m.createdUser = user
+	return m.createUserErr
+}
 func (m *mockStore) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return nil, nil
 }
@@ -378,13 +385,69 @@ func TestDualAuth_ValidJWT_ResolvesUserAndCaregiver(t *testing.T) {
 	}
 }
 
-func TestDualAuth_ValidJWT_WithoutFamilyID(t *testing.T) {
+func TestDualAuth_ValidJWT_WithoutFamilyID_SingleFamily_AutoResolves(t *testing.T) {
+	userID := uuid.New()
+	caregiverID := uuid.New()
+	familyID := uuid.New()
+
+	user := &domain.User{ID: userID, SupabaseUserID: "sup-123", Email: "test@example.com"}
+	family := &domain.Family{ID: familyID, Name: "Test Family"}
+	caregiver := &domain.Caregiver{ID: caregiverID, FamilyID: familyID, UserID: &userID}
+
+	m := newTestDualAuth(
+		&mockVerifier{userID: "sup-123", email: "test@example.com"},
+		&mockStore{user: user, caregiver: caregiver, families: []*domain.Family{family}},
+	)
+
+	var capturedCtx context.Context
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedCtx = r.Context()
+	})
+
+	req := httptest.NewRequest("POST", "/query", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+
+	rr := httptest.NewRecorder()
+	m.Handler(inner).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	// User context should be set
+	gotUserID, ok := GetUserID(capturedCtx)
+	if !ok {
+		t.Fatal("expected user ID in context")
+	}
+	if gotUserID != userID {
+		t.Errorf("user ID = %v, want %v", gotUserID, userID)
+	}
+
+	// Caregiver/family should be auto-resolved from single family
+	gotCaregiverID, ok := GetCaregiverID(capturedCtx)
+	if !ok {
+		t.Fatal("expected caregiver ID to be auto-resolved from single family")
+	}
+	if gotCaregiverID != caregiverID {
+		t.Errorf("caregiver ID = %v, want %v", gotCaregiverID, caregiverID)
+	}
+
+	gotFamilyID, ok := GetFamilyID(capturedCtx)
+	if !ok {
+		t.Fatal("expected family ID to be auto-resolved from single family")
+	}
+	if gotFamilyID != familyID {
+		t.Errorf("family ID = %v, want %v", gotFamilyID, familyID)
+	}
+}
+
+func TestDualAuth_ValidJWT_WithoutFamilyID_NoFamilies(t *testing.T) {
 	userID := uuid.New()
 	user := &domain.User{ID: userID, SupabaseUserID: "sup-123", Email: "test@example.com"}
 
 	m := newTestDualAuth(
 		&mockVerifier{userID: "sup-123", email: "test@example.com"},
-		&mockStore{user: user},
+		&mockStore{user: user, families: []*domain.Family{}},
 	)
 
 	var capturedCtx context.Context
@@ -408,15 +471,106 @@ func TestDualAuth_ValidJWT_WithoutFamilyID(t *testing.T) {
 		t.Fatal("expected user ID in context")
 	}
 
-	// No caregiver/family without X-Family-Id
+	// No caregiver/family when user has no families
 	_, ok = GetCaregiverID(capturedCtx)
 	if ok {
-		t.Error("expected no caregiver ID without X-Family-Id header")
+		t.Error("expected no caregiver ID when user has no families")
 	}
 
 	_, ok = GetFamilyID(capturedCtx)
 	if ok {
-		t.Error("expected no family ID without X-Family-Id header")
+		t.Error("expected no family ID when user has no families")
+	}
+}
+
+func TestDualAuth_ValidJWT_WithoutFamilyID_MultipleFamilies_NoAutoResolve(t *testing.T) {
+	userID := uuid.New()
+	user := &domain.User{ID: userID, SupabaseUserID: "sup-123", Email: "test@example.com"}
+
+	families := []*domain.Family{
+		{ID: uuid.New(), Name: "Family 1"},
+		{ID: uuid.New(), Name: "Family 2"},
+	}
+
+	m := newTestDualAuth(
+		&mockVerifier{userID: "sup-123", email: "test@example.com"},
+		&mockStore{user: user, families: families},
+	)
+
+	var capturedCtx context.Context
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedCtx = r.Context()
+	})
+
+	req := httptest.NewRequest("POST", "/query", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+
+	rr := httptest.NewRecorder()
+	m.Handler(inner).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	// User context should be set
+	_, ok := GetUserID(capturedCtx)
+	if !ok {
+		t.Fatal("expected user ID in context")
+	}
+
+	// No auto-resolve when user has multiple families
+	_, ok = GetCaregiverID(capturedCtx)
+	if ok {
+		t.Error("expected no caregiver ID when user has multiple families (ambiguous)")
+	}
+
+	_, ok = GetFamilyID(capturedCtx)
+	if ok {
+		t.Error("expected no family ID when user has multiple families (ambiguous)")
+	}
+}
+
+func TestDualAuth_ValidJWT_AutoCreatesUser(t *testing.T) {
+	ms := &mockStore{
+		userErr:  fmt.Errorf("user not found"),
+		families: []*domain.Family{},
+	}
+
+	m := newTestDualAuth(
+		&mockVerifier{userID: "sup-new", email: "new@example.com"},
+		ms,
+	)
+
+	var capturedCtx context.Context
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedCtx = r.Context()
+	})
+
+	req := httptest.NewRequest("POST", "/query", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+
+	rr := httptest.NewRecorder()
+	m.Handler(inner).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	// User should have been auto-created
+	if ms.createdUser == nil {
+		t.Fatal("expected user to be auto-created")
+	}
+	if ms.createdUser.SupabaseUserID != "sup-new" {
+		t.Errorf("created user supabase ID = %q, want %q", ms.createdUser.SupabaseUserID, "sup-new")
+	}
+	if ms.createdUser.Email != "new@example.com" {
+		t.Errorf("created user email = %q, want %q", ms.createdUser.Email, "new@example.com")
+	}
+
+	// User context should be set with the auto-created user
+	_, ok := GetUserID(capturedCtx)
+	if !ok {
+		t.Fatal("expected user ID in context after auto-creation")
 	}
 }
 
@@ -470,16 +624,16 @@ func TestDualAuth_InvalidJWT_Returns401(t *testing.T) {
 	}
 }
 
-func TestDualAuth_ValidJWT_UserNotFound_PassesThroughWithSupabaseIdentity(t *testing.T) {
+func TestDualAuth_ValidJWT_UserNotFound_AutoCreatesAndPassesThrough(t *testing.T) {
 	m := newTestDualAuth(
 		&mockVerifier{userID: "sup-unknown", email: "test@example.com"},
-		&mockStore{userErr: fmt.Errorf("user not found")},
+		&mockStore{userErr: fmt.Errorf("user not found"), families: []*domain.Family{}},
 	)
 
 	handlerCalled := false
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalled = true
-		// Should have Supabase identity but no user
+		// Should have Supabase identity
 		supID, ok := GetSupabaseID(r.Context())
 		if !ok || supID != "sup-unknown" {
 			t.Errorf("expected supabase ID 'sup-unknown', got '%s'", supID)
@@ -488,9 +642,10 @@ func TestDualAuth_ValidJWT_UserNotFound_PassesThroughWithSupabaseIdentity(t *tes
 		if !ok || supEmail != "test@example.com" {
 			t.Errorf("expected supabase email 'test@example.com', got '%s'", supEmail)
 		}
+		// User should now be auto-created
 		_, hasUser := GetUserID(r.Context())
-		if hasUser {
-			t.Error("expected no user ID when user not found in DB")
+		if !hasUser {
+			t.Error("expected user ID after auto-creation")
 		}
 	})
 
@@ -504,7 +659,41 @@ func TestDualAuth_ValidJWT_UserNotFound_PassesThroughWithSupabaseIdentity(t *tes
 		t.Errorf("expected 200, got %d", rr.Code)
 	}
 	if !handlerCalled {
-		t.Error("handler should be called with Supabase identity even when user not in DB")
+		t.Error("handler should be called with Supabase identity even when user was just auto-created")
+	}
+}
+
+func TestDualAuth_ValidJWT_UserAutoCreateFails_PassesThroughWithSupabaseIdentity(t *testing.T) {
+	m := newTestDualAuth(
+		&mockVerifier{userID: "sup-unknown", email: "test@example.com"},
+		&mockStore{userErr: fmt.Errorf("user not found"), createUserErr: fmt.Errorf("db error")},
+	)
+
+	handlerCalled := false
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		// Should have Supabase identity but no user (auto-create failed)
+		supID, ok := GetSupabaseID(r.Context())
+		if !ok || supID != "sup-unknown" {
+			t.Errorf("expected supabase ID 'sup-unknown', got '%s'", supID)
+		}
+		_, hasUser := GetUserID(r.Context())
+		if hasUser {
+			t.Error("expected no user ID when auto-creation fails")
+		}
+	})
+
+	req := httptest.NewRequest("POST", "/query", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+
+	rr := httptest.NewRecorder()
+	m.Handler(inner).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+	if !handlerCalled {
+		t.Error("handler should be called even when user auto-creation fails")
 	}
 }
 

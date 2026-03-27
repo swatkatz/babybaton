@@ -107,9 +107,10 @@ func (m *DualAuthMiddleware) Handler(next http.Handler) http.Handler {
 	})
 }
 
-// handleJWTAuth verifies the JWT, looks up the user, and resolves the caregiver
-// if X-Family-Id is also provided. Returns nil context if verification fails
-// (and writes the HTTP error response).
+// handleJWTAuth verifies the JWT, looks up (or auto-creates) the user, and resolves
+// the family context. If X-Family-Id header is provided, uses that; otherwise
+// auto-selects if the user belongs to exactly one family. Returns nil context if
+// verification fails (and writes the HTTP error response).
 func (m *DualAuthMiddleware) handleJWTAuth(ctx context.Context, w http.ResponseWriter, r *http.Request, token string) context.Context {
 	supabaseID, email, err := m.verifier.VerifyToken(ctx, token)
 	if err != nil {
@@ -122,22 +123,50 @@ func (m *DualAuthMiddleware) handleJWTAuth(ctx context.Context, w http.ResponseW
 	ctx = context.WithValue(ctx, SupabaseIDKey, supabaseID)
 	ctx = context.WithValue(ctx, SupabaseEmailKey, email)
 
-	// Look up existing user — if found, set user context
+	// Look up existing user — auto-create if not found
 	user, err := m.store.GetUserBySupabaseID(ctx, supabaseID)
-	if err == nil {
+	if err != nil {
+		// Auto-create user record for verified JWT users
+		newUser := &domain.User{
+			ID:             uuid.New(),
+			SupabaseUserID: supabaseID,
+			Email:          email,
+		}
+		if createErr := m.store.CreateUser(ctx, newUser); createErr == nil {
+			user = newUser
+			log.Printf("Auto-created user record for Supabase ID %s", supabaseID)
+		} else {
+			log.Printf("Failed to auto-create user for Supabase ID %s: %v", supabaseID, createErr)
+		}
+	}
+
+	if user != nil {
 		ctx = context.WithValue(ctx, UserIDKey, user.ID)
 		ctx = context.WithValue(ctx, UserKey, user)
 	}
 
-	// If X-Family-Id is provided and user exists, resolve the specific caregiver for this user+family
-	familyIDStr := r.Header.Get("X-Family-Id")
-	if familyIDStr != "" && user != nil {
-		familyID, err := uuid.Parse(familyIDStr)
-		if err == nil {
-			caregiver, err := m.store.GetCaregiverByUserAndFamily(ctx, user.ID, familyID)
+	// Resolve family context for the user
+	if user != nil {
+		familyIDStr := r.Header.Get("X-Family-Id")
+		if familyIDStr != "" {
+			// Explicit family selection via header
+			familyID, err := uuid.Parse(familyIDStr)
 			if err == nil {
-				ctx = context.WithValue(ctx, CaregiverIDKey, caregiver.ID)
-				ctx = context.WithValue(ctx, FamilyIDKey, familyID)
+				caregiver, err := m.store.GetCaregiverByUserAndFamily(ctx, user.ID, familyID)
+				if err == nil {
+					ctx = context.WithValue(ctx, CaregiverIDKey, caregiver.ID)
+					ctx = context.WithValue(ctx, FamilyIDKey, familyID)
+				}
+			}
+		} else {
+			// Auto-resolve: if user belongs to exactly one family, select it automatically
+			families, err := m.store.GetFamiliesByUserID(ctx, user.ID)
+			if err == nil && len(families) == 1 {
+				caregiver, err := m.store.GetCaregiverByUserAndFamily(ctx, user.ID, families[0].ID)
+				if err == nil {
+					ctx = context.WithValue(ctx, CaregiverIDKey, caregiver.ID)
+					ctx = context.WithValue(ctx, FamilyIDKey, families[0].ID)
+				}
 			}
 		}
 	}
