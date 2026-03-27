@@ -50,7 +50,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
-  // When Supabase session changes, fetch family data from server
+  // When Supabase session changes after initial load (e.g. sign in/out),
+  // re-fetch family data from server
   useEffect(() => {
     if (supabaseSession && !isLoading) {
       fetchFamilyFromServer();
@@ -126,12 +127,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const deviceAuth = await authService.getAuth();
 
       if (session) {
-        // User has Supabase session — fetch family data from server
+        // User has Supabase session — fetch family data before finishing load
         if (deviceAuth) {
           // Has legacy device auth — flag for migration
           setLegacyAuthData(deviceAuth);
         }
-        // Family data will be fetched from server via the useEffect
+        await fetchFamilyFromServer();
       } else if (deviceAuth) {
         // Has old device auth but no Supabase session — migration candidate
         setLegacyAuthData(deviceAuth);
