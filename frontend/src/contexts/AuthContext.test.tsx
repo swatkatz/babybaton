@@ -14,12 +14,32 @@ jest.mock('../services/authService', () => ({
   },
 }));
 
+// Mock Supabase
+const mockGetSession = jest.fn();
+const mockSignOut = jest.fn();
+const mockOnAuthStateChange = jest.fn();
+jest.mock('../services/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: (...args: unknown[]) => mockGetSession(...args),
+      signOut: (...args: unknown[]) => mockSignOut(...args),
+      onAuthStateChange: (...args: unknown[]) => mockOnAuthStateChange(...args),
+    },
+  },
+}));
+
 const mockAuthData: AuthData = {
   familyId: 'family-123',
   caregiverId: 'caregiver-456',
   caregiverName: 'Jane Doe',
   familyName: 'Doe Family',
   babyName: 'Baby Doe',
+};
+
+const mockSupabaseSession = {
+  access_token: 'test-token',
+  refresh_token: 'test-refresh',
+  user: { id: 'user-1', email: 'test@example.com' },
 };
 
 // A test consumer component that exposes auth context values
@@ -34,12 +54,16 @@ function TestConsumer({
     <>
       <Text testID="loading">{String(auth.isLoading)}</Text>
       <Text testID="authenticated">{String(auth.isAuthenticated)}</Text>
+      <Text testID="hasFamily">{String(auth.hasFamily)}</Text>
       <Text testID="familyId">{auth.authData?.familyId ?? 'none'}</Text>
+      <Text testID="hasLegacy">{String(auth.legacyAuthData !== null)}</Text>
+      <Text testID="hasSupabase">{String(auth.supabaseSession !== null)}</Text>
       <TouchableOpacity
         testID="login"
         onPress={() => auth.login(mockAuthData)}
       />
       <TouchableOpacity testID="logout" onPress={() => auth.logout()} />
+      <TouchableOpacity testID="clearLegacy" onPress={() => auth.clearLegacyAuth()} />
     </>
   );
 }
@@ -47,15 +71,20 @@ function TestConsumer({
 describe('AuthContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // By default, return null (not authenticated)
+    // Default: no auth of any kind
     (authService.getAuth as jest.Mock).mockResolvedValue(null);
     (authService.saveAuth as jest.Mock).mockResolvedValue(undefined);
     (authService.clearAuth as jest.Mock).mockResolvedValue(undefined);
+    mockGetSession.mockResolvedValue({ data: { session: null } });
+    mockSignOut.mockResolvedValue({ error: null });
+    mockOnAuthStateChange.mockReturnValue({
+      data: { subscription: { unsubscribe: jest.fn() } },
+    });
   });
 
   it('should start in loading state', () => {
-    // Make getAuth never resolve to keep loading state
-    (authService.getAuth as jest.Mock).mockReturnValue(new Promise(() => {}));
+    // Make getSession never resolve to keep loading state
+    mockGetSession.mockReturnValue(new Promise(() => {}));
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
     render(
@@ -72,8 +101,32 @@ describe('AuthContext', () => {
     expect(capturedAuth!.isAuthenticated).toBe(false);
   });
 
-  it('should load existing auth from storage on mount', async () => {
+  it('should be unauthenticated when no auth exists', async () => {
+    let capturedAuth: ReturnType<typeof useAuth> | undefined;
+    render(
+      <AuthProvider>
+        <TestConsumer
+          onRender={(ctx) => {
+            capturedAuth = ctx;
+          }}
+        />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedAuth!.isLoading).toBe(false);
+    });
+
+    expect(capturedAuth!.isAuthenticated).toBe(false);
+    expect(capturedAuth!.hasFamily).toBe(false);
+    expect(capturedAuth!.supabaseSession).toBeNull();
+    expect(capturedAuth!.legacyAuthData).toBeNull();
+  });
+
+  it('should detect legacy device auth as migration candidate', async () => {
     (authService.getAuth as jest.Mock).mockResolvedValue(mockAuthData);
+    // No Supabase session
+    mockGetSession.mockResolvedValue({ data: { session: null } });
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
     render(
@@ -91,10 +144,39 @@ describe('AuthContext', () => {
     });
 
     expect(capturedAuth!.isAuthenticated).toBe(true);
-    expect(capturedAuth!.authData).toEqual(mockAuthData);
+    expect(capturedAuth!.hasFamily).toBe(true);
+    expect(capturedAuth!.legacyAuthData).toEqual(mockAuthData);
+    expect(capturedAuth!.supabaseSession).toBeNull();
   });
 
-  it('should set isAuthenticated to false when no auth data exists', async () => {
+  it('should be authenticated with Supabase session and device auth', async () => {
+    (authService.getAuth as jest.Mock).mockResolvedValue(mockAuthData);
+    mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
+
+    let capturedAuth: ReturnType<typeof useAuth> | undefined;
+    render(
+      <AuthProvider>
+        <TestConsumer
+          onRender={(ctx) => {
+            capturedAuth = ctx;
+          }}
+        />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedAuth!.isLoading).toBe(false);
+    });
+
+    expect(capturedAuth!.isAuthenticated).toBe(true);
+    expect(capturedAuth!.hasFamily).toBe(true);
+    expect(capturedAuth!.supabaseSession).toBeTruthy();
+    expect(capturedAuth!.legacyAuthData).toEqual(mockAuthData);
+  });
+
+  it('should be authenticated via Supabase without family', async () => {
+    // Supabase session but no device auth (new user who signed up)
+    mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
     (authService.getAuth as jest.Mock).mockResolvedValue(null);
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
@@ -112,8 +194,9 @@ describe('AuthContext', () => {
       expect(capturedAuth!.isLoading).toBe(false);
     });
 
-    expect(capturedAuth!.isAuthenticated).toBe(false);
-    expect(capturedAuth!.authData).toBeNull();
+    expect(capturedAuth!.isAuthenticated).toBe(true);
+    expect(capturedAuth!.hasFamily).toBe(false);
+    expect(capturedAuth!.supabaseSession).toBeTruthy();
   });
 
   it('should save auth data and update state on login', async () => {
@@ -132,19 +215,19 @@ describe('AuthContext', () => {
       expect(capturedAuth!.isLoading).toBe(false);
     });
 
-    // Call login
     await act(async () => {
       await capturedAuth!.login(mockAuthData);
     });
 
     expect(authService.saveAuth).toHaveBeenCalledWith(mockAuthData);
     expect(capturedAuth!.isAuthenticated).toBe(true);
+    expect(capturedAuth!.hasFamily).toBe(true);
     expect(capturedAuth!.authData).toEqual(mockAuthData);
   });
 
-  it('should clear auth data and update state on logout', async () => {
-    // Start authenticated
+  it('should clear all auth data on logout', async () => {
     (authService.getAuth as jest.Mock).mockResolvedValue(mockAuthData);
+    mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
     render(
@@ -161,20 +244,82 @@ describe('AuthContext', () => {
       expect(capturedAuth!.isAuthenticated).toBe(true);
     });
 
-    // Call logout
     await act(async () => {
       await capturedAuth!.logout();
     });
 
     expect(authService.clearAuth).toHaveBeenCalled();
+    expect(mockSignOut).toHaveBeenCalled();
     expect(capturedAuth!.isAuthenticated).toBe(false);
-    expect(capturedAuth!.authData).toBeNull();
+    expect(capturedAuth!.hasFamily).toBe(false);
+    expect(capturedAuth!.supabaseSession).toBeNull();
+    expect(capturedAuth!.legacyAuthData).toBeNull();
+  });
+
+  it('should clear legacy auth without affecting Supabase session', async () => {
+    (authService.getAuth as jest.Mock).mockResolvedValue(mockAuthData);
+    mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
+
+    let capturedAuth: ReturnType<typeof useAuth> | undefined;
+    render(
+      <AuthProvider>
+        <TestConsumer
+          onRender={(ctx) => {
+            capturedAuth = ctx;
+          }}
+        />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedAuth!.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await capturedAuth!.clearLegacyAuth();
+    });
+
+    expect(authService.clearAuth).toHaveBeenCalled();
+    expect(capturedAuth!.legacyAuthData).toBeNull();
+    // Supabase session should still be there
+    expect(capturedAuth!.supabaseSession).toBeTruthy();
+  });
+
+  it('should listen for Supabase auth state changes', async () => {
+    let authChangeCallback: (event: string, session: unknown) => void;
+    mockOnAuthStateChange.mockImplementation((callback: (event: string, session: unknown) => void) => {
+      authChangeCallback = callback;
+      return { data: { subscription: { unsubscribe: jest.fn() } } };
+    });
+
+    let capturedAuth: ReturnType<typeof useAuth> | undefined;
+    render(
+      <AuthProvider>
+        <TestConsumer
+          onRender={(ctx) => {
+            capturedAuth = ctx;
+          }}
+        />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedAuth!.isLoading).toBe(false);
+    });
+
+    expect(capturedAuth!.supabaseSession).toBeNull();
+
+    // Simulate Supabase auth change
+    act(() => {
+      authChangeCallback!('SIGNED_IN', mockSupabaseSession);
+    });
+
+    expect(capturedAuth!.supabaseSession).toEqual(mockSupabaseSession);
   });
 });
 
 describe('useAuth outside AuthProvider', () => {
   it('should throw an error when used outside AuthProvider', () => {
-    // Suppress the expected error output during this test
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     function BadConsumer() {

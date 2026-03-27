@@ -10,6 +10,7 @@ import { SignInScreen } from '../screens/SignInScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { CreateFamilyScreen } from '../screens/CreateFamilyScreen';
 import { JoinFamilyScreen } from '../screens/JoinFamilyScreen';
+import { MigrationScreen } from '../screens/MigrationScreen';
 import { CustomHeader } from '../components/CustomHeader';
 import { GetPredictionQuery } from '../types/__generated__/graphql';
 import { useAuth } from '../hooks/useAuth';
@@ -21,6 +22,7 @@ export type RootStackParamList = {
   SignUp: undefined;
   CreateFamily: undefined;
   JoinFamily: undefined;
+  Migration: undefined;
   Dashboard: undefined;
   PredictionDetail: {
     prediction: NonNullable<GetPredictionQuery['predictNextFeed']>;
@@ -33,26 +35,34 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 
 export function AppNavigator() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, hasFamily, isLoading, supabaseSession, legacyAuthData } = useAuth();
 
   console.log(
     'AppNavigator render: isLoading =',
     isLoading,
     'isAuthenticated =',
-    isAuthenticated
+    isAuthenticated,
+    'hasFamily =',
+    hasFamily,
+    'hasSupabase =',
+    !!supabaseSession,
+    'hasLegacy =',
+    !!legacyAuthData
   );
 
   if (isLoading) {
     console.log('AppNavigator: Showing loading state...');
-    // Could return a loading screen here if desired
     return null;
   }
 
-  console.log(
-    'AppNavigator: Rendering',
-    isAuthenticated ? 'authenticated' : 'unauthenticated',
-    'screens'
-  );
+  // Determine which navigation state to show:
+  // 1. Has legacy auth but no Supabase session → Migration flow
+  // 2. Not authenticated at all → Auth screens (Welcome/SignIn/SignUp)
+  // 3. Authenticated (Supabase) but no family → Family setup screens
+  // 4. Authenticated with family → Main app screens
+
+  const needsMigration = legacyAuthData !== null && supabaseSession === null;
+  const needsFamilySetup = supabaseSession !== null && !hasFamily;
 
   return (
     <Stack.Navigator
@@ -67,8 +77,29 @@ export function AppNavigator() {
         cardStyle: { flex: 1 },
       }}
     >
-      {!isAuthenticated ? (
-        // Auth screens
+      {needsMigration ? (
+        // Migration flow: old device auth detected, prompt to create Supabase account
+        <>
+          <Stack.Screen
+            name="Migration"
+            component={MigrationScreen}
+            options={{ title: 'Upgrade Account' }}
+          />
+          <Stack.Screen
+            name="SignIn"
+            component={SignInScreen}
+            options={{ title: 'Sign In' }}
+          />
+          <Stack.Screen
+            name="Dashboard"
+            component={DashboardScreen}
+            options={{
+              header: (props) => <CustomHeader {...props} />,
+            }}
+          />
+        </>
+      ) : !isAuthenticated ? (
+        // Unauthenticated: show auth screens
         <>
           <Stack.Screen
             name="Welcome"
@@ -96,8 +127,22 @@ export function AppNavigator() {
             options={{ title: 'Join Family' }}
           />
         </>
+      ) : needsFamilySetup ? (
+        // Authenticated via Supabase but no family yet
+        <>
+          <Stack.Screen
+            name="CreateFamily"
+            component={CreateFamilyScreen}
+            options={{ title: 'Create Family' }}
+          />
+          <Stack.Screen
+            name="JoinFamily"
+            component={JoinFamilyScreen}
+            options={{ title: 'Join Family' }}
+          />
+        </>
       ) : (
-        // Main app screens
+        // Fully authenticated with family — main app
         <>
           <Stack.Screen
             name="Dashboard"
