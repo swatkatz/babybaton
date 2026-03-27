@@ -364,10 +364,7 @@ func TestLinkCaregiverToUser_Success(t *testing.T) {
 
 	resolver := NewResolver(store)
 	mr := &mutationResolver{resolver}
-	// Set both Supabase identity and existing user in context
-	ctx := context.WithValue(context.Background(), middleware.SupabaseIDKey, "sup-123")
-	ctx = context.WithValue(ctx, middleware.SupabaseEmailKey, "test@example.com")
-	ctx = withUserID(ctx, userID)
+	ctx := withUserID(context.Background(), userID)
 
 	result, err := mr.LinkCaregiverToUser(ctx, caregiverID.String())
 	if err != nil {
@@ -407,9 +404,7 @@ func TestLinkCaregiverToUser_AlreadyLinked(t *testing.T) {
 
 	resolver := NewResolver(store)
 	mr := &mutationResolver{resolver}
-	ctx := context.WithValue(context.Background(), middleware.SupabaseIDKey, "sup-123")
-	ctx = context.WithValue(ctx, middleware.SupabaseEmailKey, "test@example.com")
-	ctx = withUserID(ctx, userID)
+	ctx := withUserID(context.Background(), userID)
 
 	_, err := mr.LinkCaregiverToUser(ctx, caregiverID.String())
 	if err == nil {
@@ -421,9 +416,7 @@ func TestLinkCaregiverToUser_InvalidCaregiverID(t *testing.T) {
 	store := newMockStore()
 	resolver := NewResolver(store)
 	mr := &mutationResolver{resolver}
-	ctx := context.WithValue(context.Background(), middleware.SupabaseIDKey, "sup-123")
-	ctx = context.WithValue(ctx, middleware.SupabaseEmailKey, "test@example.com")
-	ctx = withUserID(ctx, uuid.New())
+	ctx := withUserID(context.Background(), uuid.New())
 
 	_, err := mr.LinkCaregiverToUser(ctx, "not-a-uuid")
 	if err == nil {
