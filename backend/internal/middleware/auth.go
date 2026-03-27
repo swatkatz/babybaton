@@ -129,9 +129,9 @@ func (m *DualAuthMiddleware) handleJWTAuth(ctx context.Context, w http.ResponseW
 		ctx = context.WithValue(ctx, UserKey, user)
 	}
 
-	// If X-Family-Id is provided, resolve the specific caregiver for this user+family
+	// If X-Family-Id is provided and user exists, resolve the specific caregiver for this user+family
 	familyIDStr := r.Header.Get("X-Family-Id")
-	if familyIDStr != "" {
+	if familyIDStr != "" && user != nil {
 		familyID, err := uuid.Parse(familyIDStr)
 		if err == nil {
 			caregiver, err := m.store.GetCaregiverByUserAndFamily(ctx, user.ID, familyID)
