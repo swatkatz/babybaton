@@ -17,16 +17,16 @@
       "android": { "buildType": "apk" },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://babybaton-production.up.railway.app",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-supabase-anon-key"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://fimcnmxtvuhbdqndlbui.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Jv7f3BPuYwFODf1KNWcZ4g_JWNHAK6W"
       }
     },
     "production": {
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://babybaton-production.up.railway.app",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-supabase-anon-key"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://fimcnmxtvuhbdqndlbui.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Jv7f3BPuYwFODf1KNWcZ4g_JWNHAK6W"
       }
     }
   }
