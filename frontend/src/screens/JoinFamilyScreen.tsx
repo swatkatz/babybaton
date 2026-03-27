@@ -26,7 +26,7 @@ type Props = StackScreenProps<RootStackParamList, 'JoinFamily'>;
 const QUICK_NAMES = ['Mom', 'Dad', 'Grandma', 'Grandpa', 'Nanny'];
 
 export function JoinFamilyScreen({ navigation }: Props) {
-  const { login, supabaseSession } = useAuth();
+  const { login, refreshFamily, supabaseSession } = useAuth();
   const familyNameRef = useRef<TextInput>(null);
   const [familyName, setFamilyName] = useState('');
   const [password, setPassword] = useState('');
@@ -73,14 +73,19 @@ export function JoinFamilyScreen({ navigation }: Props) {
       });
 
       if (data?.joinFamily?.success && data.joinFamily.family && data.joinFamily.caregiver) {
-        // Save auth data
-        await login({
-          familyId: data.joinFamily.family.id,
-          caregiverId: data.joinFamily.caregiver.id,
-          caregiverName: data.joinFamily.caregiver.name,
-          familyName: data.joinFamily.family.name,
-          babyName: data.joinFamily.family.babyName,
-        });
+        if (supabaseSession) {
+          // Supabase user: refresh family data from server
+          await refreshFamily();
+        } else {
+          // Legacy device auth: save to local storage
+          await login({
+            familyId: data.joinFamily.family.id,
+            caregiverId: data.joinFamily.caregiver.id,
+            caregiverName: data.joinFamily.caregiver.name,
+            familyName: data.joinFamily.family.name,
+            babyName: data.joinFamily.family.babyName,
+          });
+        }
       } else {
         // Show error and highlight family name field
         const errorMessage = data?.joinFamily?.error || 'Failed to join family';

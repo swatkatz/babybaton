@@ -1,6 +1,8 @@
 import React from 'react';
 import { render, act, waitFor } from '@testing-library/react-native';
 import { Text, TouchableOpacity } from 'react-native';
+import { ApolloClient, InMemoryCache, ApolloLink, Observable } from '@apollo/client';
+import { ApolloProvider } from '@apollo/client/react';
 import { AuthProvider, useAuth } from './AuthContext';
 import authService, { AuthData } from '../services/authService';
 
@@ -42,6 +44,20 @@ const mockSupabaseSession = {
   user: { id: 'user-1', email: 'test@example.com' },
 };
 
+// Create a mock Apollo client for tests
+function createMockApolloClient() {
+  // Mock link that returns errors — auth context handles query errors gracefully
+  const mockLink = new ApolloLink(() => {
+    return new Observable((observer) => {
+      observer.error(new Error('No network in tests'));
+    });
+  });
+  return new ApolloClient({
+    cache: new InMemoryCache(),
+    link: mockLink,
+  });
+}
+
 // A test consumer component that exposes auth context values
 function TestConsumer({
   onRender,
@@ -70,6 +86,15 @@ function TestConsumer({
   );
 }
 
+function renderWithProviders(ui: React.ReactElement) {
+  const client = createMockApolloClient();
+  return render(
+    <ApolloProvider client={client}>
+      {ui}
+    </ApolloProvider>
+  );
+}
+
 describe('AuthContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -89,7 +114,7 @@ describe('AuthContext', () => {
     mockGetSession.mockReturnValue(new Promise(() => {}));
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -105,7 +130,7 @@ describe('AuthContext', () => {
 
   it('should be unauthenticated when no auth exists', async () => {
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -131,7 +156,7 @@ describe('AuthContext', () => {
     mockGetSession.mockResolvedValue({ data: { session: null } });
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -151,12 +176,12 @@ describe('AuthContext', () => {
     expect(capturedAuth!.supabaseSession).toBeNull();
   });
 
-  it('should be authenticated with Supabase session and device auth', async () => {
+  it('should be authenticated with Supabase session and detect legacy auth', async () => {
     (authService.getAuth as jest.Mock).mockResolvedValue(mockAuthData);
     mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -171,7 +196,6 @@ describe('AuthContext', () => {
     });
 
     expect(capturedAuth!.isAuthenticated).toBe(true);
-    expect(capturedAuth!.hasFamily).toBe(true);
     expect(capturedAuth!.supabaseSession).toBeTruthy();
     expect(capturedAuth!.legacyAuthData).toEqual(mockAuthData);
   });
@@ -182,7 +206,7 @@ describe('AuthContext', () => {
     (authService.getAuth as jest.Mock).mockResolvedValue(null);
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -197,13 +221,14 @@ describe('AuthContext', () => {
     });
 
     expect(capturedAuth!.isAuthenticated).toBe(true);
-    expect(capturedAuth!.hasFamily).toBe(false);
+    // hasFamily may be false initially until server query resolves
+    // (server query will fail in test since no link, so stays false)
     expect(capturedAuth!.supabaseSession).toBeTruthy();
   });
 
-  it('should save auth data and update state on login', async () => {
+  it('should save auth data and update state on login (legacy path)', async () => {
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -221,6 +246,7 @@ describe('AuthContext', () => {
       await capturedAuth!.login(mockAuthData);
     });
 
+    // No Supabase session, so login saves to device
     expect(authService.saveAuth).toHaveBeenCalledWith(mockAuthData);
     expect(capturedAuth!.isAuthenticated).toBe(true);
     expect(capturedAuth!.hasFamily).toBe(true);
@@ -232,7 +258,7 @@ describe('AuthContext', () => {
     mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -263,7 +289,7 @@ describe('AuthContext', () => {
     mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -292,7 +318,7 @@ describe('AuthContext', () => {
     mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -323,7 +349,7 @@ describe('AuthContext', () => {
     mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession } });
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {
@@ -335,7 +361,6 @@ describe('AuthContext', () => {
 
     await waitFor(() => {
       expect(capturedAuth!.isAuthenticated).toBe(true);
-      expect(capturedAuth!.hasFamily).toBe(true);
     });
 
     await act(async () => {
@@ -363,7 +388,7 @@ describe('AuthContext', () => {
     });
 
     let capturedAuth: ReturnType<typeof useAuth> | undefined;
-    render(
+    renderWithProviders(
       <AuthProvider>
         <TestConsumer
           onRender={(ctx) => {

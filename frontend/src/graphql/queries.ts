@@ -205,6 +205,30 @@ export const GET_CARE_SESSION = gql`
   ${CARE_SESSION_FRAGMENT}
 `;
 
+export const GET_MY_FAMILIES = gql`
+  query GetMyFamilies {
+    getMyFamilies {
+      id
+      name
+      babyName
+      caregivers {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const GET_MY_CAREGIVER = gql`
+  query GetMyCaregiver {
+    getMyCaregiver {
+      id
+      name
+      familyId
+    }
+  }
+`;
+
 export const GET_FAMILY_SETTINGS = gql`
   query GetFamilySettings {
     getMyFamily {

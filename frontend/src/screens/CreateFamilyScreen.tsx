@@ -26,7 +26,7 @@ type Props = StackScreenProps<RootStackParamList, 'CreateFamily'>;
 const QUICK_NAMES = ['Mom', 'Dad', 'Grandma', 'Grandpa', 'Nanny'];
 
 export function CreateFamilyScreen({ navigation }: Props) {
-  const { login, supabaseSession } = useAuth();
+  const { login, refreshFamily, supabaseSession } = useAuth();
   const familyNameRef = useRef<TextInput>(null);
   const [familyName, setFamilyName] = useState('');
   const [babyName, setBabyName] = useState('');
@@ -78,14 +78,19 @@ export function CreateFamilyScreen({ navigation }: Props) {
       });
 
       if (data?.createFamily?.success && data.createFamily.family && data.createFamily.caregiver) {
-        // Save auth data
-        await login({
-          familyId: data.createFamily.family.id,
-          caregiverId: data.createFamily.caregiver.id,
-          caregiverName: data.createFamily.caregiver.name,
-          familyName: data.createFamily.family.name,
-          babyName: data.createFamily.family.babyName,
-        });
+        if (supabaseSession) {
+          // Supabase user: refresh family data from server
+          await refreshFamily();
+        } else {
+          // Legacy device auth: save to local storage
+          await login({
+            familyId: data.createFamily.family.id,
+            caregiverId: data.createFamily.caregiver.id,
+            caregiverName: data.createFamily.caregiver.name,
+            familyName: data.createFamily.family.name,
+            babyName: data.createFamily.family.babyName,
+          });
+        }
       } else {
         // Show error and highlight family name field
         const errorMessage =

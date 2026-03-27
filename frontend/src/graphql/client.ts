@@ -44,17 +44,14 @@ const authLink = setContext(async (_, { headers }) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.access_token) {
       console.log('Apollo: Using Supabase Bearer token');
-      const authData = await authService.getAuth();
-      const supabaseHeaders: Record<string, string> = {
-        ...headers,
-        'Authorization': `Bearer ${session.access_token}`,
-        'X-Timezone': timezone,
+      // Backend auto-resolves family from user account — no X-Family-ID needed
+      return {
+        headers: {
+          ...headers,
+          'Authorization': `Bearer ${session.access_token}`,
+          'X-Timezone': timezone,
+        },
       };
-      // Include family ID so the backend can resolve the caregiver
-      if (authData?.familyId) {
-        supabaseHeaders['X-Family-ID'] = authData.familyId;
-      }
-      return { headers: supabaseHeaders };
     }
 
     // Fall back to device-based auth headers (migration compatibility)
