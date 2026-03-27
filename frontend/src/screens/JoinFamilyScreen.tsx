@@ -67,8 +67,8 @@ export function JoinFamilyScreen({ navigation }: Props) {
           familyName: familyName.trim(),
           password,
           caregiverName: caregiverName.trim(),
-          deviceId,
-          deviceName,
+          deviceId: deviceId ?? '',
+          deviceName: deviceName ?? '',
         },
       });
 

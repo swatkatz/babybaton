@@ -72,8 +72,8 @@ export function CreateFamilyScreen({ navigation }: Props) {
           password,
           babyName: babyName.trim(),
           caregiverName: caregiverName.trim(),
-          deviceId,
-          deviceName,
+          deviceId: deviceId ?? '',
+          deviceName: deviceName ?? '',
         },
       });
 
