@@ -9,7 +9,7 @@ import {
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
-import { spacing, typography } from '../theme/spacing';
+import { spacing, typography, layout } from '../theme/spacing';
 
 type Props = StackScreenProps<RootStackParamList, 'Welcome'>;
 
@@ -30,19 +30,42 @@ export function WelcomeScreen({ navigation }: Props) {
         <View style={styles.buttonsSection}>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}
-            onPress={() => navigation.navigate('CreateFamily')}
+            onPress={() => navigation.navigate('SignUp')}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryButtonText}>Create New Family</Text>
+            <Text style={styles.primaryButtonText}>Get Started</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, styles.secondaryButton]}
-            onPress={() => navigation.navigate('JoinFamily')}
+            onPress={() => navigation.navigate('SignIn')}
             activeOpacity={0.8}
           >
-            <Text style={styles.secondaryButtonText}>Join Existing Family</Text>
+            <Text style={styles.secondaryButtonText}>Sign In</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Device Auth Section */}
+        <View style={styles.deviceAuthSection}>
+          <Text style={styles.deviceAuthText}>
+            Or continue without an account
+          </Text>
+          <View style={styles.deviceAuthButtons}>
+            <TouchableOpacity
+              style={styles.deviceAuthButton}
+              onPress={() => navigation.navigate('CreateFamily')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.deviceAuthButtonText}>Create Family</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deviceAuthButton}
+              onPress={() => navigation.navigate('JoinFamily')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.deviceAuthButtonText}>Join Family</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Footer */}
@@ -117,6 +140,31 @@ const styles = StyleSheet.create({
     fontSize: typography.lg,
     fontWeight: '600' as const,
     color: colors.primary,
+  },
+  deviceAuthSection: {
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  deviceAuthText: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  deviceAuthButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  deviceAuthButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: layout.radiusRound,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deviceAuthButtonText: {
+    fontSize: typography.sm,
+    fontWeight: '500' as const,
+    color: colors.textSecondary,
   },
   footer: {
     fontSize: typography.sm,
