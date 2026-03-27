@@ -470,7 +470,7 @@ func TestDualAuth_InvalidJWT_Returns401(t *testing.T) {
 	}
 }
 
-func TestDualAuth_ValidJWT_UserNotFound_Returns401(t *testing.T) {
+func TestDualAuth_ValidJWT_UserNotFound_PassesThroughWithSupabaseIdentity(t *testing.T) {
 	m := newTestDualAuth(
 		&mockVerifier{userID: "sup-unknown", email: "test@example.com"},
 		&mockStore{userErr: fmt.Errorf("user not found")},
@@ -479,6 +479,19 @@ func TestDualAuth_ValidJWT_UserNotFound_Returns401(t *testing.T) {
 	handlerCalled := false
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalled = true
+		// Should have Supabase identity but no user
+		supID, ok := GetSupabaseID(r.Context())
+		if !ok || supID != "sup-unknown" {
+			t.Errorf("expected supabase ID 'sup-unknown', got '%s'", supID)
+		}
+		supEmail, ok := GetSupabaseEmail(r.Context())
+		if !ok || supEmail != "test@example.com" {
+			t.Errorf("expected supabase email 'test@example.com', got '%s'", supEmail)
+		}
+		_, hasUser := GetUserID(r.Context())
+		if hasUser {
+			t.Error("expected no user ID when user not found in DB")
+		}
 	})
 
 	req := httptest.NewRequest("POST", "/query", nil)
@@ -487,11 +500,11 @@ func TestDualAuth_ValidJWT_UserNotFound_Returns401(t *testing.T) {
 	rr := httptest.NewRecorder()
 	m.Handler(inner).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401, got %d", rr.Code)
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
 	}
-	if handlerCalled {
-		t.Error("handler should not be called when user not found")
+	if !handlerCalled {
+		t.Error("handler should be called with Supabase identity even when user not in DB")
 	}
 }
 

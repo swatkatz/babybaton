@@ -243,10 +243,25 @@ func (r *mutationResolver) JoinFamily(ctx context.Context, familyName string, pa
 
 // LinkCaregiverToUser is the resolver for the linkCaregiverToUser field.
 func (r *mutationResolver) LinkCaregiverToUser(ctx context.Context, caregiverID string) (*model.Caregiver, error) {
-	// Require JWT-based user auth
+	// Require verified Supabase identity
+	supabaseID, hasSupa := middleware.GetSupabaseID(ctx)
+	if !hasSupa {
+		return nil, fmt.Errorf("authentication required: must be authenticated with a user account")
+	}
+	supabaseEmail, _ := middleware.GetSupabaseEmail(ctx)
+
+	// Get or create the user record
 	userID, hasUser := middleware.GetUserID(ctx)
 	if !hasUser {
-		return nil, fmt.Errorf("authentication required: must be authenticated with a user account")
+		newUser := &domain.User{
+			ID:             uuid.New(),
+			SupabaseUserID: supabaseID,
+			Email:          supabaseEmail,
+		}
+		if err := r.store.CreateUser(ctx, newUser); err != nil {
+			return nil, fmt.Errorf("failed to create user: %w", err)
+		}
+		userID = newUser.ID
 	}
 
 	caregiverUUID, err := uuid.Parse(caregiverID)

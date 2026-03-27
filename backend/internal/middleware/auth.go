@@ -16,11 +16,13 @@ import (
 type contextKey string
 
 const (
-	CaregiverIDKey contextKey = "caregiverId"
-	FamilyIDKey    contextKey = "familyId"
-	TimezoneKey    contextKey = "timezone"
-	UserIDKey      contextKey = "userId"
-	UserKey        contextKey = "user"
+	CaregiverIDKey   contextKey = "caregiverId"
+	FamilyIDKey      contextKey = "familyId"
+	TimezoneKey      contextKey = "timezone"
+	UserIDKey        contextKey = "userId"
+	UserKey          contextKey = "user"
+	SupabaseIDKey    contextKey = "supabaseId"
+	SupabaseEmailKey contextKey = "supabaseEmail"
 )
 
 // AuthMiddleware extracts caregiver and family IDs from headers (legacy device-based auth).
@@ -109,22 +111,23 @@ func (m *DualAuthMiddleware) Handler(next http.Handler) http.Handler {
 // if X-Family-Id is also provided. Returns nil context if verification fails
 // (and writes the HTTP error response).
 func (m *DualAuthMiddleware) handleJWTAuth(ctx context.Context, w http.ResponseWriter, r *http.Request, token string) context.Context {
-	supabaseID, _, err := m.verifier.VerifyToken(ctx, token)
+	supabaseID, email, err := m.verifier.VerifyToken(ctx, token)
 	if err != nil {
 		log.Printf("JWT verification failed: %v", err)
 		http.Error(w, "invalid or expired token", http.StatusUnauthorized)
 		return nil
 	}
 
-	user, err := m.store.GetUserBySupabaseID(ctx, supabaseID)
-	if err != nil {
-		log.Printf("User lookup failed for supabase ID %s: %v", supabaseID, err)
-		http.Error(w, "user not found", http.StatusUnauthorized)
-		return nil
-	}
+	// Always set verified Supabase identity in context
+	ctx = context.WithValue(ctx, SupabaseIDKey, supabaseID)
+	ctx = context.WithValue(ctx, SupabaseEmailKey, email)
 
-	ctx = context.WithValue(ctx, UserIDKey, user.ID)
-	ctx = context.WithValue(ctx, UserKey, user)
+	// Look up existing user — if found, set user context
+	user, err := m.store.GetUserBySupabaseID(ctx, supabaseID)
+	if err == nil {
+		ctx = context.WithValue(ctx, UserIDKey, user.ID)
+		ctx = context.WithValue(ctx, UserKey, user)
+	}
 
 	// If X-Family-Id is provided, resolve the specific caregiver for this user+family
 	familyIDStr := r.Header.Get("X-Family-Id")
@@ -206,6 +209,18 @@ func GetUserID(ctx context.Context) (uuid.UUID, bool) {
 func GetUser(ctx context.Context) (*domain.User, bool) {
 	user, ok := ctx.Value(UserKey).(*domain.User)
 	return user, ok
+}
+
+// GetSupabaseID extracts the verified Supabase user ID from context
+func GetSupabaseID(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(SupabaseIDKey).(string)
+	return id, ok
+}
+
+// GetSupabaseEmail extracts the verified Supabase email from context
+func GetSupabaseEmail(ctx context.Context) (string, bool) {
+	email, ok := ctx.Value(SupabaseEmailKey).(string)
+	return email, ok
 }
 
 // RequireAuth returns error if caregiver/family not in context
