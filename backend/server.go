@@ -46,16 +46,16 @@ func main() {
 	defer store.Close()
 	log.Println("Successfully connected to database")
 
-	// Initialize auth verifier (optional — falls back to header-only auth if no JWT secret)
+	// Initialize auth verifier (optional — falls back to header-only auth if no Supabase URL)
 	var authMiddleware func(http.Handler) http.Handler
-	if jwtSecret := os.Getenv("SUPABASE_JWT_SECRET"); jwtSecret != "" {
-		verifier := auth.NewSupabaseVerifier(jwtSecret)
+	if supabaseURL := os.Getenv("SUPABASE_URL"); supabaseURL != "" {
+		verifier := auth.NewSupabaseVerifier(supabaseURL)
 		dualAuth := middleware.NewDualAuthMiddleware(verifier, store)
 		authMiddleware = dualAuth.Handler
-		log.Println("Dual auth enabled (JWT + header-based)")
+		log.Println("Dual auth enabled (JWT via JWKS + header-based)")
 	} else {
 		authMiddleware = middleware.AuthMiddleware
-		log.Println("Header-based auth only (SUPABASE_JWT_SECRET not set)")
+		log.Println("Header-based auth only (SUPABASE_URL not set)")
 	}
 
 	// Create resolver with store
