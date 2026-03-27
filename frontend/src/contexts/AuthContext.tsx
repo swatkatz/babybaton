@@ -54,7 +54,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // re-fetch family data from server
   useEffect(() => {
     if (supabaseSession && !isLoading) {
-      fetchFamilyFromServer();
+      setIsLoading(true);
+      fetchFamilyFromServer().finally(() => setIsLoading(false));
     }
   }, [supabaseSession]);
 
