@@ -180,6 +180,31 @@ export const UPDATE_ACTIVITY = gql`
   }
 `;
 
+export const LINK_CAREGIVER_TO_USER = gql`
+  mutation LinkCaregiverToUser($caregiverId: ID!) {
+    linkCaregiverToUser(caregiverId: $caregiverId) {
+      id
+      name
+      deviceId
+      familyId
+    }
+  }
+`;
+
+export const GET_MY_FAMILY = gql`
+  query GetMyFamily {
+    getMyFamily {
+      id
+      name
+      babyName
+      caregivers {
+        id
+        name
+      }
+    }
+  }
+`;
+
 export const END_ACTIVITY = gql`
   mutation EndActivity($activityId: ID!, $endTime: DateTime) {
     endActivity(activityId: $activityId, endTime: $endTime) {
