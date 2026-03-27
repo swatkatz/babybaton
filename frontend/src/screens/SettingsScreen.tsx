@@ -9,6 +9,7 @@ import {
   Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -26,57 +27,38 @@ export function SettingsScreen({ navigation }: Props) {
   const [leaveFamilyMutation] = useMutation(LeaveFamilyDocument);
 
   const userEmail = supabaseSession?.user?.email;
+  const [showLeaveDialog, setShowLeaveDialog] = React.useState(false);
+  const [showSignOutDialog, setShowSignOutDialog] = React.useState(false);
 
   const handleCopyPassword = () => {
     if (data?.getMyFamily?.password) {
       Clipboard.setString(data.getMyFamily.password);
-      Alert.alert('Copied!', 'Password copied to clipboard');
     }
   };
 
-  const handleLeaveFamily = () => {
-    Alert.alert(
-      'Leave Family',
-      'Are you sure? This will remove you from the family. Your account will remain active.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Leave',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await leaveFamilyMutation();
-            } catch (e) {
-              // Mutation failed (e.g. caregiver already deleted) — still clear family
-            }
-            await client.clearStore();
-            await leaveFamilyAuth();
-          },
-        },
-      ]
-    );
+  const handleLeaveFamily = async () => {
+    setShowLeaveDialog(false);
+    try {
+      await leaveFamilyMutation();
+    } catch (e) {
+      // Mutation failed (e.g. caregiver already deleted) — still clear family
+    }
+    try {
+      await client.clearStore();
+    } catch (e) {
+      // ignore
+    }
+    await leaveFamilyAuth();
   };
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await client.clearStore();
-            } catch (e) {
-              // clearStore can fail if there are active queries — ignore
-            }
-            await signOut();
-          },
-        },
-      ]
-    );
+  const handleSignOut = async () => {
+    setShowSignOutDialog(false);
+    try {
+      await client.clearStore();
+    } catch (e) {
+      // clearStore can fail if there are active queries — ignore
+    }
+    await signOut();
   };
 
   if (loading) {
@@ -102,17 +84,19 @@ export function SettingsScreen({ navigation }: Props) {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.leaveFamilyButton, { marginTop: spacing.md }]}
-            onPress={async () => {
-              try {
-                await client.clearStore();
-              } catch (e) {
-                // clearStore can fail if there are active queries — ignore
-              }
-              await signOut();
-            }}
+            onPress={() => setShowSignOutDialog(true)}
           >
             <Text style={styles.leaveFamilyButtonText}>Sign Out</Text>
           </TouchableOpacity>
+          <ConfirmDialog
+            visible={showSignOutDialog}
+            title="Sign Out"
+            message="Are you sure you want to sign out?"
+            confirmText="Sign Out"
+            destructive
+            onConfirm={handleSignOut}
+            onCancel={() => setShowSignOutDialog(false)}
+          />
         </View>
       </SafeAreaView>
     );
@@ -201,7 +185,7 @@ export function SettingsScreen({ navigation }: Props) {
           {/* Leave Family Button */}
           <TouchableOpacity
             style={styles.leaveFamilyButton}
-            onPress={handleLeaveFamily}
+            onPress={() => setShowLeaveDialog(true)}
           >
             <Text style={styles.leaveFamilyButtonText}>Leave Family</Text>
           </TouchableOpacity>
@@ -209,12 +193,31 @@ export function SettingsScreen({ navigation }: Props) {
           {/* Sign Out Button */}
           <TouchableOpacity
             style={styles.signOutButton}
-            onPress={handleSignOut}
+            onPress={() => setShowSignOutDialog(true)}
           >
             <Text style={styles.signOutButtonText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={showLeaveDialog}
+        title="Leave Family"
+        message="Are you sure? This will remove you from the family. Your account will remain active."
+        confirmText="Leave"
+        destructive
+        onConfirm={handleLeaveFamily}
+        onCancel={() => setShowLeaveDialog(false)}
+      />
+      <ConfirmDialog
+        visible={showSignOutDialog}
+        title="Sign Out"
+        message="Are you sure you want to sign out?"
+        confirmText="Sign Out"
+        destructive
+        onConfirm={handleSignOut}
+        onCancel={() => setShowSignOutDialog(false)}
+      />
     </SafeAreaView>
   );
 }
