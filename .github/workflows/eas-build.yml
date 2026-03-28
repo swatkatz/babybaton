@@ -49,7 +49,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
+          eas-version: 18.0.5
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
       - run: eas build --platform ${{ inputs.platform }} --profile ${{ inputs.profile }} --non-interactive --no-wait
