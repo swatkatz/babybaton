@@ -2,18 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { StackHeaderProps } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CaregiverAvatar } from './CaregiverAvatar';
 import { useAuth } from '../hooks/useAuth';
-import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 
 export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
   const { authData } = useAuth();
   const insets = useSafeAreaInsets();
-
-  const handleAvatarPress = () => {
-    navigation.navigate('Settings' as never);
-  };
 
   const handleBackPress = () => {
     navigation.goBack();
@@ -48,18 +42,6 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
             {title}
           </Text>
         </View>
-
-        {/* Avatar */}
-        {authData && (
-          <View style={styles.avatarContainer}>
-            <CaregiverAvatar
-              caregiverId={authData.caregiverId}
-              caregiverName={authData.caregiverName}
-              size={36}
-              onPress={handleAvatarPress}
-            />
-          </View>
-        )}
       </View>
     </View>
   );
@@ -98,8 +80,5 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold' as const,
     color: '#FFFFFF',
-  },
-  avatarContainer: {
-    marginLeft: spacing.sm,
   },
 });

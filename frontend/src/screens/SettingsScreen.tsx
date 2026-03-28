@@ -11,16 +11,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client/react';
-import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { spacing, typography, layout } from '../theme/spacing';
 import { useAuth } from '../hooks/useAuth';
 import { GetFamilySettingsDocument, LeaveFamilyDocument } from '../types/__generated__/graphql';
 
-type Props = StackScreenProps<RootStackParamList, 'Settings'>;
-
-export function SettingsScreen({ navigation }: Props) {
+export function SettingsScreen() {
+  const navigation = useNavigation();
   const { authData, signOut, leaveFamily: leaveFamilyAuth, supabaseSession } = useAuth();
   const client = useApolloClient();
   const { data, loading, error } = useQuery(GetFamilySettingsDocument);

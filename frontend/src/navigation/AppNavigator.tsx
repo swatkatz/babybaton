@@ -1,19 +1,15 @@
 import React from 'react';
 import { View, Image, ActivityIndicator, StyleSheet } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { DashboardScreen } from '../screens/DashboardScreen';
-import { SessionDetailScreen } from '../screens/SessionDetailScreen';
-import { PredictionDetailScreen } from '../screens/PredictionDetailScreen';
-import { CurrentSessionDetailScreen } from '../screens/CurrentSessionDetailScreen';
-import { SettingsScreen } from '../screens/SettingsScreen';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { SignInScreen } from '../screens/SignInScreen';
 import { SignUpScreen } from '../screens/SignUpScreen';
 import { CreateFamilyScreen } from '../screens/CreateFamilyScreen';
 import { JoinFamilyScreen } from '../screens/JoinFamilyScreen';
 import { MigrationScreen } from '../screens/MigrationScreen';
+import { DashboardScreen } from '../screens/DashboardScreen';
 import { CustomHeader } from '../components/CustomHeader';
-import { GetPredictionQuery } from '../types/__generated__/graphql';
+import { MainTabNavigator } from './MainTabNavigator';
 import { useAuth } from '../hooks/useAuth';
 
 // Define the route params for type safety
@@ -24,13 +20,8 @@ export type RootStackParamList = {
   CreateFamily: undefined;
   JoinFamily: undefined;
   Migration: undefined;
+  MainTabs: undefined;
   Dashboard: undefined;
-  PredictionDetail: {
-    prediction: NonNullable<GetPredictionQuery['predictNextFeed']>;
-  };
-  CurrentSessionDetail: undefined;
-  SessionDetail: { sessionId: string };
-  Settings: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -152,50 +143,12 @@ export function AppNavigator() {
           />
         </>
       ) : (
-        // Fully authenticated with family — main app
+        // Fully authenticated with family — main app (tab navigator)
         <>
           <Stack.Screen
-            name="Dashboard"
-            component={DashboardScreen}
-            options={{
-              header: (props) => <CustomHeader {...props} />,
-            }}
-          />
-
-          <Stack.Screen
-            name="PredictionDetail"
-            component={PredictionDetailScreen}
-            options={{
-              title: '🍼  Prediction Details',
-              header: (props) => <CustomHeader {...props} />,
-            }}
-          />
-
-          <Stack.Screen
-            name="CurrentSessionDetail"
-            component={CurrentSessionDetailScreen}
-            options={{
-              title: '🍼  Ongoing Session',
-              header: (props) => <CustomHeader {...props} />,
-            }}
-          />
-
-          <Stack.Screen
-            name="SessionDetail"
-            component={SessionDetailScreen}
-            options={{
-              title: '🍼  Session Details',
-              header: (props) => <CustomHeader {...props} />,
-            }}
-          />
-
-          <Stack.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{
-              title: '🍼  Family Settings',
-              header: (props) => <CustomHeader {...props} />,
-            }}
+            name="MainTabs"
+            component={MainTabNavigator}
+            options={{ headerShown: false }}
           />
         </>
       )}

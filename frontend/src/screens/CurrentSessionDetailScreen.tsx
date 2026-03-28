@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { HomeStackParamList } from '../navigation/MainTabNavigator';
 import {
   GetCurrentSessionDocument,
   GetRecentSessionsDocument,
@@ -26,7 +26,7 @@ import { ActivityItem } from '../components/ActivityItem';
 import { EditActivityModal } from '../components/EditActivityModal';
 import { formatDuration, formatTime } from '../utils/time';
 
-type Props = StackScreenProps<RootStackParamList, 'CurrentSessionDetail'>;
+type Props = StackScreenProps<HomeStackParamList, 'CurrentSessionDetail'>;
 
 export function CurrentSessionDetailScreen({ navigation }: Props) {
   const { data, loading, error } = useQuery(GetCurrentSessionDocument);
