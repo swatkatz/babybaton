@@ -19,7 +19,7 @@ import { VoiceInputModal } from '../components/VoiceInputModal';
 import { ActivityConfirmationModal } from '../components/ActivityConfirmationModal';
 import { ManualEntryModal } from '../components/ManualEntryModal';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { HomeStackParamList } from '../navigation/MainTabNavigator';
 import {
   GetPredictionDocument,
   GetCurrentSessionDocument,
@@ -34,7 +34,7 @@ import {
  * - Current care session
  * - Recent care sessions
  */
-type Props = StackScreenProps<RootStackParamList, 'Dashboard'>;
+type Props = StackScreenProps<HomeStackParamList, 'Dashboard'>;
 
 export function DashboardScreen({ navigation }: Props) {
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);

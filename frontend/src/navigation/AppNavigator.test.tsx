@@ -66,20 +66,16 @@ jest.mock('../screens/MigrationScreen', () => ({
     return <Text>Migration Screen</Text>;
   },
 }));
-jest.mock('../screens/SessionDetailScreen', () => ({
-  SessionDetailScreen: () => null,
-}));
-jest.mock('../screens/PredictionDetailScreen', () => ({
-  PredictionDetailScreen: () => null,
-}));
-jest.mock('../screens/CurrentSessionDetailScreen', () => ({
-  CurrentSessionDetailScreen: () => null,
-}));
-jest.mock('../screens/SettingsScreen', () => ({
-  SettingsScreen: () => null,
-}));
 jest.mock('../components/CustomHeader', () => ({
   CustomHeader: () => null,
+}));
+
+// Mock the MainTabNavigator to render a simple indicator
+jest.mock('./MainTabNavigator', () => ({
+  MainTabNavigator: () => {
+    const { Text } = require('react-native');
+    return <Text>Main Tab Navigator</Text>;
+  },
 }));
 
 function renderNavigator() {
@@ -154,7 +150,7 @@ describe('AppNavigator', () => {
     expect(getByText('Create Family Screen')).toBeTruthy();
   });
 
-  it('shows Dashboard when fully authenticated with family', () => {
+  it('shows MainTabNavigator when fully authenticated with family', () => {
     mockUseAuth.mockReturnValue({
       isAuthenticated: true,
       hasFamily: true,
@@ -164,11 +160,11 @@ describe('AppNavigator', () => {
     });
 
     const { getByText } = renderNavigator();
-    expect(getByText('Dashboard Screen')).toBeTruthy();
+    expect(getByText('Main Tab Navigator')).toBeTruthy();
   });
 
-  it('shows Dashboard for device-auth user with family (backward compat, both auth + legacy)', () => {
-    // User has both Supabase and legacy auth, with family — goes to dashboard
+  it('shows MainTabNavigator for device-auth user with family (backward compat, both auth + legacy)', () => {
+    // User has both Supabase and legacy auth, with family — goes to tab navigator
     mockUseAuth.mockReturnValue({
       isAuthenticated: true,
       hasFamily: true,
@@ -184,6 +180,6 @@ describe('AppNavigator', () => {
     });
 
     const { getByText } = renderNavigator();
-    expect(getByText('Dashboard Screen')).toBeTruthy();
+    expect(getByText('Main Tab Navigator')).toBeTruthy();
   });
 });

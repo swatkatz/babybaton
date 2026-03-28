@@ -2,14 +2,14 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useQuery } from '@apollo/client/react';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { HomeStackParamList } from '../navigation/MainTabNavigator';
 import { GetCareSessionDocument } from '../types/__generated__/graphql';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { ActivityItem } from '../components/ActivityItem';
 import { formatDuration, formatTime } from '../utils/time';
 
-type Props = StackScreenProps<RootStackParamList, 'SessionDetail'>;
+type Props = StackScreenProps<HomeStackParamList, 'SessionDetail'>;
 
 export function SessionDetailScreen({ route }: Props) {
   const { sessionId } = route.params;

@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { HomeStackParamList } from '../navigation/MainTabNavigator';
 import { colors } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 
-type Props = StackScreenProps<RootStackParamList, 'PredictionDetail'>;
+type Props = StackScreenProps<HomeStackParamList, 'PredictionDetail'>;
 
 export function PredictionDetailScreen({ route }: Props) {
   const { prediction } = route.params;
