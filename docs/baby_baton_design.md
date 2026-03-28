@@ -1878,3 +1878,837 @@ mutation LeaveFamily {
   leaveFamily
 }
 ```
+
+---
+
+## 18. UI Refresh
+
+### 18.1 Overview
+
+The MVP dashboard is limited: it shows only 3 recent sessions with no history browsing, the prediction card only handles feed predictions, and there's no tab-based navigation. This refresh introduces:
+
+- **Bottom tab navigation** (Home, History, Profile)
+- **Redesigned dashboard** focused on baby status at a glance (caregiver handoff use case)
+- **History tab** with search, filtering, and infinite scroll through all past activities
+- **Upcoming screen** for predictions and scheduled events (future: vaccinations, appointments)
+- **Log Activity screen** as the primary entry point for recording activities
+
+**Key insight driving the redesign:** When a caregiver opens the app, their #1 action is logging an activity (feed, diaper, sleep). Their #2 need is seeing the baby's current status at a glance — "when did she last eat? last diaper? is she sleeping?" — especially during caregiver handoffs. The current dashboard doesn't serve either need well.
+
+### 18.2 Navigation Structure (New)
+
+**Auth flow (unchanged):**
+```
+App Launch → Check auth
+├── Needs migration → MigrationScreen → SignInScreen
+├── No auth → WelcomeScreen → SignIn/SignUp → CreateFamily/JoinFamily
+├── Auth, no family → CreateFamily/JoinFamily
+└── Auth + family → Main App (tab navigator)
+```
+
+**Main app (new tab-based navigation):**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        HEADER BAR                               │
+│  [+]           Baby's Name Baton              [🔮]             │
+│  Log Activity                                 Upcoming          │
+│  (navigates to                                (navigates to     │
+│   LogActivityScreen)                           UpcomingScreen)   │
+└─────────────────────────────────────────────────────────────────┘
+                            │
+                ┌───────────┼───────────┐
+                │           │           │
+         ┌──────▼──────┐ ┌──▼────────┐ ┌▼──────────┐
+         │  🏠 Home    │ │📋 History │ │👤 Profile │
+         │ (Dashboard) │ │           │ │(Settings) │
+         └──────┬──────┘ └─────┬─────┘ └───────────┘
+                │               │
+    ┌───────────┼──────┐        │
+    │           │      │        │
+    ▼           ▼      ▼        ▼
+ See All →   Tap    Tap      Tap session
+ Session    activity activity  header →
+ Detail     → Edit  → Edit    Session
+                                Detail
+```
+
+**Full navigation flow:**
+```
+Main App (Tab Navigator)
+├── Home Tab (DashboardScreen)
+│   ├── Tap activity cell → ActivityDetailScreen (or edit modal)
+│   └── Tap "See All" in grid → CurrentSessionDetailScreen
+│       ├── Tap activity → EditActivityModal
+│       ├── Swipe activity → Delete
+│       └── Complete Session → goBack()
+│
+├── History Tab (HistoryScreen) [NEW]
+│   ├── Tap activity row → ActivityDetailScreen (or edit modal)
+│   └── Tap session header → SessionDetailScreen (read-only)
+│
+├── Profile Tab (SettingsScreen — existing, moved to tab)
+│   ├── Leave Family → WelcomeScreen
+│   └── Sign Out → WelcomeScreen
+│
+├── [+] Header Button → LogActivityScreen [NEW]
+│   ├── Tap Voice Input → VoiceInputModal → ActivityConfirmationModal → save
+│   └── Tap activity icon (Feed/Diaper/Sleep) → Activity form → save
+│
+└── [🔮] Header Button → UpcomingScreen [NEW]
+    └── (leaf screen, no further navigation)
+```
+
+### 18.3 Screen Mocks
+
+#### 18.3.1 Dashboard (Home Tab) — REDESIGNED
+
+```
+┌──────────────────────────────────┐
+│ [+]    Emma's Baton        [🔮] │
+├──────────────────────────────────┤
+│                                  │
+│  🍼 Last feed: 45m ago          │
+│     120ml (bottle)               │
+│                                  │
+│  😴 Last sleep: 1h ago          │
+│     nap, 45m                     │
+│                                  │
+│  💧 Last diaper: 20m ago        │
+│     pee                          │
+│                                  │
+│  ── Current Session ──────────── │
+│  Swati · Started 12:00 PM       │
+│                                  │
+│  ┌────────┐┌────────┐┌────────┐ │
+│  │   🍼   ││   💩   ││   😴   │ │
+│  │ 120ml  ││  poop  ││ 32m 💤 │ │
+│  │ 3:15p  ││ 2:45p  ││ 2:30p  │ │
+│  ├────────┤├────────┤├────────┤ │
+│  │   🍼   ││   💧   ││See All │ │
+│  │  90ml  ││  pee   ││   →    │ │
+│  │ 1:00p  ││ 12:30p ││        │ │
+│  └────────┘└────────┘└────────┘ │
+│                                  │
+├──────────────────────────────────┤
+│   🏠 Home    📋 History    👤   │
+└──────────────────────────────────┘
+```
+
+**Status summary section:**
+- Shows last occurrence of each activity type (feed, sleep, diaper)
+- Answers the caregiver handoff question instantly: "when did she last eat/sleep/get changed?"
+- Data derived from the most recent activities across all sessions
+
+**Current session activity grid:**
+- 2×3 grid of tappable activity cells
+- Each cell: big icon → key detail → time (see cell format below)
+- Most recent activity in top-left, reading order left-to-right, top-to-bottom
+- "See All" appears in the last cell position when there are 6+ activities
+- Tapping "See All" navigates to CurrentSessionDetailScreen
+- Tapping any activity cell opens the activity detail/edit view
+- If 5 or fewer activities, no "See All" — all fit in the grid
+- If no current session, show a "No active session" message
+
+**Activity cell format:**
+```
+Standard cells:
+
+Feed (bottle):     Feed (breast):    Diaper (poop):
+┌──────────┐      ┌──────────┐      ┌──────────┐
+│    🍼    │      │    🤱    │      │    💩    │
+│  120ml   │      │  breast  │      │   poop   │
+│  3:15p   │      │  1:00p   │      │  2:45p   │
+└──────────┘      └──────────┘      └──────────┘
+
+Diaper (pee):     Diaper (both):    Sleep (ended):
+┌──────────┐      ┌──────────┐      ┌──────────┐
+│    💧    │      │   💩💧   │      │    😴    │
+│   pee    │      │   both   │      │   45m    │
+│  1:30p   │      │ 12:00p   │      │  2:30p   │
+└──────────┘      └──────────┘      └──────────┘
+
+Sleep (active — green border + pulsing 💤):
+┌──────────┐
+│    😴    │  ← green border on card
+│  32m 💤  │  ← 💤 pulses/animates
+│  2:30p   │
+└──────────┘
+```
+
+- Icon changes to convey subtype (💩 vs 💧, 🍼 vs 🤱)
+- Active sleep: green border + pulsing 💤 emoji, duration updates live
+- Ended sleep: normal border, shows final duration
+
+**What's removed from dashboard:**
+- PredictionCard (replaced by 🔮 Upcoming screen)
+- Recent Care Sessions section (replaced by History tab)
+- Bottom sticky Voice/Manual bar (replaced by [+] header button)
+
+#### 18.3.2 Log Activity Screen — NEW
+
+Accessed via [+] button in header. Replaces the old Voice/Manual bottom bar.
+
+```
+┌──────────────────────────────────┐
+│  ← Log Activity                  │
+│                                  │
+│  ┌──────────────────────────┐   │
+│  │       🎤 Voice Input     │   │
+│  │  "Tell me what happened" │   │
+│  └──────────────────────────┘   │
+│                                  │
+│  Or tap to log:                  │
+│                                  │
+│  ┌────────┐┌────────┐┌────────┐ │
+│  │   🍼   ││   💩   ││   😴   │ │
+│  │  Feed  ││ Diaper ││ Sleep  │ │
+│  ├────────┤├────────┤├────────┤ │
+│  │   💊   ││   📏   ││  ...   │ │
+│  │  Meds  ││ Growth ││ Other  │ │
+│  └────────┘└────────┘└────────┘ │
+│                                  │
+└──────────────────────────────────┘
+```
+
+**Behavior:**
+- **Voice Input button:** Opens VoiceInputModal (existing component, unchanged). On success → ActivityConfirmationModal → save. On error → offers to switch to manual.
+- **Activity type icons:** Tapping an icon opens the form for that activity type (reuses existing form logic from ManualEntryModal). No separate "Manual Entry" modal — the user directly picks the activity type.
+- **Future activity types** (Meds, Growth, etc.) can be added as new icon cells. For MVP, only Feed, Diaper, Sleep are functional; others show "Coming soon."
+- Pushes onto the stack from any tab (not a tab itself).
+
+#### 18.3.3 Upcoming Screen — NEW
+
+Accessed via [🔮] button in header. Replaces PredictionDetailScreen.
+
+```
+┌──────────────────────────────────┐
+│  ← Upcoming                      │
+│                                  │
+│  ⚠️ NEEDS ATTENTION              │
+│  ┌──────────────────────────┐   │
+│  │ 🍼 Feed due in ~8 min    │   │
+│  │    Based on 3h pattern    │   │
+│  └──────────────────────────┘   │
+│                                  │
+│  📊 PREDICTIONS                  │
+│  ┌──────────────────────────┐   │
+│  │ 😴 Next nap    ~4:00 PM  │   │
+│  │    Based on wake window   │   │
+│  │                           │   │
+│  │ 🍼 Next feed   ~6:30 PM  │   │
+│  │    Pattern: every ~3h     │   │
+│  └──────────────────────────┘   │
+│                                  │
+│  📅 SCHEDULED                    │
+│  ┌──────────────────────────┐   │
+│  │ 💉 4-month shots         │   │
+│  │    Apr 15 · Dr. Patel    │   │
+│  │                           │   │
+│  │ 📋 Well-baby checkup     │   │
+│  │    Apr 15 · 10:00 AM     │   │
+│  └──────────────────────────┘   │
+│                                  │
+└──────────────────────────────────┘
+```
+
+**Sections (urgency-based ordering):**
+1. **NEEDS ATTENTION** — items within ~10 minutes. Only shown when something is imminent. Red/warning styling.
+2. **PREDICTIONS** — AI-generated predictions (feed, sleep). Shows predicted time, reasoning, confidence.
+3. **SCHEDULED** — Calendar events (vaccinations, appointments). Future feature — section is empty/hidden for MVP.
+
+**🔮 Header icon behavior:**
+- Shows a red dot badge when any prediction is within ~10 minutes (Needs Attention threshold)
+- Red dot disappears once the predicted time passes or a relevant activity is logged
+- Tapping always opens the full Upcoming screen regardless of badge state
+
+**MVP scope:** Only feed predictions (existing `predictNextFeed` query). Sleep predictions and scheduled events are future work — sections hidden when empty.
+
+#### 18.3.4 History Tab — NEW
+
+```
+┌──────────────────────────────────┐
+│  🔍 Search activities...         │
+│  ☰ Filter by type  │ 📅 By date │
+│                                  │
+│  ── Today ─────────────────────  │
+│  3 feeds · 290ml | 2💩 1💧 | 1h😴│
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │ 🟢 Current session · Swati>│  │
+│  │    12:00 PM - now · 5 acts │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │ Amit · 8:00 - 12:00 PM   >│  │
+│  │                            │  │
+│  │ 🍼 11:00 AM · 90ml        │  │
+│  │ 💧 9:30 AM · pee          │  │
+│  │ 😴 8:00 AM · 45m          │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  ── Yesterday ─────────────────  │
+│  4 feeds · 360ml | 3💩 2💧 | 3h😴│
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │ Swati · 8:00 PM - 8:00 AM>│  │
+│  │                            │  │
+│  │ 🍼 11:00 PM · 100ml       │  │
+│  │ 💩 10:15 PM · poop        │  │
+│  │ 😴 9:00 PM · 2h           │  │
+│  │ 🍼 8:30 PM · 90ml         │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │ Amit · 12:00 - 8:00 PM   >│  │
+│  │                            │  │
+│  │ 🍼 7:00 PM · 110ml        │  │
+│  │ 💩 5:30 PM · poop         │  │
+│  │ 💧 3:00 PM · pee          │  │
+│  │ 😴 2:00 PM · 1h           │  │
+│  │ 🍼 12:30 PM · 80ml        │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  ── Mar 26 ────────────────────  │
+│  5 feeds · 400ml | 2💩 3💧 | 4h😴│
+│  ...                             │
+│                                  │
+│  (infinite scroll)               │
+│                                  │
+├──────────────────────────────────┤
+│   🏠 Home    📋 History    👤   │
+└──────────────────────────────────┘
+```
+
+**Layout:**
+- **Search bar** at top: search by activity type, content (e.g. "poop", "feed", "bottle")
+- **Filter chips**: by activity type (Feed/Diaper/Sleep/All) and by date range
+- **Grouped by day**: each day has a header with the date and a summary bar
+- **Day summary bar**: aggregate stats for the day — total feeds + ml, diaper counts by type (💩/💧), total sleep time. Includes current session stats for "Today."
+- **Sessions within each day**: each session is a card with caregiver name + time range header, and activity list inside
+- **Current session in Today**: shown as a compact card (green dot, caregiver name, time, activity count) — NOT a full activity list. This avoids duplicating dashboard data. Tapping navigates to Dashboard's current session.
+- **Completed sessions**: show full activity lists within each card
+- **Tapping a session header** (chevron >) → navigates to SessionDetailScreen (read-only)
+- **Tapping an activity row** → opens activity detail/edit view
+- **Infinite scroll**: loads older days as user scrolls down (cursor-based pagination)
+
+**Search mode:**
+When the user types in the search bar, the view switches to flat search results (no session grouping):
+```
+┌──────────────────────────────────┐
+│  🔍 poop                    [✕] │
+│                                  │
+│  ── Today ─────────────────────  │
+│  💩 2:45 PM · poop       Swati  │
+│                                  │
+│  ── Yesterday ─────────────────  │
+│  💩 8:15 PM · poop       Swati  │
+│  💩 3:00 PM · poop        Amit  │
+│                                  │
+│  ── Mar 26 ────────────────────  │
+│  💩 6:00 PM · poop        Amit  │
+│  💩 11:00 AM · poop      Swati  │
+│                                  │
+│  5 results                       │
+└──────────────────────────────────┘
+```
+- Session grouping drops — flat activity list grouped by day
+- Caregiver shown as a tag on each row (since no session wrapper)
+- Clear search (✕) returns to the session-grouped browse view
+
+#### 18.3.5 Profile Tab (Settings) — MOVED
+
+Existing SettingsScreen moves from stack navigation (accessed via avatar) to the 👤 Profile tab. Content is unchanged:
+
+```
+┌──────────────────────────────────┐
+│  Profile                         │
+├──────────────────────────────────┤
+│                                  │
+│  Account                         │
+│  ┌────────────────────────────┐  │
+│  │ mom@example.com            │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  Family Information              │
+│  ┌────────────────────────────┐  │
+│  │ Family: Smith Family       │  │
+│  │ Baby: Emma                 │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  Share Access                    │
+│  ┌────────────────────────────┐  │
+│  │ Family Name: Smith Family  │  │
+│  │ [Copy]                     │  │
+│  │ Password: baby123          │  │
+│  │ [Copy]                     │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  Caregivers (3)                  │
+│  • Mom                           │
+│  • Dad                           │
+│  • Nana                          │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │      Leave Family          │  │
+│  └────────────────────────────┘  │
+│  ┌────────────────────────────┐  │
+│  │       Sign Out             │  │
+│  └────────────────────────────┘  │
+│                                  │
+├──────────────────────────────────┤
+│   🏠 Home    📋 History    👤   │
+└──────────────────────────────────┘
+```
+
+#### 18.3.6 Unchanged Screens
+
+These screens are not modified in the UI refresh. Mocked here for completeness.
+
+**CurrentSessionDetailScreen** (accessed via "See All" in dashboard grid):
+```
+┌──────────────────────────────────┐
+│  ← Current Care Session          │
+├──────────────────────────────────┤
+│                                  │
+│  [Sw] Swati                      │
+│  Started: 12:00 PM               │
+│  Duration: 3h 15m                │
+│                                  │
+│  Activities (6):                 │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │ 🍼 Fed 120ml formula  ← ⌫ │  │
+│  │    3:15 PM                 │  │
+│  └────────────────────────────┘  │
+│  ┌────────────────────────────┐  │
+│  │ 💩 Diaper change       ← ⌫ │  │
+│  │    2:45 PM · poop          │  │
+│  └────────────────────────────┘  │
+│  ┌────────────────────────────┐  │
+│  │ 😴 Nap (Active)       LIVE │  │
+│  │    Started: 2:30 PM        │  │
+│  │    Duration: 32m           │  │
+│  │    [Mark as Awake]         │  │
+│  └────────────────────────────┘  │
+│  ...more activities...           │
+│                                  │
+│  Session Summary:                │
+│  • Total feeds: 2 (210ml)       │
+│  • Diaper changes: 2            │
+│  • Total sleep: 1h 17m          │
+│  • Currently sleeping: Yes      │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │   Complete Care Session    │  │
+│  └────────────────────────────┘  │
+├──────────────────────────────────┤
+│   🏠 Home    📋 History    👤   │
+└──────────────────────────────────┘
+```
+
+**SessionDetailScreen** (accessed via History tab session headers):
+```
+┌──────────────────────────────────┐
+│  ← Care Session                  │
+├──────────────────────────────────┤
+│                                  │
+│  [Am] Amit                       │
+│  8:00 AM - 12:00 PM              │
+│  Duration: 4h                    │
+│                                  │
+│  Activities (3):                 │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │ 🍼 Fed 90ml formula       │  │
+│  │    11:00 AM                │  │
+│  └────────────────────────────┘  │
+│  ┌────────────────────────────┐  │
+│  │ 💧 Diaper change           │  │
+│  │    9:30 AM · pee           │  │
+│  └────────────────────────────┘  │
+│  ┌────────────────────────────┐  │
+│  │ 😴 Nap                     │  │
+│  │    8:00 AM · 45m           │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  Session Summary:                │
+│  • Total feeds: 1 (90ml)        │
+│  • Diaper changes: 1            │
+│  • Total sleep: 45m             │
+│                                  │
+├──────────────────────────────────┤
+│   🏠 Home    📋 History    👤   │
+└──────────────────────────────────┘
+```
+
+**VoiceInputModal** (launched from LogActivityScreen):
+```
+┌──────────────────────────────────┐
+│                                  │
+│         ┌───────────┐            │
+│         │     🎤    │            │
+│         │  (80px)   │            │
+│         └───────────┘            │
+│    ═══ waveform animation ═══    │
+│                                  │
+│      Tap to start recording      │
+│                                  │
+│  Try saying:                     │
+│  "Fed 60ml formula at 2pm"      │
+│  "Changed diaper, had poop"     │
+│  "She's sleeping now"           │
+│                                  │
+└──────────────────────────────────┘
+```
+
+**ActivityConfirmationModal** (after voice parsing):
+```
+┌──────────────────────────────────┐
+│  Confirm Activities              │
+├──────────────────────────────────┤
+│                                  │
+│  You said:                       │
+│  "She fed 60ml formula at 2pm,  │
+│   pooped, and is sleeping now"   │
+│                                  │
+│  🍼 Feed - 60ml formula         │
+│     2:00 PM                      │
+│                                  │
+│  💩 Diaper Change - Had poop    │
+│     2:25 PM                      │
+│                                  │
+│  😴 Sleep - Started 2:30 PM     │
+│     (ongoing)                    │
+│                                  │
+│  [↻ Re-record]                   │
+│  [✓ Confirm & Save]             │
+└──────────────────────────────────┘
+```
+
+**WelcomeScreen, SignInScreen, SignUpScreen, CreateFamilyScreen, JoinFamilyScreen, MigrationScreen:** No changes. See existing mocks in sections 8.1–8.3.
+
+### 18.4 Components Changed / Removed / Added
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| `CustomHeader` | **Modified** | Remove avatar. Add [+] left and [🔮] right icons with red dot badge |
+| `PredictionCard` | **Removed** | Replaced by 🔮 Upcoming screen |
+| `RecentSessionCard` | **Removed** | Replaced by History tab |
+| `CurrentSessionCard` | **Removed** | Replaced by activity grid on dashboard |
+| `ManualEntryModal` | **Modified** | Forms reused in LogActivityScreen; modal wrapper may be removed |
+| `StatusSummary` | **New** | Baby status section (last feed/sleep/diaper) |
+| `ActivityGrid` | **New** | 2×3 tappable grid for current session |
+| `ActivityCell` | **New** | Individual grid cell (icon + detail + time) |
+| `HistoryScreen` | **New** | History tab with search, filters, day/session grouping |
+| `LogActivityScreen` | **New** | Voice + activity type icon grid |
+| `UpcomingScreen` | **New** | Predictions + scheduled events |
+
+### 18.5 Backend Changes Required
+
+#### Pagination for History
+
+The current `getRecentCareSessions(limit: Int)` query has no pagination. The History tab needs cursor-based pagination to support infinite scroll.
+
+**Schema changes:**
+```graphql
+type CareSessionConnection {
+  edges: [CareSessionEdge!]!
+  pageInfo: PageInfo!
+}
+
+type CareSessionEdge {
+  node: CareSession!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type Query {
+  # Existing (keep for backward compat during migration)
+  getRecentCareSessions(limit: Int): [CareSession!]!
+
+  # New paginated query
+  getCareSessionHistory(first: Int!, after: String): CareSessionConnection!
+}
+```
+
+**Cursor strategy:** Use `startedAt` timestamp as cursor (base64-encoded). Sessions ordered by `startedAt` descending.
+
+#### Status Summary Query
+
+The dashboard status summary needs the most recent activity of each type across all sessions. Options:
+1. **Derive on frontend** from the first page of session history (may miss activities in older sessions if the current page doesn't contain all types)
+2. **New backend query** that returns the latest activity per type
+
+Recommended: new query for accuracy.
+
+```graphql
+type BabyStatus {
+  lastFeed: FeedActivity
+  lastDiaper: DiaperActivity
+  lastSleep: SleepActivity
+}
+
+type Query {
+  getBabyStatus: BabyStatus!
+}
+```
+
+### 18.6 Implementation Tasks
+
+Tasks are ordered by dependency. Each task becomes a GitHub issue. Later tasks should link to earlier tasks as blockers.
+
+---
+
+**Task 1: Add bottom tab navigator**
+
+Convert the flat stack navigator to a tab navigator (Home, History, Profile) with a nested stack for each tab. The tab bar shows three icons: 🏠 Home, 📋 History, 👤 Profile.
+
+*Files to modify:*
+- `frontend/src/navigation/AppNavigator.tsx` — add `@react-navigation/bottom-tabs`, create tab navigator wrapping stack navigators
+- `frontend/package.json` — add `@react-navigation/bottom-tabs` dependency
+
+*Acceptance criteria:*
+- Bottom tab bar visible on all main-app screens
+- Three tabs: Home (DashboardScreen), History (placeholder empty screen), Profile (existing SettingsScreen)
+- Auth flow screens (Welcome, SignIn, etc.) remain outside the tab navigator
+- Existing navigation between screens still works (PredictionDetail, SessionDetail, etc. push onto the Home stack)
+- Tab bar hidden during auth flow
+- All existing tests pass
+
+*Blocked by:* None
+
+---
+
+**Task 2: Redesign CustomHeader with [+] and [🔮] icons**
+
+Replace the caregiver avatar in CustomHeader with [+] on the left and [🔮] on the right. The [+] navigates to LogActivityScreen (placeholder for now). The [🔮] navigates to UpcomingScreen (placeholder for now). Add red dot badge support on the 🔮 icon.
+
+*Files to modify:*
+- `frontend/src/components/CustomHeader.tsx` — replace avatar with + and 🔮 icons
+- `frontend/src/navigation/AppNavigator.tsx` — add LogActivity and Upcoming routes to stack
+
+*Acceptance criteria:*
+- [+] button on left side of header, tappable, navigates to LogActivityScreen (can be empty placeholder)
+- [🔮] icon on right side of header, tappable, navigates to UpcomingScreen (can be empty placeholder)
+- Red dot badge on 🔮 when prediction `minutesUntilFeed` is ≤ 10 (use existing prediction query data)
+- Baby name title remains centered
+- Avatar removed from header (settings now accessed via Profile tab)
+- Back button still works on pushed screens
+
+*Blocked by:* Task 1
+
+---
+
+**Task 3: Build StatusSummary component**
+
+Create a new component showing the baby's current status: last feed (time ago + amount), last sleep (time ago + duration or "sleeping"), last diaper (time ago + type). This replaces PredictionCard and forms the top section of the dashboard.
+
+*Files to modify:*
+- `frontend/src/components/StatusSummary.tsx` — new component
+- `frontend/src/graphql/queries.ts` — add `getBabyStatus` query (or derive from existing data)
+
+*Backend dependency:* If adding `getBabyStatus` query, coordinate with backend task. Otherwise, derive from `getRecentCareSessions` data with a higher limit.
+
+*Acceptance criteria:*
+- Shows last feed with relative time ("45m ago") and key detail (amount + type)
+- Shows last sleep with relative time and duration, or "sleeping" + duration if active
+- Shows last diaper with relative time and type (💩 poop / 💧 pee / 💩💧 both)
+- Relative times update without requiring a page refresh (use a timer or poll)
+- Correct icons per activity subtype
+
+*Blocked by:* None (can be built independently, integrated in Task 5)
+
+---
+
+**Task 4: Build ActivityGrid and ActivityCell components**
+
+Create the 2×3 tappable activity grid for the current session on the dashboard. Each cell shows a big icon, key detail, and time. Active sleep cells have a green border and pulsing 💤.
+
+*Files to create:*
+- `frontend/src/components/ActivityGrid.tsx` — 2×3 grid layout with "See All" logic
+- `frontend/src/components/ActivityCell.tsx` — individual cell (icon + detail + time)
+
+*Acceptance criteria:*
+- 2×3 grid layout using flexbox (3 columns, up to 2 rows)
+- Cells ordered most-recent-first (top-left = newest)
+- "See All →" in last cell position when 6+ activities
+- Fewer than 6 activities: no "See All", cells fill available positions
+- Each cell tappable (calls `onPress` with activity ID)
+- "See All" tappable (calls `onSeeAll`)
+- Active sleep cell: green border (`colors.success`), pulsing 💤 animation (use `Animated` API)
+- Cell icon changes by subtype: 🍼/🤱 for feed, 💩/💧/💩💧 for diaper, 😴 for sleep
+- Duration on active sleep updates live
+
+*Blocked by:* None (can be built independently, integrated in Task 5)
+
+---
+
+**Task 5: Redesign DashboardScreen with new layout**
+
+Integrate StatusSummary, ActivityGrid, and new header into the dashboard. Remove PredictionCard, RecentSessionCard list, and bottom Voice/Manual bar.
+
+*Files to modify:*
+- `frontend/src/screens/DashboardScreen.tsx` — replace content with StatusSummary + current session ActivityGrid
+- Remove imports/usage of `PredictionCard`, `RecentSessionCard`
+- Remove bottom bar (Voice/Manual buttons) — activity logging now via [+] header button
+- Keep VoiceInputModal, ManualEntryModal, ActivityConfirmationModal temporarily (they'll be moved in Task 6)
+
+*Acceptance criteria:*
+- Dashboard shows: StatusSummary → Current Session header → ActivityGrid
+- No PredictionCard on dashboard
+- No Recent Sessions section on dashboard
+- No bottom Voice/Manual bar
+- "See All" in grid navigates to CurrentSessionDetailScreen
+- Activity cell tap navigates to activity detail/edit
+- Current session data still polls every 10 seconds
+- Empty state shown when no current session
+
+*Blocked by:* Task 1, Task 2, Task 3, Task 4
+
+---
+
+**Task 6: Build LogActivityScreen**
+
+Create the new Log Activity screen with voice input button and activity type icon grid. Accessed via [+] header button.
+
+*Files to create:*
+- `frontend/src/screens/LogActivityScreen.tsx`
+
+*Files to modify:*
+- `frontend/src/navigation/AppNavigator.tsx` — wire up route
+- Move voice/manual modal management from DashboardScreen to LogActivityScreen
+
+*Acceptance criteria:*
+- Screen shows: Voice Input button (prominent, top) + activity type grid (Feed, Diaper, Sleep, + future placeholders)
+- Tapping Voice Input opens VoiceInputModal → ActivityConfirmationModal → saves → navigates back
+- Tapping an activity icon opens the corresponding form (reuse ManualEntryModal form components)
+- After saving, navigates back to previous screen
+- Future activity types (Meds, Growth) show "Coming soon" or are hidden for MVP
+- Accessible from any tab via the [+] header button
+
+*Blocked by:* Task 2, Task 5
+
+---
+
+**Task 7: Build UpcomingScreen**
+
+Create the Upcoming screen with urgency-based sections. Accessed via [🔮] header button.
+
+*Files to create:*
+- `frontend/src/screens/UpcomingScreen.tsx`
+
+*Files to modify:*
+- `frontend/src/navigation/AppNavigator.tsx` — wire up route
+
+*Acceptance criteria:*
+- Three sections: "Needs Attention" (items ≤ 10 min), "Predictions" (AI predictions), "Scheduled" (future — hidden when empty)
+- "Needs Attention" section only visible when a prediction is ≤ 10 minutes away, styled with warning colors
+- "Predictions" section shows feed prediction (reuse data from existing `predictNextFeed` query): predicted time, confidence, reasoning
+- "Scheduled" section hidden for MVP (no scheduled events feature yet)
+- Section cards styled distinctly (warning for Needs Attention, neutral for Predictions, calendar style for Scheduled)
+
+*Blocked by:* Task 2
+
+---
+
+**Task 8: Backend — Add paginated session history query**
+
+Add cursor-based pagination to support the History tab's infinite scroll.
+
+*Files to modify:*
+- `schema.graphql` — add `CareSessionConnection`, `CareSessionEdge`, `PageInfo` types and `getCareSessionHistory` query
+- `backend/graph/schema.resolvers.go` — implement resolver
+- `backend/internal/store/store.go` — add store method
+- `backend/internal/store/postgres/` — implement PostgreSQL query with cursor
+- `frontend/src/graphql/queries.ts` — add `getCareSessionHistory` query
+- Run codegen for both backend and frontend
+
+*Acceptance criteria:*
+- `getCareSessionHistory(first: Int!, after: String)` returns paginated sessions with `pageInfo.hasNextPage` and `endCursor`
+- Sessions ordered by `startedAt` descending (newest first)
+- Cursor is base64-encoded `startedAt` timestamp
+- Includes both completed and in-progress sessions
+- Scoped to authenticated family (via middleware)
+- Backend tests for pagination (first page, next page, empty results, single-item pages)
+
+*Blocked by:* None (backend work, independent of frontend tasks)
+
+---
+
+**Task 9: Build HistoryScreen**
+
+Create the History tab screen with search, filters, day grouping, session cards, and infinite scroll.
+
+*Files to create:*
+- `frontend/src/screens/HistoryScreen.tsx`
+
+*Files to modify:*
+- `frontend/src/navigation/AppNavigator.tsx` — replace History tab placeholder with HistoryScreen
+
+*Acceptance criteria:*
+- **Browse mode:** Sessions grouped by day. Each day has a summary bar (feed count + ml, diaper counts by type, sleep total). Sessions within each day show as cards with caregiver name + time range + activity list.
+- **Current session:** Shown as a compact card in Today (green dot, caregiver, time, activity count — no duplicated activity list). Tapping navigates to Dashboard.
+- **Completed sessions:** Show full activity lists. Tapping session header (chevron) navigates to SessionDetailScreen.
+- **Tapping an activity row:** Opens activity detail.
+- **Search bar:** Filters activities by text. Search mode shows flat activity results grouped by day with caregiver tags (no session grouping).
+- **Filter chips:** Filter by activity type (All/Feed/Diaper/Sleep) and date range.
+- **Infinite scroll:** Fetches more data via `getCareSessionHistory` pagination when near bottom.
+- **Loading states:** Skeleton/spinner for initial load and pagination loads.
+- **Empty state:** Message when no sessions exist.
+
+*Blocked by:* Task 1, Task 8
+
+---
+
+**Task 10: Remove deprecated components and clean up**
+
+Remove old components and code paths that are no longer used after the UI refresh.
+
+*Files to delete or modify:*
+- `frontend/src/components/PredictionCard.tsx` — delete (replaced by UpcomingScreen)
+- `frontend/src/components/RecentSessionCard.tsx` — delete (replaced by HistoryScreen)
+- `frontend/src/components/CurrentSessionCard.tsx` — delete (replaced by ActivityGrid)
+- `frontend/src/screens/PredictionDetailScreen.tsx` — delete (replaced by UpcomingScreen)
+- Remove unused imports, routes, and types across the codebase
+- Update existing tests to reflect new navigation structure
+
+*Acceptance criteria:*
+- No dead code referencing removed components
+- All routes in AppNavigator are reachable
+- All tests pass
+- TypeScript typecheck passes (`npm run typecheck`)
+
+*Blocked by:* Task 5, Task 6, Task 7, Task 9
+
+---
+
+### 18.7 Task Dependency Graph
+
+```
+Task 1: Bottom Tab Navigator
+  ├── Task 2: Header Redesign [blocked by 1]
+  │     ├── Task 5: Dashboard Redesign [blocked by 1,2,3,4]
+  │     │     └── Task 6: Log Activity Screen [blocked by 2,5]
+  │     └── Task 7: Upcoming Screen [blocked by 2]
+  ├── Task 9: History Screen [blocked by 1,8]
+  └── (Task 8: Backend Pagination — no frontend blockers)
+
+Task 3: StatusSummary Component [no blockers]
+Task 4: ActivityGrid Component [no blockers]
+Task 8: Backend Pagination [no blockers]
+
+Task 10: Cleanup [blocked by 5,6,7,9]
+```
+
+**Parallel work streams:**
+- Tasks 3, 4, 8 can all start immediately (no blockers)
+- Task 1 can also start immediately
+- After Task 1: Tasks 2, 9 can begin
+- After Tasks 1+2+3+4: Task 5 (dashboard) can begin
+- After Task 5: Task 6 (log activity)
+- After Task 2: Task 7 (upcoming)
+- After all features: Task 10 (cleanup)
