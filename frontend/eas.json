@@ -1,5 +1,14 @@
 {
   "cli": { "version": ">= 16.0.0" },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "swati.kumar.a@gmail.com",
+        "ascAppId": "6761305123",
+        "appleTeamId": "AAXPR95Q87"
+      }
+    }
+  },
   "build": {
     "development": {
       "developmentClient": true,
