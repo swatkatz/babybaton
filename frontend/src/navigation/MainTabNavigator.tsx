@@ -6,6 +6,8 @@ import { DashboardScreen } from '../screens/DashboardScreen';
 import { PredictionDetailScreen } from '../screens/PredictionDetailScreen';
 import { CurrentSessionDetailScreen } from '../screens/CurrentSessionDetailScreen';
 import { SessionDetailScreen } from '../screens/SessionDetailScreen';
+import { LogActivityScreen } from '../screens/LogActivityScreen';
+import { UpcomingScreen } from '../screens/UpcomingScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { CustomHeader } from '../components/CustomHeader';
@@ -19,6 +21,8 @@ export type HomeStackParamList = {
   };
   CurrentSessionDetail: undefined;
   SessionDetail: { sessionId: string };
+  LogActivity: undefined;
+  Upcoming: undefined;
 };
 
 export type MainTabParamList = {
@@ -61,6 +65,22 @@ function HomeStackNavigator() {
         component={SessionDetailScreen}
         options={{
           title: 'Session Details',
+          header: (props) => <CustomHeader {...props} />,
+        }}
+      />
+      <HomeStack.Screen
+        name="LogActivity"
+        component={LogActivityScreen}
+        options={{
+          title: 'Log Activity',
+          header: (props) => <CustomHeader {...props} />,
+        }}
+      />
+      <HomeStack.Screen
+        name="Upcoming"
+        component={UpcomingScreen}
+        options={{
+          title: 'Upcoming',
           header: (props) => <CustomHeader {...props} />,
         }}
       />
