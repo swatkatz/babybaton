@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,128 +7,88 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
+import { StackScreenProps } from '@react-navigation/stack';
 import { colors } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import {
   GetPredictionsDocument,
-  PredictionConfidence,
+  DismissPredictionDocument,
   PredictionStatus,
   PredictionType,
-  ActivityType,
+  type GetPredictionsQuery,
 } from '../types/__generated__/graphql';
-import predictionReadService from '../services/predictionReadService';
+import { PredictionCard } from '../components/PredictionCard';
+import type { HomeStackParamList } from '../navigation/MainTabNavigator';
 
-const NEEDS_ATTENTION_THRESHOLD = 10;
+const POLL_INTERVAL = 15 * 60 * 1000; // 15 minutes
 
-function getConfidenceColor(confidence: PredictionConfidence): string {
-  switch (confidence) {
-    case PredictionConfidence.High:
-      return colors.success;
-    case PredictionConfidence.Medium:
-      return colors.warning;
-    case PredictionConfidence.Low:
-      return colors.error;
-    default:
-      return colors.textSecondary;
+type Prediction = GetPredictionsQuery['predictions'][number];
+
+type Props = StackScreenProps<HomeStackParamList, 'Upcoming'>;
+
+function groupByStatus(predictions: readonly Prediction[]) {
+  const overdue: Prediction[] = [];
+  const upcoming: Prediction[] = [];
+  const planned: Prediction[] = [];
+
+  for (const p of predictions) {
+    switch (p.status) {
+      case PredictionStatus.Overdue:
+        overdue.push(p);
+        break;
+      case PredictionStatus.Upcoming:
+        upcoming.push(p);
+        break;
+      case PredictionStatus.Planned:
+        planned.push(p);
+        break;
+    }
   }
+
+  // Sort each group by predictedTime ascending
+  const byTime = (a: Prediction, b: Prediction) =>
+    new Date(a.predictedTime).getTime() - new Date(b.predictedTime).getTime();
+  overdue.sort(byTime);
+  upcoming.sort(byTime);
+  planned.sort(byTime);
+
+  return { overdue, upcoming, planned };
 }
 
-function getConfidenceLabel(confidence: PredictionConfidence): string {
-  switch (confidence) {
-    case PredictionConfidence.High:
-      return 'High';
-    case PredictionConfidence.Medium:
-      return 'Medium';
-    case PredictionConfidence.Low:
-      return 'Low';
-    default:
-      return String(confidence);
-  }
-}
-
-function getPredictionEmoji(predictionType: PredictionType): string {
-  switch (predictionType) {
-    case PredictionType.NextFeed:
-      return '🍼';
-    case PredictionType.NextNap:
-      return '😴';
-    case PredictionType.NextWake:
-      return '☀️';
-    case PredictionType.Bedtime:
-      return '🌙';
-    default:
-      return '🔮';
-  }
-}
-
-function getPredictionLabel(predictionType: PredictionType): string {
-  switch (predictionType) {
-    case PredictionType.NextFeed:
-      return 'Next feed';
-    case PredictionType.NextNap:
-      return 'Next nap';
-    case PredictionType.NextWake:
-      return 'Next wake';
-    case PredictionType.Bedtime:
-      return 'Bedtime';
-    default:
-      return 'Prediction';
-  }
-}
-
-function computeMinutesUntil(predictedTime: string): number {
-  const now = new Date();
-  const predicted = new Date(predictedTime);
-  return Math.round((predicted.getTime() - now.getTime()) / 60000);
-}
-
-function formatTimeUntil(minutesUntil: number): string {
-  if (minutesUntil <= 0) return 'Overdue';
-  const hours = Math.floor(minutesUntil / 60);
-  const mins = minutesUntil % 60;
-  return hours > 0 ? `~${hours}h ${mins}m` : `~${mins} min`;
-}
-
-export function UpcomingScreen() {
+export function UpcomingScreen({ navigation }: Props) {
   const { data, loading, error, refetch } = useQuery(GetPredictionsDocument, {
-    pollInterval: 30000,
+    pollInterval: POLL_INTERVAL,
   });
 
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [dismissPrediction] = useMutation(DismissPredictionDocument, {
+    refetchQueries: ['GetPredictions'],
+  });
 
   const predictions = data?.predictions ?? [];
 
-  // Stable key for dependency tracking - only re-run when prediction IDs change
-  const predictionIdsKey = useMemo(
-    () => predictions.map(p => p.id).join(','),
+  const { overdue, upcoming, planned } = useMemo(
+    () => groupByStatus(predictions),
     [predictions]
   );
 
-  // Check read state on focus and when predictions change
-  useFocusEffect(
-    useCallback(() => {
-      const checkReadState = async () => {
-        const newReadIds = new Set<string>();
-        for (const p of predictions) {
-          const read = await predictionReadService.isRead(p.id);
-          if (read) newReadIds.add(p.id);
-        }
-        setReadIds(prev => {
-          const prevArr = [...prev].sort().join(',');
-          const newArr = [...newReadIds].sort().join(',');
-          return prevArr === newArr ? prev : newReadIds;
-        });
-      };
-      checkReadState();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [predictionIdsKey])
-  );
+  const handleLogActivity = () => {
+    navigation.navigate('LogActivity');
+  };
 
-  const handleMarkAsRead = async (predictionId: string) => {
-    await predictionReadService.markAsRead(predictionId);
-    setReadIds(prev => new Set(prev).add(predictionId));
+  const handleMarkAwake = (prediction: Prediction) => {
+    if (prediction.careSessionId) {
+      // Navigate to session detail where caregiver can end the sleep activity
+      navigation.navigate('SessionDetail', { sessionId: prediction.careSessionId });
+    }
+  };
+
+  const handleDismiss = (predictionId: string) => {
+    dismissPrediction({ variables: { id: predictionId } });
+  };
+
+  const handleCardPress = (prediction: Prediction) => {
+    navigation.navigate('PredictionDetail', { predictionId: prediction.id });
   };
 
   if (loading && !data) {
@@ -166,110 +126,60 @@ export function UpcomingScreen() {
     );
   }
 
-  const overduePredictions = predictions.filter(p => p.status === PredictionStatus.Overdue);
-  const upcomingPredictions = predictions.filter(p => p.status !== PredictionStatus.Overdue);
-
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Needs Attention Section */}
-        {overduePredictions.length > 0 && (
-          <View testID="needs-attention-section">
-            <Text style={styles.sectionHeaderWarning}>⚠️  NEEDS ATTENTION</Text>
-            {overduePredictions.map(prediction => {
-              const isRead = readIds.has(prediction.id);
-              return (
-                <View
-                  key={prediction.id}
-                  style={[styles.card, styles.warningCard, isRead && styles.readCard]}
-                >
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardEmoji}>{getPredictionEmoji(prediction.predictionType)}</Text>
-                    <View style={styles.cardHeaderText}>
-                      <Text style={[styles.cardTitle, styles.warningText]}>
-                        {getPredictionLabel(prediction.predictionType)} due now
-                      </Text>
-                      {prediction.reasoning && (
-                        <Text style={styles.cardSubtitle}>{prediction.reasoning}</Text>
-                      )}
-                    </View>
-                  </View>
-                  {!isRead && (
-                    <TouchableOpacity
-                      style={styles.markReadButton}
-                      onPress={() => handleMarkAsRead(prediction.id)}
-                      testID="mark-read-button"
-                    >
-                      <Text style={styles.markReadText}>Mark as read</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-            })}
+        {/* OVERDUE section */}
+        {overdue.length > 0 && (
+          <View testID="overdue-section">
+            <Text style={styles.sectionHeaderOverdue}>OVERDUE</Text>
+            {overdue.map(prediction => (
+              <PredictionCard
+                key={prediction.id}
+                prediction={prediction}
+                onPress={() => handleCardPress(prediction)}
+                onLogActivity={handleLogActivity}
+                onMarkAwake={
+                  prediction.predictionType === PredictionType.NextWake
+                    ? () => handleMarkAwake(prediction)
+                    : undefined
+                }
+                onDismiss={() => handleDismiss(prediction.id)}
+              />
+            ))}
           </View>
         )}
 
-        {/* Predictions Section */}
-        <Text style={styles.sectionHeader}>📊  PREDICTIONS</Text>
-        {predictions.map(prediction => {
-          const minutesUntil = computeMinutesUntil(prediction.predictedTime);
-          const needsAttention = minutesUntil <= NEEDS_ATTENTION_THRESHOLD;
-          const isRead = readIds.has(prediction.id);
+        {/* UPCOMING section (Coming Up) */}
+        {upcoming.length > 0 && (
+          <View testID="upcoming-section">
+            <Text style={styles.sectionHeader}>COMING UP</Text>
+            {upcoming.map(prediction => (
+              <PredictionCard
+                key={prediction.id}
+                prediction={prediction}
+                onPress={() => handleCardPress(prediction)}
+              />
+            ))}
+          </View>
+        )}
 
-          const predictedDate = new Date(prediction.predictedTime);
-          const formattedTime = predictedDate.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          });
-
-          return (
-            <View
-              key={prediction.id}
-              style={[styles.card, isRead && styles.readCard]}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardEmoji}>{getPredictionEmoji(prediction.predictionType)}</Text>
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>{getPredictionLabel(prediction.predictionType)}</Text>
-                  <Text style={styles.cardTime}>{formattedTime}</Text>
-                </View>
-                <View style={styles.timeUntilContainer}>
-                  <Text style={styles.timeUntilText}>{formatTimeUntil(minutesUntil)}</Text>
-                </View>
-              </View>
-
-              {/* Confidence badge */}
-              {prediction.confidence && (
-                <View
-                  style={[
-                    styles.confidenceBadge,
-                    { backgroundColor: getConfidenceColor(prediction.confidence) },
-                  ]}
-                >
-                  <Text style={styles.confidenceText}>
-                    {getConfidenceLabel(prediction.confidence)} confidence
-                  </Text>
-                </View>
-              )}
-
-              {/* Reasoning */}
-              {prediction.reasoning && (
-                <Text style={styles.reasoning}>{prediction.reasoning}</Text>
-              )}
-
-              {!isRead && !needsAttention && (
-                <TouchableOpacity
-                  style={styles.markReadButton}
-                  onPress={() => handleMarkAsRead(prediction.id)}
-                  testID="mark-read-button"
-                >
-                  <Text style={styles.markReadText}>Mark as read</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          );
-        })}
+        {/* PLANNED section (Rest of Day) */}
+        {planned.length > 0 && (
+          <View testID="planned-section">
+            <Text style={styles.sectionHeader}>REST OF DAY</Text>
+            <Text style={styles.plannedDisclaimer}>
+              Updates as activities are logged
+            </Text>
+            {planned.map(prediction => (
+              <PredictionCard
+                key={prediction.id}
+                prediction={prediction}
+                onPress={() => handleCardPress(prediction)}
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -298,100 +208,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
   },
-  sectionHeaderWarning: {
+  sectionHeaderOverdue: {
     fontSize: typography.xs,
     fontWeight: '700',
     color: colors.error,
     letterSpacing: 1,
     marginBottom: spacing.sm,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: layout.radiusMedium,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  warningCard: {
-    borderColor: colors.error,
-    borderWidth: 2,
-    backgroundColor: '#FFF5F5',
-  },
-  readCard: {
-    opacity: 0.5,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardEmoji: {
-    fontSize: typography.xxl,
-    marginRight: spacing.sm,
-  },
-  cardHeaderText: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: typography.lg,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  warningText: {
-    color: colors.error,
-  },
-  cardSubtitle: {
-    fontSize: typography.sm,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  cardTime: {
-    fontSize: typography.sm,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  timeUntilContainer: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: layout.radiusSmall,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  timeUntilText: {
-    fontSize: typography.sm,
-    fontWeight: '600',
-    color: colors.primaryDark,
-  },
-  confidenceBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: layout.radiusSmall,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  confidenceText: {
+  plannedDisclaimer: {
     fontSize: typography.xs,
-    fontWeight: '600',
-    color: colors.surface,
-  },
-  reasoning: {
-    fontSize: typography.sm,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    marginTop: spacing.sm,
-  },
-  markReadButton: {
-    alignSelf: 'flex-end',
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: layout.radiusSmall,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  markReadText: {
-    fontSize: typography.sm,
-    color: colors.textSecondary,
-    fontWeight: '500',
+    color: colors.textLight,
+    fontStyle: 'italic',
+    marginBottom: spacing.sm,
   },
   errorText: {
     fontSize: typography.base,
