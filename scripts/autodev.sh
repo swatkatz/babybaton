@@ -62,7 +62,7 @@ pick_next_issue() {
 
     # Extract issue numbers from "Blocked by:" line(s)
     local blocked_by_nums
-    blocked_by_nums=$(echo "$body" | grep -i "blocked by:" | grep -oE '#[0-9]+' | sed 's/#//' || true)
+    blocked_by_nums=$(echo "$body" | grep -iE "blocked by:?" | grep -oE '#[0-9]+' | sed 's/#//' || true)
 
     # Check if all blockers are closed
     local all_resolved=true
