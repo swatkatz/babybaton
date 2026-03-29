@@ -55,6 +55,18 @@ export const formatRelativeTime = (
   return `${diffDays}d ago`;
 };
 
+/**
+ * Format a Date as short time: "3:15p", "12:00a"
+ */
+export const formatShortTime = (date: Date): string => {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const period = hours >= 12 ? 'p' : 'a';
+  const displayHour = hours % 12 || 12;
+  const displayMinute = minutes.toString().padStart(2, '0');
+  return `${displayHour}:${displayMinute}${period}`;
+};
+
 export const formatMinutesToDuration = (totalMinutes: number): string => {
   const hours = Math.floor(totalMinutes / 60);
   const mins = totalMinutes % 60;
