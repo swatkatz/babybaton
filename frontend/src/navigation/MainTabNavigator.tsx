@@ -3,7 +3,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Home, Clock, User } from 'lucide-react-native';
 import { DashboardScreen } from '../screens/DashboardScreen';
-import { PredictionDetailScreen } from '../screens/PredictionDetailScreen';
 import { CurrentSessionDetailScreen } from '../screens/CurrentSessionDetailScreen';
 import { SessionDetailScreen } from '../screens/SessionDetailScreen';
 import { LogActivityScreen } from '../screens/LogActivityScreen';
@@ -11,14 +10,10 @@ import { UpcomingScreen } from '../screens/UpcomingScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { CustomHeader } from '../components/CustomHeader';
-import { GetPredictionQuery } from '../types/__generated__/graphql';
 import { colors } from '../theme/colors';
 
 export type HomeStackParamList = {
   Dashboard: undefined;
-  PredictionDetail: {
-    prediction: NonNullable<GetPredictionQuery['predictNextFeed']>;
-  };
   CurrentSessionDetail: undefined;
   SessionDetail: { sessionId: string };
   LogActivity: undefined;
@@ -47,14 +42,6 @@ function HomeStackNavigator() {
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          header: (props) => <CustomHeader {...props} />,
-        }}
-      />
-      <HomeStack.Screen
-        name="PredictionDetail"
-        component={PredictionDetailScreen}
-        options={{
-          title: 'Prediction Details',
           header: (props) => <CustomHeader {...props} />,
         }}
       />

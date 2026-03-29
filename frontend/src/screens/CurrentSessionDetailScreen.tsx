@@ -12,7 +12,6 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/MainTabNavigator';
 import {
   GetCurrentSessionDocument,
-  GetRecentSessionsDocument,
   CompleteCareSessionDocument,
   DeleteActivityDocument,
   EndActivityDocument,
@@ -33,7 +32,7 @@ export function CurrentSessionDetailScreen({ navigation }: Props) {
   const [completeCareSession, { loading: completing }] = useMutation(
     CompleteCareSessionDocument,
     {
-      refetchQueries: [GetCurrentSessionDocument, GetRecentSessionsDocument],
+      refetchQueries: [GetCurrentSessionDocument],
     },
   );
   const [endActivity, { loading: endingActivity }] = useMutation(

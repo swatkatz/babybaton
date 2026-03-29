@@ -68,12 +68,6 @@ export const JOIN_FAMILY = gql`
   }
 `;
 
-export const CHECK_FAMILY_NAME_AVAILABLE = gql`
-  query CheckFamilyNameAvailable($name: String!) {
-    checkFamilyNameAvailable(name: $name)
-  }
-`;
-
 export const PARSE_VOICE_INPUT = gql`
   mutation ParseVoiceInput($audioFile: Upload!) {
     parseVoiceInput(audioFile: $audioFile) {
@@ -187,20 +181,6 @@ export const LINK_CAREGIVER_TO_USER = gql`
       name
       deviceId
       familyId
-    }
-  }
-`;
-
-export const GET_MY_FAMILY = gql`
-  query GetMyFamily {
-    getMyFamily {
-      id
-      name
-      babyName
-      caregivers {
-        id
-        name
-      }
     }
   }
 `;
