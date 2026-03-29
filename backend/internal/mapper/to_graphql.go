@@ -2,11 +2,15 @@ package mapper
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/graph/model"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
 )
+
+var hhmmRegexp = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
 
 // domainFeedTypeToGraphQL maps domain FeedType (lowercase) to GraphQL FeedType (uppercase).
 func domainFeedTypeToGraphQL(dt domain.FeedType) (model.FeedType, error) {
@@ -265,4 +269,84 @@ func PredictionToGraphQL(p *domain.Prediction) *model.Prediction {
 	}
 
 	return gql
+}
+
+// ScheduleGoalsToGraphQL converts a domain ScheduleGoals to a GraphQL model
+func ScheduleGoalsToGraphQL(sg *domain.ScheduleGoals) *model.ScheduleGoals {
+	if sg == nil {
+		return nil
+	}
+
+	result := &model.ScheduleGoals{}
+
+	if sg.TargetWakeWindowMinutes != nil {
+		v := int32(*sg.TargetWakeWindowMinutes)
+		result.TargetWakeWindowMinutes = &v
+	}
+	if sg.TargetFeedIntervalMinutes != nil {
+		v := int32(*sg.TargetFeedIntervalMinutes)
+		result.TargetFeedIntervalMinutes = &v
+	}
+	if sg.TargetNapCount != nil {
+		v := int32(*sg.TargetNapCount)
+		result.TargetNapCount = &v
+	}
+	if sg.MaxDaytimeNapMinutes != nil {
+		v := int32(*sg.MaxDaytimeNapMinutes)
+		result.MaxDaytimeNapMinutes = &v
+	}
+	result.TargetBedtime = sg.TargetBedtime
+	result.TargetWakeTime = sg.TargetWakeTime
+
+	return result
+}
+
+// ScheduleGoalsInputToDomain converts a GraphQL ScheduleGoalsInput to a domain ScheduleGoals
+func ScheduleGoalsInputToDomain(input model.ScheduleGoalsInput, familyID uuid.UUID) (*domain.ScheduleGoals, error) {
+	sg := &domain.ScheduleGoals{
+		FamilyID: familyID,
+	}
+
+	if input.TargetWakeWindowMinutes != nil {
+		v := int(*input.TargetWakeWindowMinutes)
+		if v < 0 {
+			return nil, fmt.Errorf("targetWakeWindowMinutes must be non-negative")
+		}
+		sg.TargetWakeWindowMinutes = &v
+	}
+	if input.TargetFeedIntervalMinutes != nil {
+		v := int(*input.TargetFeedIntervalMinutes)
+		if v < 0 {
+			return nil, fmt.Errorf("targetFeedIntervalMinutes must be non-negative")
+		}
+		sg.TargetFeedIntervalMinutes = &v
+	}
+	if input.TargetNapCount != nil {
+		v := int(*input.TargetNapCount)
+		if v < 0 {
+			return nil, fmt.Errorf("targetNapCount must be non-negative")
+		}
+		sg.TargetNapCount = &v
+	}
+	if input.MaxDaytimeNapMinutes != nil {
+		v := int(*input.MaxDaytimeNapMinutes)
+		if v < 0 {
+			return nil, fmt.Errorf("maxDaytimeNapMinutes must be non-negative")
+		}
+		sg.MaxDaytimeNapMinutes = &v
+	}
+	if input.TargetBedtime != nil {
+		if !hhmmRegexp.MatchString(*input.TargetBedtime) {
+			return nil, fmt.Errorf("targetBedtime must be in HH:MM format")
+		}
+		sg.TargetBedtime = input.TargetBedtime
+	}
+	if input.TargetWakeTime != nil {
+		if !hhmmRegexp.MatchString(*input.TargetWakeTime) {
+			return nil, fmt.Errorf("targetWakeTime must be in HH:MM format")
+		}
+		sg.TargetWakeTime = input.TargetWakeTime
+	}
+
+	return sg, nil
 }

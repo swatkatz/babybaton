@@ -912,6 +912,26 @@ func (r *mutationResolver) DismissPrediction(ctx context.Context, id string) (bo
 	return true, nil
 }
 
+// UpdateScheduleGoals is the resolver for the updateScheduleGoals field.
+func (r *mutationResolver) UpdateScheduleGoals(ctx context.Context, input model.ScheduleGoalsInput) (*model.ScheduleGoals, error) {
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+
+	goals, err := mapper.ScheduleGoalsInputToDomain(input, familyID)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := r.store.UpsertScheduleGoals(ctx, familyID, goals)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update schedule goals: %w", err)
+	}
+
+	return mapper.ScheduleGoalsToGraphQL(result), nil
+}
+
 // CheckFamilyNameAvailable is the resolver for the checkFamilyNameAvailable field.
 func (r *queryResolver) CheckFamilyNameAvailable(ctx context.Context, name string) (bool, error) {
 	exists, err := r.store.FamilyNameExists(ctx, name)
@@ -1252,6 +1272,21 @@ func (r *queryResolver) Predictions(ctx context.Context) ([]*model.Prediction, e
 		result = append(result, mapper.PredictionToGraphQL(dp))
 	}
 	return result, nil
+}
+
+// ScheduleGoals is the resolver for the scheduleGoals field.
+func (r *queryResolver) ScheduleGoals(ctx context.Context) (*model.ScheduleGoals, error) {
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+
+	goals, err := r.store.GetScheduleGoals(ctx, familyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schedule goals: %w", err)
+	}
+
+	return mapper.ScheduleGoalsToGraphQL(goals), nil
 }
 
 // Mutation returns MutationResolver implementation.

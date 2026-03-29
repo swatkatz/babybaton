@@ -71,6 +71,10 @@ type Store interface {
 	DismissPrediction(ctx context.Context, id uuid.UUID) error
 	CleanupOldPredictions(ctx context.Context, olderThan time.Time) error
 
+	// Schedule Goals operations
+	GetScheduleGoals(ctx context.Context, familyID uuid.UUID) (*domain.ScheduleGoals, error)
+	UpsertScheduleGoals(ctx context.Context, familyID uuid.UUID, goals *domain.ScheduleGoals) (*domain.ScheduleGoals, error)
+
 	// Lifecycle
 	Close() error
 }

@@ -481,3 +481,166 @@ func TestSleepDetailsToGraphQL_Nil(t *testing.T) {
 		t.Error("expected nil for nil input")
 	}
 }
+
+func TestScheduleGoalsToGraphQL_Nil(t *testing.T) {
+	result := ScheduleGoalsToGraphQL(nil)
+	if result != nil {
+		t.Error("expected nil for nil input")
+	}
+}
+
+func TestScheduleGoalsToGraphQL_AllFields(t *testing.T) {
+	wakeWindow := 90
+	feedInterval := 180
+	napCount := 3
+	maxNap := 120
+	bedtime := "19:30"
+	wakeTime := "07:00"
+
+	sg := &domain.ScheduleGoals{
+		TargetWakeWindowMinutes:   &wakeWindow,
+		TargetFeedIntervalMinutes: &feedInterval,
+		TargetNapCount:            &napCount,
+		MaxDaytimeNapMinutes:      &maxNap,
+		TargetBedtime:             &bedtime,
+		TargetWakeTime:            &wakeTime,
+	}
+
+	result := ScheduleGoalsToGraphQL(sg)
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.TargetWakeWindowMinutes == nil || *result.TargetWakeWindowMinutes != 90 {
+		t.Errorf("TargetWakeWindowMinutes = %v, want 90", result.TargetWakeWindowMinutes)
+	}
+	if result.TargetFeedIntervalMinutes == nil || *result.TargetFeedIntervalMinutes != 180 {
+		t.Errorf("TargetFeedIntervalMinutes = %v, want 180", result.TargetFeedIntervalMinutes)
+	}
+	if result.TargetNapCount == nil || *result.TargetNapCount != 3 {
+		t.Errorf("TargetNapCount = %v, want 3", result.TargetNapCount)
+	}
+	if result.MaxDaytimeNapMinutes == nil || *result.MaxDaytimeNapMinutes != 120 {
+		t.Errorf("MaxDaytimeNapMinutes = %v, want 120", result.MaxDaytimeNapMinutes)
+	}
+	if result.TargetBedtime == nil || *result.TargetBedtime != "19:30" {
+		t.Errorf("TargetBedtime = %v, want 19:30", result.TargetBedtime)
+	}
+	if result.TargetWakeTime == nil || *result.TargetWakeTime != "07:00" {
+		t.Errorf("TargetWakeTime = %v, want 07:00", result.TargetWakeTime)
+	}
+}
+
+func TestScheduleGoalsToGraphQL_PartialFields(t *testing.T) {
+	napCount := 2
+
+	sg := &domain.ScheduleGoals{
+		TargetNapCount: &napCount,
+	}
+
+	result := ScheduleGoalsToGraphQL(sg)
+	if result.TargetNapCount == nil || *result.TargetNapCount != 2 {
+		t.Errorf("TargetNapCount = %v, want 2", result.TargetNapCount)
+	}
+	if result.TargetWakeWindowMinutes != nil {
+		t.Errorf("TargetWakeWindowMinutes = %v, want nil", result.TargetWakeWindowMinutes)
+	}
+	if result.TargetBedtime != nil {
+		t.Errorf("TargetBedtime = %v, want nil", result.TargetBedtime)
+	}
+}
+
+func TestScheduleGoalsInputToDomain_Valid(t *testing.T) {
+	wakeWindow := int32(90)
+	bedtime := "19:30"
+	wakeTime := "07:00"
+
+	input := model.ScheduleGoalsInput{
+		TargetWakeWindowMinutes: &wakeWindow,
+		TargetBedtime:           &bedtime,
+		TargetWakeTime:          &wakeTime,
+	}
+
+	familyID := uuid.New()
+	result, err := ScheduleGoalsInputToDomain(input, familyID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.FamilyID != familyID {
+		t.Errorf("FamilyID = %v, want %v", result.FamilyID, familyID)
+	}
+	if *result.TargetWakeWindowMinutes != 90 {
+		t.Errorf("TargetWakeWindowMinutes = %v, want 90", *result.TargetWakeWindowMinutes)
+	}
+	if *result.TargetBedtime != "19:30" {
+		t.Errorf("TargetBedtime = %v, want 19:30", *result.TargetBedtime)
+	}
+}
+
+func TestScheduleGoalsInputToDomain_InvalidBedtime(t *testing.T) {
+	badTimes := []string{"25:00", "abc", "1:30", "19:60", ""}
+
+	for _, bt := range badTimes {
+		input := model.ScheduleGoalsInput{
+			TargetBedtime: &bt,
+		}
+		_, err := ScheduleGoalsInputToDomain(input, uuid.New())
+		if err == nil {
+			t.Errorf("expected error for bedtime %q", bt)
+		}
+	}
+}
+
+func TestScheduleGoalsInputToDomain_InvalidWakeTime(t *testing.T) {
+	badTime := "abc"
+	input := model.ScheduleGoalsInput{
+		TargetWakeTime: &badTime,
+	}
+	_, err := ScheduleGoalsInputToDomain(input, uuid.New())
+	if err == nil {
+		t.Error("expected error for invalid wake time")
+	}
+}
+
+func TestScheduleGoalsInputToDomain_NegativeValues(t *testing.T) {
+	neg := int32(-1)
+
+	tests := []struct {
+		name  string
+		input model.ScheduleGoalsInput
+	}{
+		{"negative wake window", model.ScheduleGoalsInput{TargetWakeWindowMinutes: &neg}},
+		{"negative feed interval", model.ScheduleGoalsInput{TargetFeedIntervalMinutes: &neg}},
+		{"negative nap count", model.ScheduleGoalsInput{TargetNapCount: &neg}},
+		{"negative max nap", model.ScheduleGoalsInput{MaxDaytimeNapMinutes: &neg}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ScheduleGoalsInputToDomain(tc.input, uuid.New())
+			if err == nil {
+				t.Error("expected error for negative value")
+			}
+		})
+	}
+}
+
+func TestScheduleGoalsInputToDomain_ValidBoundary(t *testing.T) {
+	midnight := "00:00"
+	endOfDay := "23:59"
+
+	input := model.ScheduleGoalsInput{
+		TargetBedtime:  &midnight,
+		TargetWakeTime: &endOfDay,
+	}
+
+	result, err := ScheduleGoalsInputToDomain(input, uuid.New())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if *result.TargetBedtime != "00:00" {
+		t.Errorf("TargetBedtime = %v, want 00:00", *result.TargetBedtime)
+	}
+	if *result.TargetWakeTime != "23:59" {
+		t.Errorf("TargetWakeTime = %v, want 23:59", *result.TargetWakeTime)
+	}
+}

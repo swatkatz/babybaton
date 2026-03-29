@@ -255,4 +255,12 @@ func (m *mockStore) CleanupOldPredictions(_ context.Context, _ time.Time) error 
 	return nil
 }
 
+// Schedule Goals operations
+func (m *mockStore) GetScheduleGoals(_ context.Context, _ uuid.UUID) (*domain.ScheduleGoals, error) {
+	return nil, nil
+}
+func (m *mockStore) UpsertScheduleGoals(_ context.Context, _ uuid.UUID, goals *domain.ScheduleGoals) (*domain.ScheduleGoals, error) {
+	return goals, nil
+}
+
 func (m *mockStore) Close() error { return nil }

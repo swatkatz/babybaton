@@ -173,6 +173,24 @@ type Prediction struct {
 type Query struct {
 }
 
+type ScheduleGoals struct {
+	TargetWakeWindowMinutes   *int32  `json:"targetWakeWindowMinutes,omitempty"`
+	TargetFeedIntervalMinutes *int32  `json:"targetFeedIntervalMinutes,omitempty"`
+	TargetNapCount            *int32  `json:"targetNapCount,omitempty"`
+	MaxDaytimeNapMinutes      *int32  `json:"maxDaytimeNapMinutes,omitempty"`
+	TargetBedtime             *string `json:"targetBedtime,omitempty"`
+	TargetWakeTime            *string `json:"targetWakeTime,omitempty"`
+}
+
+type ScheduleGoalsInput struct {
+	TargetWakeWindowMinutes   *int32  `json:"targetWakeWindowMinutes,omitempty"`
+	TargetFeedIntervalMinutes *int32  `json:"targetFeedIntervalMinutes,omitempty"`
+	TargetNapCount            *int32  `json:"targetNapCount,omitempty"`
+	MaxDaytimeNapMinutes      *int32  `json:"maxDaytimeNapMinutes,omitempty"`
+	TargetBedtime             *string `json:"targetBedtime,omitempty"`
+	TargetWakeTime            *string `json:"targetWakeTime,omitempty"`
+}
+
 type SleepActivity struct {
 	ID           string        `json:"id"`
 	ActivityType ActivityType  `json:"activityType"`
