@@ -231,6 +231,19 @@ export const GET_CARE_SESSION_HISTORY = gql`
   ${CARE_SESSION_FRAGMENT}
 `;
 
+export const GET_SCHEDULE_GOALS = gql`
+  query GetScheduleGoals {
+    scheduleGoals {
+      targetWakeWindowMinutes
+      targetFeedIntervalMinutes
+      targetNapCount
+      maxDaytimeNapMinutes
+      targetBedtime
+      targetWakeTime
+    }
+  }
+`;
+
 export const GET_FAMILY_SETTINGS = gql`
   query GetFamilySettings {
     getMyFamily {

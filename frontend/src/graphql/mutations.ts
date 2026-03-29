@@ -191,6 +191,19 @@ export const DISMISS_PREDICTION = gql`
   }
 `;
 
+export const UPDATE_SCHEDULE_GOALS = gql`
+  mutation UpdateScheduleGoals($input: ScheduleGoalsInput!) {
+    updateScheduleGoals(input: $input) {
+      targetWakeWindowMinutes
+      targetFeedIntervalMinutes
+      targetNapCount
+      maxDaytimeNapMinutes
+      targetBedtime
+      targetWakeTime
+    }
+  }
+`;
+
 export const END_ACTIVITY = gql`
   mutation EndActivity($activityId: ID!, $endTime: DateTime) {
     endActivity(activityId: $activityId, endTime: $endTime) {
