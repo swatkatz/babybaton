@@ -57,7 +57,7 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
               testID="log-activity-button"
               accessibilityLabel="Log Activity"
             >
-              <Plus size={ICON_SIZE} color="#FFFFFF" />
+              <Plus size={ICON_SIZE} color={colors.surface} />
             </TouchableOpacity>
           ) : canGoBack ? (
             <TouchableOpacity
@@ -88,7 +88,7 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
               testID="upcoming-button"
               accessibilityLabel="Upcoming"
             >
-              <Calendar size={ICON_SIZE} color="#FFFFFF" />
+              <Calendar size={ICON_SIZE} color={colors.surface} />
               {showBadge && <View style={styles.badge} testID="upcoming-badge" />}
             </TouchableOpacity>
           )}
@@ -100,7 +100,7 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: '#5B9BD5',
+    backgroundColor: colors.primary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 28,
-    color: '#FFFFFF',
+    color: colors.surface,
     fontWeight: '300' as const,
   },
   titleContainer: {
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold' as const,
-    color: '#FFFFFF',
+    color: colors.surface,
     textAlign: 'center',
   },
   badge: {
