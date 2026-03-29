@@ -1250,9 +1250,26 @@ func (r *queryResolver) Predictions(ctx context.Context) ([]*model.Prediction, e
 		})
 	}
 
+	// Fetch schedule goals for blending
+	goals, err := r.store.GetScheduleGoals(ctx, familyID)
+	if err != nil {
+		// Non-fatal: proceed without goals
+		goals = nil
+	}
+
 	// Generate predictions
 	timezone := middleware.GetTimezone(ctx)
 	predictions := prediction.GeneratePredictions(now, feeds, sleeps, timezone)
+
+	// If no data-driven predictions but goals exist, generate goal-only predictions
+	if len(predictions) == 0 && goals != nil {
+		predictions = prediction.GenerateGoalOnlyPredictions(now, goals, timezone)
+	}
+
+	// Blend predictions with schedule goals
+	if goals != nil && len(predictions) > 0 {
+		predictions = prediction.BlendPredictions(predictions, goals, len(feeds), len(sleeps))
+	}
 
 	// Set family ID on all predictions
 	for _, p := range predictions {
