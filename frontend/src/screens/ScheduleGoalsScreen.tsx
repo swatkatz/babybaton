@@ -488,20 +488,21 @@ const styles = StyleSheet.create({
   },
   durationRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 12,
   },
   durationInput: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 6,
   },
   textInput: {
     flex: 1,
     height: 48,
+    minWidth: 48,
     backgroundColor: colors.background,
     borderRadius: layout.radiusSmall,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 12,
     fontSize: typography.base,
     color: colors.textPrimary,
     borderWidth: 1,
@@ -510,6 +511,7 @@ const styles = StyleSheet.create({
   durationUnit: {
     fontSize: typography.sm,
     color: colors.textSecondary,
+    flexShrink: 0,
   },
   stepperRow: {
     flexDirection: 'row',
