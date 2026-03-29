@@ -269,6 +269,24 @@ export const GET_BABY_STATUS = gql`
   }
 `;
 
+export const GET_CARE_SESSION_HISTORY = gql`
+  query GetCareSessionHistory($first: Int!, $after: String) {
+    getCareSessionHistory(first: $first, after: $after) {
+      edges {
+        cursor
+        node {
+          ...CareSessionDetail
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+  ${CARE_SESSION_FRAGMENT}
+`;
+
 export const GET_FAMILY_SETTINGS = gql`
   query GetFamilySettings {
     getMyFamily {
