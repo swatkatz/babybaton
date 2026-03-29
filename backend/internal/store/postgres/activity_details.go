@@ -233,6 +233,44 @@ func (s *PostgresStore) UpdateDiaperDetails(ctx context.Context, details *domain
 	return nil
 }
 
+// GetRecentSleepDetailsForFamily retrieves recent sleep details across all sessions for a family
+func (s *PostgresStore) GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.SleepDetails, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT sd.id, sd.activity_id, sd.start_time, sd.end_time, sd.duration_minutes, sd.created_at, sd.updated_at
+		FROM sleep_details sd
+		JOIN activities a ON sd.activity_id = a.id
+		JOIN care_sessions cs ON a.care_session_id = cs.id
+		WHERE cs.family_id = $1
+		ORDER BY sd.start_time DESC
+		LIMIT $2
+	`, familyID, limit)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query recent sleep details: %w", err)
+	}
+	defer rows.Close()
+
+	var details []*domain.SleepDetails
+	for rows.Next() {
+		d := &domain.SleepDetails{}
+		err := rows.Scan(
+			&d.ID, &d.ActivityID, &d.StartTime, &d.EndTime,
+			&d.DurationMinutes,
+			&d.CreatedAt, &d.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan sleep details: %w", err)
+		}
+		details = append(details, d)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating sleep details: %w", err)
+	}
+
+	return details, nil
+}
+
 // UpdateSleepDetails updates sleep details (for marking sleep as complete or editing)
 func (s *PostgresStore) UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error {
 	result, err := s.db.ExecContext(ctx, `

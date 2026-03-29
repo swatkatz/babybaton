@@ -40,10 +40,20 @@ type mockStore struct {
 	diaperDetails        *domain.DiaperDetails
 	sleepDetails         *domain.SleepDetails
 
+	// Predictions
+	recentFeedDetails  []*domain.FeedDetails
+	recentFeedErr      error
+	recentSleepDetails []*domain.SleepDetails
+	recentSleepErr     error
+	predictions        []*domain.Prediction
+	predictionsErr     error
+	upsertPredErr      error
+
 	// Tracking calls
 	lastCreatedCaregiver      *domain.Caregiver
 	linkCaregiverToUserCalled bool
 	deleteCaregiverCalled     bool
+	upsertedPredictions       []*domain.Prediction
 }
 
 func newMockStore() *mockStore {
@@ -192,7 +202,10 @@ func (m *mockStore) GetFeedDetails(_ context.Context, _ uuid.UUID) (*domain.Feed
 	return nil, errNotFound
 }
 func (m *mockStore) GetRecentFeedDetailsForFamily(_ context.Context, _ uuid.UUID, _ int) ([]*domain.FeedDetails, error) {
-	return nil, nil
+	if m.recentFeedErr != nil {
+		return nil, m.recentFeedErr
+	}
+	return m.recentFeedDetails, nil
 }
 func (m *mockStore) UpdateFeedDetails(_ context.Context, _ *domain.FeedDetails) error { return nil }
 
@@ -216,14 +229,24 @@ func (m *mockStore) GetSleepDetails(_ context.Context, _ uuid.UUID) (*domain.Sle
 	}
 	return nil, errNotFound
 }
+func (m *mockStore) GetRecentSleepDetailsForFamily(_ context.Context, _ uuid.UUID, _ int) ([]*domain.SleepDetails, error) {
+	if m.recentSleepErr != nil {
+		return nil, m.recentSleepErr
+	}
+	return m.recentSleepDetails, nil
+}
 func (m *mockStore) UpdateSleepDetails(_ context.Context, _ *domain.SleepDetails) error { return nil }
 
 // Prediction operations
-func (m *mockStore) UpsertPredictions(_ context.Context, _ uuid.UUID, _ []*domain.Prediction) error {
-	return nil
+func (m *mockStore) UpsertPredictions(_ context.Context, _ uuid.UUID, predictions []*domain.Prediction) error {
+	m.upsertedPredictions = predictions
+	return m.upsertPredErr
 }
 func (m *mockStore) GetPredictionsForFamily(_ context.Context, _ uuid.UUID) ([]*domain.Prediction, error) {
-	return nil, nil
+	if m.predictionsErr != nil {
+		return nil, m.predictionsErr
+	}
+	return m.predictions, nil
 }
 func (m *mockStore) DismissPrediction(_ context.Context, _ uuid.UUID) error {
 	return nil
