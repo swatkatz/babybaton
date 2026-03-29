@@ -54,6 +54,12 @@ type ComplexityRoot struct {
 		Success   func(childComplexity int) int
 	}
 
+	BabyStatus struct {
+		LastDiaper func(childComplexity int) int
+		LastFeed   func(childComplexity int) int
+		LastSleep  func(childComplexity int) int
+	}
+
 	CareSession struct {
 		Activities  func(childComplexity int) int
 		Caregiver   func(childComplexity int) int
@@ -163,6 +169,7 @@ type ComplexityRoot struct {
 
 	Query struct {
 		CheckFamilyNameAvailable func(childComplexity int, name string) int
+		GetBabyStatus            func(childComplexity int) int
 		GetCareSession           func(childComplexity int, id string) int
 		GetCurrentSession        func(childComplexity int) int
 		GetMyCaregiver           func(childComplexity int) int
@@ -209,6 +216,7 @@ type QueryResolver interface {
 	GetRecentCareSessions(ctx context.Context, limit *int32) ([]*model.CareSession, error)
 	GetCurrentSession(ctx context.Context) (*model.CareSession, error)
 	GetCareSession(ctx context.Context, id string) (*model.CareSession, error)
+	GetBabyStatus(ctx context.Context) (*model.BabyStatus, error)
 	PredictNextFeed(ctx context.Context) (*model.NextFeedPrediction, error)
 }
 
@@ -255,6 +263,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AuthResult.Success(childComplexity), true
+
+	case "BabyStatus.lastDiaper":
+		if e.complexity.BabyStatus.LastDiaper == nil {
+			break
+		}
+
+		return e.complexity.BabyStatus.LastDiaper(childComplexity), true
+	case "BabyStatus.lastFeed":
+		if e.complexity.BabyStatus.LastFeed == nil {
+			break
+		}
+
+		return e.complexity.BabyStatus.LastFeed(childComplexity), true
+	case "BabyStatus.lastSleep":
+		if e.complexity.BabyStatus.LastSleep == nil {
+			break
+		}
+
+		return e.complexity.BabyStatus.LastSleep(childComplexity), true
 
 	case "CareSession.activities":
 		if e.complexity.CareSession.Activities == nil {
@@ -755,6 +782,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.CheckFamilyNameAvailable(childComplexity, args["name"].(string)), true
+	case "Query.getBabyStatus":
+		if e.complexity.Query.GetBabyStatus == nil {
+			break
+		}
+
+		return e.complexity.Query.GetBabyStatus(childComplexity), true
 	case "Query.getCareSession":
 		if e.complexity.Query.GetCareSession == nil {
 			break
@@ -1089,6 +1122,12 @@ type SleepActivity {
   sleepDetails: SleepDetails
 }
 
+type BabyStatus {
+  lastFeed: FeedActivity
+  lastDiaper: DiaperActivity
+  lastSleep: SleepActivity
+}
+
 type NextFeedPrediction {
   predictedTime: DateTime!
   confidence: PredictionConfidence!
@@ -1159,6 +1198,9 @@ type Query {
   getRecentCareSessions(limit: Int): [CareSession!]!
   getCurrentSession: CareSession
   getCareSession(id: ID!): CareSession
+
+  # Baby Status
+  getBabyStatus: BabyStatus!
 
   # Predictions
   predictNextFeed: NextFeedPrediction!
@@ -1613,6 +1655,123 @@ func (ec *executionContext) fieldContext_AuthResult_error(_ context.Context, fie
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BabyStatus_lastFeed(ctx context.Context, field graphql.CollectedField, obj *model.BabyStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_BabyStatus_lastFeed,
+		func(ctx context.Context) (any, error) {
+			return obj.LastFeed, nil
+		},
+		nil,
+		ec.marshalOFeedActivity2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedActivity,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_BabyStatus_lastFeed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BabyStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_FeedActivity_id(ctx, field)
+			case "activityType":
+				return ec.fieldContext_FeedActivity_activityType(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_FeedActivity_createdAt(ctx, field)
+			case "feedDetails":
+				return ec.fieldContext_FeedActivity_feedDetails(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FeedActivity", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BabyStatus_lastDiaper(ctx context.Context, field graphql.CollectedField, obj *model.BabyStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_BabyStatus_lastDiaper,
+		func(ctx context.Context) (any, error) {
+			return obj.LastDiaper, nil
+		},
+		nil,
+		ec.marshalODiaperActivity2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐDiaperActivity,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_BabyStatus_lastDiaper(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BabyStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_DiaperActivity_id(ctx, field)
+			case "activityType":
+				return ec.fieldContext_DiaperActivity_activityType(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_DiaperActivity_createdAt(ctx, field)
+			case "diaperDetails":
+				return ec.fieldContext_DiaperActivity_diaperDetails(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DiaperActivity", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BabyStatus_lastSleep(ctx context.Context, field graphql.CollectedField, obj *model.BabyStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_BabyStatus_lastSleep,
+		func(ctx context.Context) (any, error) {
+			return obj.LastSleep, nil
+		},
+		nil,
+		ec.marshalOSleepActivity2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐSleepActivity,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_BabyStatus_lastSleep(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BabyStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_SleepActivity_id(ctx, field)
+			case "activityType":
+				return ec.fieldContext_SleepActivity_activityType(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_SleepActivity_createdAt(ctx, field)
+			case "sleepDetails":
+				return ec.fieldContext_SleepActivity_sleepDetails(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SleepActivity", field.Name)
 		},
 	}
 	return fc, nil
@@ -4372,6 +4531,43 @@ func (ec *executionContext) fieldContext_Query_getCareSession(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_getBabyStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_getBabyStatus,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().GetBabyStatus(ctx)
+		},
+		nil,
+		ec.marshalNBabyStatus2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐBabyStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_getBabyStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "lastFeed":
+				return ec.fieldContext_BabyStatus_lastFeed(ctx, field)
+			case "lastDiaper":
+				return ec.fieldContext_BabyStatus_lastDiaper(ctx, field)
+			case "lastSleep":
+				return ec.fieldContext_BabyStatus_lastSleep(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type BabyStatus", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_predictNextFeed(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6482,6 +6678,46 @@ func (ec *executionContext) _AuthResult(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
+var babyStatusImplementors = []string{"BabyStatus"}
+
+func (ec *executionContext) _BabyStatus(ctx context.Context, sel ast.SelectionSet, obj *model.BabyStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, babyStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BabyStatus")
+		case "lastFeed":
+			out.Values[i] = ec._BabyStatus_lastFeed(ctx, field, obj)
+		case "lastDiaper":
+			out.Values[i] = ec._BabyStatus_lastDiaper(ctx, field, obj)
+		case "lastSleep":
+			out.Values[i] = ec._BabyStatus_lastSleep(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var careSessionImplementors = []string{"CareSession"}
 
 func (ec *executionContext) _CareSession(ctx context.Context, sel ast.SelectionSet, obj *model.CareSession) graphql.Marshaler {
@@ -7381,6 +7617,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getBabyStatus":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getBabyStatus(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "predictNextFeed":
 			field := field
 
@@ -7966,6 +8224,20 @@ func (ec *executionContext) marshalNAuthResult2ᚖgithubᚗcomᚋswatkatzᚋbaby
 		return graphql.Null
 	}
 	return ec._AuthResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNBabyStatus2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐBabyStatus(ctx context.Context, sel ast.SelectionSet, v model.BabyStatus) graphql.Marshaler {
+	return ec._BabyStatus(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNBabyStatus2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐBabyStatus(ctx context.Context, sel ast.SelectionSet, v *model.BabyStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._BabyStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
@@ -8665,6 +8937,13 @@ func (ec *executionContext) marshalODateTime2ᚖtimeᚐTime(ctx context.Context,
 	return res
 }
 
+func (ec *executionContext) marshalODiaperActivity2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐDiaperActivity(ctx context.Context, sel ast.SelectionSet, v *model.DiaperActivity) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._DiaperActivity(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalODiaperDetails2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐDiaperDetails(ctx context.Context, sel ast.SelectionSet, v *model.DiaperDetails) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -8685,6 +8964,13 @@ func (ec *executionContext) marshalOFamily2ᚖgithubᚗcomᚋswatkatzᚋbabybato
 		return graphql.Null
 	}
 	return ec._Family(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOFeedActivity2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedActivity(ctx context.Context, sel ast.SelectionSet, v *model.FeedActivity) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedActivity(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFeedDetails2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedDetails(ctx context.Context, sel ast.SelectionSet, v *model.FeedDetails) graphql.Marshaler {
@@ -8751,6 +9037,13 @@ func (ec *executionContext) marshalOInt2ᚖint32(ctx context.Context, sel ast.Se
 	_ = ctx
 	res := graphql.MarshalInt32(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOSleepActivity2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐSleepActivity(ctx context.Context, sel ast.SelectionSet, v *model.SleepActivity) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SleepActivity(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOSleepDetails2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐSleepDetails(ctx context.Context, sel ast.SelectionSet, v *model.SleepDetails) graphql.Marshaler {

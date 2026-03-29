@@ -113,6 +113,9 @@ func (m *mockStore) GetActivityByID(ctx context.Context, id uuid.UUID) (*domain.
 func (m *mockStore) GetActivitiesForSession(ctx context.Context, sessionID uuid.UUID) ([]*domain.Activity, error) {
 	return nil, nil
 }
+func (m *mockStore) GetLatestActivityByTypeForFamily(ctx context.Context, familyID uuid.UUID, activityType domain.ActivityType) (*domain.Activity, error) {
+	return nil, nil
+}
 func (m *mockStore) DeleteActivity(ctx context.Context, id uuid.UUID) error { return nil }
 func (m *mockStore) CreateFeedDetails(ctx context.Context, details *domain.FeedDetails) error {
 	return nil

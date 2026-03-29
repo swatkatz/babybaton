@@ -45,6 +45,7 @@ type Store interface {
 	CreateActivity(ctx context.Context, activity *domain.Activity) error
 	GetActivityByID(ctx context.Context, id uuid.UUID) (*domain.Activity, error)
 	GetActivitiesForSession(ctx context.Context, sessionID uuid.UUID) ([]*domain.Activity, error)
+	GetLatestActivityByTypeForFamily(ctx context.Context, familyID uuid.UUID, activityType domain.ActivityType) (*domain.Activity, error)
 	DeleteActivity(ctx context.Context, id uuid.UUID) error
 
 	// Activity detail operations (lazy loaded)

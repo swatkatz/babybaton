@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
@@ -513,4 +514,146 @@ func TestLeaveFamily_NotAuthenticated(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unauthenticated request")
 	}
+}
+
+// ==================== GetBabyStatus Tests ====================
+
+func TestGetBabyStatus_AllTypesPresent(t *testing.T) {
+	feedActivityID := uuid.New()
+	diaperActivityID := uuid.New()
+	sleepActivityID := uuid.New()
+	caregiverID := uuid.New()
+	familyID := uuid.New()
+
+	store := newMockStore()
+	store.latestActivityByType = map[domain.ActivityType]*domain.Activity{
+		domain.ActivityTypeFeed: {
+			ID:           feedActivityID,
+			ActivityType: domain.ActivityTypeFeed,
+			CreatedAt:    testing_time(),
+		},
+		domain.ActivityTypeDiaper: {
+			ID:           diaperActivityID,
+			ActivityType: domain.ActivityTypeDiaper,
+			CreatedAt:    testing_time(),
+		},
+		domain.ActivityTypeSleep: {
+			ID:           sleepActivityID,
+			ActivityType: domain.ActivityTypeSleep,
+			CreatedAt:    testing_time(),
+		},
+	}
+	store.feedDetails = &domain.FeedDetails{
+		ID:         uuid.New(),
+		ActivityID: feedActivityID,
+		StartTime:  testing_time(),
+	}
+	store.diaperDetails = &domain.DiaperDetails{
+		ID:         uuid.New(),
+		ActivityID: diaperActivityID,
+		ChangedAt:  testing_time(),
+		HadPoop:    true,
+		HadPee:     true,
+	}
+	store.sleepDetails = &domain.SleepDetails{
+		ID:         uuid.New(),
+		ActivityID: sleepActivityID,
+		StartTime:  testing_time(),
+	}
+
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	result, err := qr.GetBabyStatus(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.LastFeed == nil {
+		t.Error("expected LastFeed to be non-nil")
+	}
+	if result.LastDiaper == nil {
+		t.Error("expected LastDiaper to be non-nil")
+	}
+	if result.LastSleep == nil {
+		t.Error("expected LastSleep to be non-nil")
+	}
+}
+
+func TestGetBabyStatus_SomeTypesMissing(t *testing.T) {
+	feedActivityID := uuid.New()
+	caregiverID := uuid.New()
+	familyID := uuid.New()
+
+	store := newMockStore()
+	store.latestActivityByType = map[domain.ActivityType]*domain.Activity{
+		domain.ActivityTypeFeed: {
+			ID:           feedActivityID,
+			ActivityType: domain.ActivityTypeFeed,
+			CreatedAt:    testing_time(),
+		},
+	}
+	store.feedDetails = &domain.FeedDetails{
+		ID:         uuid.New(),
+		ActivityID: feedActivityID,
+		StartTime:  testing_time(),
+	}
+
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	result, err := qr.GetBabyStatus(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.LastFeed == nil {
+		t.Error("expected LastFeed to be non-nil")
+	}
+	if result.LastDiaper != nil {
+		t.Error("expected LastDiaper to be nil")
+	}
+	if result.LastSleep != nil {
+		t.Error("expected LastSleep to be nil")
+	}
+}
+
+func TestGetBabyStatus_NoActivities(t *testing.T) {
+	caregiverID := uuid.New()
+	familyID := uuid.New()
+
+	store := newMockStore()
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	result, err := qr.GetBabyStatus(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.LastFeed != nil {
+		t.Error("expected LastFeed to be nil")
+	}
+	if result.LastDiaper != nil {
+		t.Error("expected LastDiaper to be nil")
+	}
+	if result.LastSleep != nil {
+		t.Error("expected LastSleep to be nil")
+	}
+}
+
+func TestGetBabyStatus_Unauthenticated(t *testing.T) {
+	store := newMockStore()
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+	ctx := context.Background()
+
+	_, err := qr.GetBabyStatus(ctx)
+	if err == nil {
+		t.Fatal("expected error for unauthenticated request")
+	}
+}
+
+func testing_time() time.Time {
+	return time.Date(2026, 3, 28, 12, 0, 0, 0, time.UTC)
 }

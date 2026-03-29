@@ -120,6 +120,12 @@ type SleepActivity {
   sleepDetails: SleepDetails
 }
 
+type BabyStatus {
+  lastFeed: FeedActivity
+  lastDiaper: DiaperActivity
+  lastSleep: SleepActivity
+}
+
 type NextFeedPrediction {
   predictedTime: DateTime!
   confidence: PredictionConfidence!
@@ -190,6 +196,9 @@ type Query {
   getRecentCareSessions(limit: Int): [CareSession!]!
   getCurrentSession: CareSession
   getCareSession(id: ID!): CareSession
+
+  # Baby Status
+  getBabyStatus: BabyStatus!
 
   # Predictions
   predictNextFeed: NextFeedPrediction!
