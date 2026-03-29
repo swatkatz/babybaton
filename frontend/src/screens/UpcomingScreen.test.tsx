@@ -7,6 +7,15 @@ const mockNavigate = jest.fn();
 jest.mock('@react-navigation/stack', () => ({
   createStackNavigator: jest.fn(),
 }));
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: (cb: () => void) => cb(),
+}));
+jest.mock('../services/predictionReadService', () => ({
+  __esModule: true,
+  default: {
+    markAsRead: jest.fn().mockResolvedValue(undefined),
+  },
+}));
 
 // Mock Apollo hooks
 type PredictionMock = {

@@ -118,6 +118,14 @@ func (s *PostgresStore) DismissPrediction(ctx context.Context, id uuid.UUID) err
 	return nil
 }
 
+func (s *PostgresStore) DeletePredictionsForFamily(ctx context.Context, familyID uuid.UUID) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM predictions WHERE family_id = $1`,
+		familyID,
+	)
+	return err
+}
+
 func (s *PostgresStore) CleanupOldPredictions(ctx context.Context, olderThan time.Time) error {
 	_, err := s.db.ExecContext(ctx,
 		`DELETE FROM predictions WHERE created_at < $1`,

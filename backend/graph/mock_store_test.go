@@ -251,6 +251,9 @@ func (m *mockStore) GetPredictionsForFamily(_ context.Context, _ uuid.UUID) ([]*
 func (m *mockStore) DismissPrediction(_ context.Context, _ uuid.UUID) error {
 	return nil
 }
+func (m *mockStore) DeletePredictionsForFamily(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
 func (m *mockStore) CleanupOldPredictions(_ context.Context, _ time.Time) error {
 	return nil
 }

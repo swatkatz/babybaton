@@ -69,6 +69,7 @@ type Store interface {
 	UpsertPredictions(ctx context.Context, familyID uuid.UUID, predictions []*domain.Prediction) error
 	GetPredictionsForFamily(ctx context.Context, familyID uuid.UUID) ([]*domain.Prediction, error)
 	DismissPrediction(ctx context.Context, id uuid.UUID) error
+	DeletePredictionsForFamily(ctx context.Context, familyID uuid.UUID) error
 	CleanupOldPredictions(ctx context.Context, olderThan time.Time) error
 
 	// Schedule Goals operations

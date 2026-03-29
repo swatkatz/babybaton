@@ -161,6 +161,9 @@ func (m *mockStore) GetPredictionsForFamily(ctx context.Context, familyID uuid.U
 	return nil, nil
 }
 func (m *mockStore) DismissPrediction(ctx context.Context, id uuid.UUID) error { return nil }
+func (m *mockStore) DeletePredictionsForFamily(ctx context.Context, familyID uuid.UUID) error {
+	return nil
+}
 func (m *mockStore) CleanupOldPredictions(ctx context.Context, olderThan time.Time) error {
 	return nil
 }

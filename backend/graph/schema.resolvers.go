@@ -609,14 +609,17 @@ func (r *mutationResolver) AddActivities(ctx context.Context, activities []*mode
 		fmt.Printf("   ✅ Activity %d: %s\n", i+1, activity.ActivityType)
 	}
 
-	// Step 4: Return the updated session
+	// Step 4: Invalidate prediction cache so next query recomputes with new data
+	_ = r.store.DeletePredictionsForFamily(ctx, familyID)
+
+	// Step 5: Return the updated session
 	return mapper.CareSessionToGraphQL(session), nil
 }
 
 // EndActivity is the resolver for the endActivity field.
 func (r *mutationResolver) EndActivity(ctx context.Context, activityID string, endTime *time.Time) (model.Activity, error) {
 	// Require authentication
-	_, _, err := middleware.RequireAuth(ctx)
+	_, familyID, err := middleware.RequireAuth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("authentication required: %w", err)
 	}
@@ -658,6 +661,9 @@ func (r *mutationResolver) EndActivity(ctx context.Context, activityID string, e
 	}
 
 	fmt.Printf("✅ Ended sleep activity %s at %s (duration: %d minutes)\n", activityID, endTime.Format(time.RFC3339), duration)
+
+	// Invalidate prediction cache
+	_ = r.store.DeletePredictionsForFamily(ctx, familyID)
 
 	// Return the sleep activity with details
 	return &model.SleepActivity{
@@ -731,7 +737,7 @@ func (r *mutationResolver) CompleteCareSession(ctx context.Context, notes *strin
 // DeleteActivity is the resolver for the deleteActivity field.
 func (r *mutationResolver) DeleteActivity(ctx context.Context, activityID string) (bool, error) {
 	// Require authentication
-	_, _, err := middleware.RequireAuth(ctx)
+	_, familyID, err := middleware.RequireAuth(ctx)
 	if err != nil {
 		return false, fmt.Errorf("authentication required: %w", err)
 	}
@@ -746,6 +752,9 @@ func (r *mutationResolver) DeleteActivity(ctx context.Context, activityID string
 		return false, fmt.Errorf("failed to delete activity: %w", err)
 	}
 
+	// Invalidate prediction cache
+	_ = r.store.DeletePredictionsForFamily(ctx, familyID)
+
 	fmt.Printf("🗑️  Deleted activity %s\n", activityID)
 
 	return true, nil
@@ -754,7 +763,7 @@ func (r *mutationResolver) DeleteActivity(ctx context.Context, activityID string
 // UpdateActivity is the resolver for the updateActivity field.
 func (r *mutationResolver) UpdateActivity(ctx context.Context, activityID string, input model.ActivityInput) (model.Activity, error) {
 	// Require authentication
-	_, _, err := middleware.RequireAuth(ctx)
+	_, familyID, err := middleware.RequireAuth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("authentication required: %w", err)
 	}
@@ -769,6 +778,9 @@ func (r *mutationResolver) UpdateActivity(ctx context.Context, activityID string
 	if err != nil {
 		return nil, fmt.Errorf("failed to get activity: %w", err)
 	}
+
+	// Invalidate prediction cache after successful update
+	defer func() { _ = r.store.DeletePredictionsForFamily(ctx, familyID) }()
 
 	now := time.Now()
 
@@ -1209,6 +1221,18 @@ func (r *queryResolver) Predictions(ctx context.Context) ([]*model.Prediction, e
 		return nil, fmt.Errorf("failed to get predictions: %w", err)
 	}
 	if len(existing) > 0 && now.Sub(existing[0].ComputedAt) < 5*time.Minute {
+		// Re-evaluate statuses against current time (a prediction may have become overdue since it was cached)
+		for _, dp := range existing {
+			if dp.Status == domain.PredictionStatusPlanned {
+				continue // PLANNED stays PLANNED
+			}
+			if dp.PredictedTime.Before(now) {
+				dp.Status = domain.PredictionStatusOverdue
+				dp.Confidence = nil
+			} else {
+				dp.Status = domain.PredictionStatusUpcoming
+			}
+		}
 		result := make([]*model.Prediction, 0, len(existing))
 		for _, dp := range existing {
 			result = append(result, mapper.PredictionToGraphQL(dp))

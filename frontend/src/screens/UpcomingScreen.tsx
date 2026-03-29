@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client/react';
+import { useFocusEffect } from '@react-navigation/native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { colors } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
@@ -19,6 +20,7 @@ import {
   type GetPredictionsQuery,
 } from '../types/__generated__/graphql';
 import { PredictionCard } from '../components/PredictionCard';
+import predictionReadService from '../services/predictionReadService';
 import type { HomeStackParamList } from '../navigation/MainTabNavigator';
 
 const POLL_INTERVAL = 15 * 60 * 1000; // 15 minutes
@@ -66,6 +68,15 @@ export function UpcomingScreen({ navigation }: Props) {
   });
 
   const predictions = data?.predictions ?? [];
+
+  // Mark all predictions as read when this screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      for (const p of predictions) {
+        predictionReadService.markAsRead(p.id);
+      }
+    }, [predictions])
+  );
 
   const { overdue, upcoming, planned } = useMemo(
     () => groupByStatus(predictions),
