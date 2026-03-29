@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predictions - UI Mock</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; display: flex; justify-content: center; gap: 40px; padding: 40px; flex-wrap: wrap; }
+
+  .phone {
+    width: 375px;
+    height: 812px;
+    background: #111;
+    border-radius: 44px;
+    border: 3px solid #333;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .status-bar {
+    height: 54px;
+    padding: 14px 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .header {
+    padding: 8px 20px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header h1 {
+    color: #fff;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .header-subtitle {
+    color: #888;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 20px 100px;
+  }
+
+  /* Coming Up Next section */
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-label.urgent { color: #FF6B6B; }
+  .section-label.confident { color: #7EC8E3; }
+  .section-label.planning { color: #888; }
+
+  .section-label .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .dot.urgent-dot { background: #FF6B6B; box-shadow: 0 0 8px #FF6B6B88; }
+  .dot.confident-dot { background: #7EC8E3; }
+  .dot.planning-dot { background: #555; }
+
+  /* Prediction cards */
+  .prediction-card {
+    background: #1a1a1a;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border: 1px solid #252525;
+    transition: all 0.2s;
+  }
+  .prediction-card.urgent-card {
+    background: linear-gradient(135deg, #1a1111, #1a1515);
+    border-color: #FF6B6B33;
+  }
+  .prediction-card.planning-card {
+    background: #141414;
+    border-color: #1e1e1e;
+    opacity: 0.75;
+  }
+
+  .card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .icon-feed { background: #1a2a1a; }
+  .icon-nap { background: #1a1a2e; }
+  .icon-wake { background: #2e2a1a; }
+  .icon-bedtime { background: #1e1a2e; }
+
+  .card-content { flex: 1; }
+  .card-type {
+    font-size: 15px;
+    font-weight: 600;
+    color: #eee;
+  }
+  .card-detail {
+    font-size: 12px;
+    color: #777;
+    margin-top: 2px;
+  }
+
+  .card-time {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .card-time-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .card-time-until {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+  }
+  .card-time-until.soon {
+    color: #FF6B6B;
+    font-weight: 600;
+  }
+
+  .confidence-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge-high { background: #1a3a1a; color: #6BCB77; }
+  .badge-medium { background: #3a3a1a; color: #FFD93D; }
+  .badge-low { background: #3a2a1a; color: #FF8B3D; }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: #222;
+    margin: 20px 0;
+  }
+
+  /* Planning section header */
+  .planning-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .planning-note {
+    font-size: 11px;
+    color: #555;
+    font-style: italic;
+  }
+
+  /* Timeline connector */
+  .timeline-group {
+    position: relative;
+    padding-left: 0;
+  }
+
+  /* Bottom tab bar */
+  .tab-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 84px;
+    background: #111;
+    border-top: 1px solid #222;
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    padding-top: 10px;
+  }
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: #555;
+    font-size: 10px;
+    font-weight: 500;
+  }
+  .tab.active { color: #7EC8E3; }
+  .tab-icon { font-size: 22px; }
+
+  /* Screen label */
+  .screen-label {
+    text-align: center;
+    color: #444;
+    font-size: 11px;
+    margin-bottom: 16px;
+    padding-top: 8px;
+    font-style: italic;
+  }
+
+  /* Overdue styling */
+  .overdue-badge {
+    background: #FF6B6B;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+  }
+
+  /* Option B specific */
+  .timeline-line {
+    position: absolute;
+    left: 21px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #7EC8E344, #55555522);
+  }
+  .timeline-card {
+    position: relative;
+    padding-left: 50px;
+    margin-bottom: 10px;
+  }
+  .timeline-dot-wrap {
+    position: absolute;
+    left: 14px;
+    top: 18px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+  }
+  .timeline-dot-wrap.solid { background: #7EC8E3; }
+  .timeline-dot-wrap.hollow { background: #111; border: 2px solid #444; }
+  .timeline-dot-wrap.urgent-wrap { background: #FF6B6B; box-shadow: 0 0 8px #FF6B6B66; }
+  .timeline-dot-inner {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #111;
+  }
+
+  /* Compact card for timeline */
+  .compact-card {
+    background: #1a1a1a;
+    border-radius: 14px;
+    padding: 14px 16px;
+    border: 1px solid #252525;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .compact-card.faded {
+    opacity: 0.55;
+    border-color: #1e1e1e;
+  }
+  .compact-card.urgent-compact {
+    background: linear-gradient(135deg, #1a1111, #1a1515);
+    border-color: #FF6B6B33;
+  }
+  .compact-icon {
+    font-size: 18px;
+    width: 32px;
+    text-align: center;
+  }
+  .compact-content { flex: 1; }
+  .compact-type {
+    font-size: 14px;
+    font-weight: 600;
+    color: #eee;
+  }
+  .compact-detail {
+    font-size: 11px;
+    color: #666;
+    margin-top: 1px;
+  }
+  .compact-time {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ccc;
+  }
+  .compact-time.highlight { color: #fff; }
+  .compact-time.urgent-time { color: #FF6B6B; }
+
+  /* Overdue card styles */
+  .prediction-card.overdue-card {
+    background: linear-gradient(135deg, #2a1111, #251515);
+    border-color: #FF6B6B55;
+    border-width: 1.5px;
+  }
+  .overdue-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+  }
+  .overdue-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #FF6B6B;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .overdue-elapsed {
+    font-size: 11px;
+    color: #FF6B6B99;
+  }
+  .overdue-body {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .log-it-btn {
+    background: #FF6B6B;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+  }
+  .overdue-time-crossed {
+    font-size: 16px;
+    font-weight: 700;
+    color: #FF6B6B88;
+    text-decoration: line-through;
+  }
+
+  /* Compact overdue for timeline */
+  .compact-card.overdue-compact {
+    background: linear-gradient(135deg, #2a1111, #251515);
+    border-color: #FF6B6B55;
+    border-width: 1.5px;
+    flex-wrap: wrap;
+  }
+  .compact-overdue-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #FF6B6B22;
+  }
+  .compact-log-btn {
+    background: #FF6B6B;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<!-- OPTION A: Card-based with sections (with overdue) -->
+<div class="phone">
+  <div class="status-bar">
+    <span>10:42 AM</span>
+    <span>Option A: With Overdue</span>
+  </div>
+  <div class="header">
+    <div>
+      <h1>Upcoming</h1>
+      <div class="header-subtitle">Reya's day - Saturday</div>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Overdue -->
+    <div class="section-label urgent">
+      <span class="dot urgent-dot"></span>
+      OVERDUE
+    </div>
+    <div class="prediction-card overdue-card" style="flex-direction: column; align-items: stretch;">
+      <div class="overdue-body">
+        <div class="card-icon icon-nap">&#x1F31C;</div>
+        <div class="card-content">
+          <div class="card-type">Nap Time <span class="overdue-label" style="margin-left: 6px;">27 MIN AGO</span></div>
+          <div class="card-detail">Expected at 10:15 - 2.5hr wake window</div>
+        </div>
+        <div class="card-time">
+          <div class="overdue-time-crossed">10:15</div>
+        </div>
+      </div>
+      <div style="margin-top: 12px;">
+        <button class="log-it-btn" style="width: 100%;">Log Activity</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Coming Up -->
+    <div class="section-label confident">
+      <span class="dot confident-dot"></span>
+      COMING UP
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Coming Up -->
+    <div class="section-label confident">
+      <span class="dot confident-dot"></span>
+      COMING UP
+    </div>
+    <div class="prediction-card">
+      <div class="card-icon icon-wake">&#x2600;&#xFE0F;</div>
+      <div class="card-content">
+        <div class="card-type">Wake Up <span class="confidence-badge badge-high">HIGH</span></div>
+        <div class="card-detail">~60 min nap based on recent avg</div>
+      </div>
+      <div class="card-time">
+        <div class="card-time-value">11:15</div>
+        <div class="card-time-until">in 1h 13m</div>
+      </div>
+    </div>
+    <div class="prediction-card">
+      <div class="card-icon icon-feed">&#x1F37C;</div>
+      <div class="card-content">
+        <div class="card-type">Feed <span class="confidence-badge badge-high">HIGH</span></div>
+        <div class="card-detail">~200ml formula (4.5hr interval)</div>
+      </div>
+      <div class="card-time">
+        <div class="card-time-value">12:00</div>
+        <div class="card-time-until">in 2h</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Rest of Day -->
+    <div class="planning-header">
+      <div class="section-label planning" style="margin-bottom:0">
+        <span class="dot planning-dot"></span>
+        REST OF DAY
+      </div>
+      <div class="planning-note">Updates as activities are logged</div>
+    </div>
+    <div class="prediction-card planning-card">
+      <div class="card-icon icon-nap">&#x1F31C;</div>
+      <div class="card-content">
+        <div class="card-type">Nap <span class="confidence-badge badge-medium">MED</span></div>
+        <div class="card-detail">After 2.5hr wake window</div>
+      </div>
+      <div class="card-time">
+        <div class="card-time-value" style="color:#999">~1:45</div>
+        <div class="card-time-until">in 3h 43m</div>
+      </div>
+    </div>
+    <div class="prediction-card planning-card">
+      <div class="card-icon icon-wake">&#x2600;&#xFE0F;</div>
+      <div class="card-content">
+        <div class="card-type">Wake <span class="confidence-badge badge-medium">MED</span></div>
+        <div class="card-detail">~60 min nap</div>
+      </div>
+      <div class="card-time">
+        <div class="card-time-value" style="color:#999">~2:45</div>
+        <div class="card-time-until">in 4h 43m</div>
+      </div>
+    </div>
+    <div class="prediction-card planning-card">
+      <div class="card-icon icon-feed">&#x1F37C;</div>
+      <div class="card-content">
+        <div class="card-type">Feed <span class="confidence-badge badge-low">LOW</span></div>
+        <div class="card-detail">~200ml formula</div>
+      </div>
+      <div class="card-time">
+        <div class="card-time-value" style="color:#999">~4:30</div>
+        <div class="card-time-until">in 6h 28m</div>
+      </div>
+    </div>
+    <div class="prediction-card planning-card">
+      <div class="card-icon icon-nap">&#x1F31C;</div>
+      <div class="card-content">
+        <div class="card-type">Nap <span class="confidence-badge badge-low">LOW</span></div>
+        <div class="card-detail">Short nap (30 min budget left)</div>
+      </div>
+      <div class="card-time">
+        <div class="card-time-value" style="color:#999">~5:15</div>
+        <div class="card-time-until">in 7h 13m</div>
+      </div>
+    </div>
+    <div class="prediction-card planning-card">
+      <div class="card-icon icon-feed">&#x1F37C;</div>
+      <div class="card-content">
+        <div class="card-type">Feed <span class="confidence-badge badge-low">LOW</span></div>
+        <div class="card-detail">~200ml formula</div>
+      </div>
+      <div class="card-time">
+        <div class="card-time-value" style="color:#999">~9:00</div>
+        <div class="card-time-until">in 11h</div>
+      </div>
+    </div>
+    <div class="prediction-card planning-card">
+      <div class="card-icon icon-bedtime">&#x1F303;</div>
+      <div class="card-content">
+        <div class="card-type">Bedtime <span class="confidence-badge badge-medium">MED</span></div>
+        <div class="card-detail">Typical bedtime ~11 PM</div>
+      </div>
+      <div class="card-time">
+        <div class="card-time-value" style="color:#999">~11:00</div>
+        <div class="card-time-until">in 13h</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab"><span class="tab-icon">&#x1F3E0;</span> Home</div>
+    <div class="tab"><span class="tab-icon">&#x1F399;</span> Log</div>
+    <div class="tab active"><span class="tab-icon">&#x1F52E;</span> Upcoming</div>
+    <div class="tab"><span class="tab-icon">&#x23F0;</span> Schedule</div>
+    <div class="tab"><span class="tab-icon">&#x2699;&#xFE0F;</span> Settings</div>
+  </div>
+</div>
+
+<!-- OPTION B: Timeline view (with overdue) -->
+<div class="phone">
+  <div class="status-bar">
+    <span>10:42 AM</span>
+    <span>Option B: With Overdue</span>
+  </div>
+  <div class="header">
+    <div>
+      <h1>Upcoming</h1>
+      <div class="header-subtitle">Reya's day - Saturday</div>
+    </div>
+  </div>
+  <div class="content">
+
+    <div class="section-label urgent">
+      <span class="dot urgent-dot"></span>
+      OVERDUE
+    </div>
+
+    <div class="timeline-group">
+      <div class="timeline-line"></div>
+
+      <div class="timeline-card">
+        <div class="timeline-dot-wrap urgent-wrap"><div class="timeline-dot-inner"></div></div>
+        <div class="compact-card overdue-compact">
+          <div class="compact-icon">&#x1F31C;</div>
+          <div class="compact-content">
+            <div class="compact-type">Nap Time</div>
+            <div class="compact-detail">Expected at 10:15 - 27 min ago</div>
+          </div>
+          <div class="compact-time urgent-time" style="text-decoration: line-through;">10:15</div>
+          <div class="compact-overdue-row">
+            <div class="overdue-elapsed" style="font-size: 11px; color: #FF6B6B99;">Did this happen?</div>
+            <button class="compact-log-btn">Log Activity</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-card">
+        <div class="timeline-dot-wrap solid"></div>
+        <div class="compact-card">
+          <div class="compact-icon">&#x2600;&#xFE0F;</div>
+          <div class="compact-content">
+            <div class="compact-type">Wake Up</div>
+            <div class="compact-detail">~60 min nap</div>
+          </div>
+          <div class="compact-time highlight">11:15</div>
+        </div>
+      </div>
+
+      <div class="timeline-card">
+        <div class="timeline-dot-wrap solid"></div>
+        <div class="compact-card">
+          <div class="compact-icon">&#x1F37C;</div>
+          <div class="compact-content">
+            <div class="compact-type">Feed</div>
+            <div class="compact-detail">~200ml formula</div>
+          </div>
+          <div class="compact-time highlight">12:00</div>
+        </div>
+      </div>
+
+      <!-- Planning section -->
+      <div style="padding-left: 50px; margin: 16px 0 12px;">
+        <div class="section-label planning" style="margin-bottom:0; font-size: 11px;">
+          PLANNING YOUR DAY
+        </div>
+        <div class="planning-note">Approximate - updates as you log activities</div>
+      </div>
+
+      <div class="timeline-card">
+        <div class="timeline-dot-wrap hollow"></div>
+        <div class="compact-card faded">
+          <div class="compact-icon">&#x1F31C;</div>
+          <div class="compact-content">
+            <div class="compact-type">Nap</div>
+            <div class="compact-detail">2.5hr wake window</div>
+          </div>
+          <div class="compact-time">~1:45</div>
+        </div>
+      </div>
+
+      <div class="timeline-card">
+        <div class="timeline-dot-wrap hollow"></div>
+        <div class="compact-card faded">
+          <div class="compact-icon">&#x2600;&#xFE0F;</div>
+          <div class="compact-content">
+            <div class="compact-type">Wake</div>
+            <div class="compact-detail">~60 min nap</div>
+          </div>
+          <div class="compact-time">~2:45</div>
+        </div>
+      </div>
+
+      <div class="timeline-card">
+        <div class="timeline-dot-wrap hollow"></div>
+        <div class="compact-card faded">
+          <div class="compact-icon">&#x1F37C;</div>
+          <div class="compact-content">
+            <div class="compact-type">Feed</div>
+            <div class="compact-detail">~200ml formula</div>
+          </div>
+          <div class="compact-time">~4:30</div>
+        </div>
+      </div>
+
+      <div class="timeline-card">
+        <div class="timeline-dot-wrap hollow"></div>
+        <div class="compact-card faded">
+          <div class="compact-icon">&#x1F31C;</div>
+          <div class="compact-content">
+            <div class="compact-type">Short Nap</div>
+            <div class="compact-detail">30 min budget left</div>
+          </div>
+          <div class="compact-time">~5:15</div>
+        </div>
+      </div>
+
+      <div class="timeline-card">
+        <div class="timeline-dot-wrap hollow"></div>
+        <div class="compact-card faded">
+          <div class="compact-icon">&#x1F37C;</div>
+          <div class="compact-content">
+            <div class="compact-type">Feed</div>
+            <div class="compact-detail">~200ml formula</div>
+          </div>
+          <div class="compact-time">~9:00</div>
+        </div>
+      </div>
+
+      <div class="timeline-card">
+        <div class="timeline-dot-wrap hollow"></div>
+        <div class="compact-card faded">
+          <div class="compact-icon">&#x1F303;</div>
+          <div class="compact-content">
+            <div class="compact-type">Bedtime</div>
+            <div class="compact-detail">Typical ~11 PM</div>
+          </div>
+          <div class="compact-time">~11:00</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab"><span class="tab-icon">&#x1F3E0;</span> Home</div>
+    <div class="tab"><span class="tab-icon">&#x1F399;</span> Log</div>
+    <div class="tab active"><span class="tab-icon">&#x1F52E;</span> Upcoming</div>
+    <div class="tab"><span class="tab-icon">&#x23F0;</span> Schedule</div>
+    <div class="tab"><span class="tab-icon">&#x2699;&#xFE0F;</span> Settings</div>
+  </div>
+</div>
+
+</body>
+</html>

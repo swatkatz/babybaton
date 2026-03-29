@@ -550,124 +550,306 @@ type Mutation {
 
 ---
 
-## 4. Smart Feed Prediction Algorithm
+## 4. Prediction System
 
-> **Status: NOT YET IMPLEMENTED.** The `predictNextFeed` query currently returns mock data (2 hours from now, HIGH confidence, static reasoning string). The algorithm below is the planned design.
+### 4.1 Overview
 
-### 4.1 Rule-Based Prediction Engine
+The prediction system forecasts upcoming baby care events (feeds, naps, wake times) to help caregivers plan ahead. It operates in two phases:
 
-```go
-type PredictionFactors struct {
-    LastFeedTime      time.Time
-    LastFeedAmountMl  int
-    IsCurrentlySleeping bool
-    SleepStartTime    time.Time
-    TimeOfDay         int  // Hour of day (0-23)
-    RecentFeedIntervals []time.Duration  // Last 5 intervals
+- **Phase 1 (Data-driven):** Predictions derived entirely from recent activity history. No user configuration required.
+- **Phase 2 (Goals-driven):** Caregivers set schedule goals (target wake windows, feed intervals, etc.). Predictions blend goals with observed patterns, and goals serve as defaults when data is sparse.
+
+### 4.2 Domain Concepts
+
+Understanding how baby schedules work is essential to the prediction model:
+
+- **Wake time:** When the baby wakes from overnight sleep. Best derived from the **first activity logged each day**, since caregivers often forget to mark the overnight sleep as ended.
+- **Wake window:** The stretch of awake time between daytime naps. This is the primary driver of the daytime schedule. Caregivers actively manage wake windows (e.g., "working towards 3-hour wake windows").
+- **Daytime cycle:** A repeating pattern of `wake window → nap → wake window → nap → ...` from morning wake until bedtime, constrained by a max total daytime nap budget.
+- **Overnight sleep:** A different regime — longer, with a consistent bedtime. Does not follow wake window patterns.
+- **Feed cycle:** Independent of the sleep cycle. Feeds happen on their own interval regardless of naps.
+- **Schedule evolution:** Feed quantities, feed intervals, and wake windows all change as the baby grows — but they stay consistent for ~1 month stretches before shifting. Recent history (7-14 days) is the best predictor.
+
+### 4.3 Data Quality Considerations
+
+Based on real production data, the algorithm must handle:
+
+| Issue | Cause | Mitigation |
+|-------|-------|------------|
+| Overnight sleep `end_time` is hours late | Caregiver forgets to log wake-up | Use first activity of the day as wake time proxy |
+| Wake windows < 1 hr or negative | Data entry errors, duplicate entries | Filter outliers: ignore wake windows < 1 hr or > 6 hr |
+| Feed interval includes overnight gap | Baby sleeps through the night | Separate daytime (6am-10pm) and nighttime feed patterns |
+| Solids logged without `amount_ml` | Solids don't have ml amounts | Exclude solids from feed interval calculations; treat as supplementary |
+| High variance in nap durations | Some naps cut short, some extended | Use median instead of mean for robustness |
+
+### 4.4 Phase 1: Data-Driven Predictions
+
+#### 4.4.1 Prediction Types
+
+The system returns a **timeline of upcoming predictions**, replacing the single `predictNextFeed` query:
+
+| Prediction | Inputs | Algorithm |
+|------------|--------|-----------|
+| **Next feed** | Last formula/breast_milk feed time, recent feed intervals | `last_feed + median_recent_interval` |
+| **Next nap** | Last wake time, recent wake windows | `last_wake + median_wake_window` |
+| **Next wake (from nap)** | Current nap start, recent nap durations | `nap_start + median_nap_duration` |
+| **Bedtime** | Recent overnight sleep start times | `median_recent_bedtime` |
+| **Predicted feed amount** | Recent feed amounts | `median_recent_amount_ml` |
+
+#### 4.4.2 Algorithm Detail
+
+**Data window:** Use the last 7-14 days of data. More recent data is weighted higher.
+
+**Feed prediction:**
+```
+1. Query formula + breast_milk feeds from last 14 days
+2. Compute intervals between consecutive daytime feeds (6am-10pm)
+3. Filter outliers: ignore intervals < 1 hr or > 8 hr
+4. Take median interval
+5. Predicted next feed = last feed start_time + median interval
+6. Predicted amount = median of recent amounts (excluding nulls/solids)
+```
+
+**Sleep prediction (next nap):**
+```
+1. Determine current state: is baby awake or napping?
+2. If awake:
+   a. Find last wake time (nap end_time, or first activity of day for morning)
+   b. Query wake windows from last 14 days (time between nap end and next nap start)
+   c. Filter: keep only wake windows between 1-6 hours
+   d. Take median wake window
+   e. Predicted next nap = last_wake + median_wake_window
+3. If napping:
+   a. Query daytime nap durations (< 200 min) from last 14 days
+   b. Take median duration
+   c. Predicted wake = nap_start + median_duration
+```
+
+**Bedtime prediction:**
+```
+1. Query overnight sleep records (duration >= 200 min) from last 14 days
+2. Extract start times (hour:minute)
+3. Take median → predicted bedtime tonight
+```
+
+**Wake time (morning):**
+```
+1. For each day in last 14 days, find the first logged activity
+2. Extract time-of-day
+3. Take median → predicted wake time tomorrow
+```
+
+#### 4.4.3 Confidence Calculation
+
+Confidence is based on data consistency:
+
+```
+score = 100
+
+- Fewer than 5 data points for this prediction type:  score -= 30
+- Fewer than 10 data points:                          score -= 15
+- High variance (std dev > 25% of median):             score -= 25
+- Currently overnight (predictions less reliable):     score -= 10
+
+HIGH:   score >= 75
+MEDIUM: score >= 50
+LOW:    score < 50
+
+Special case: 0 data points → no prediction returned (not LOW confidence)
+```
+
+#### 4.4.4 Reasoning Strings
+
+Each prediction includes a human-readable reasoning string:
+
+- `"Based on 4.5hr median feed interval from last 12 feeds"`
+- `"Based on 2.5hr median wake window from last 8 naps"`
+- `"Bedtime is typically around 11:00 PM (last 7 nights)"`
+- `"Not enough data yet — only 2 feeds logged"` (LOW confidence)
+
+#### 4.4.5 Current State Detection
+
+The algorithm needs to know the baby's current state to decide which predictions are relevant:
+
+```
+1. Find the most recent activity (any type)
+2. If most recent is a sleep with no end_time → baby is napping
+3. If most recent sleep has an end_time → baby is awake
+4. If no sleep today, use first activity as wake time
+5. Check time of day: if after median bedtime, predict morning wake
+```
+
+### 4.5 Phase 2: Schedule Goals
+
+#### 4.5.1 Motivation
+
+Caregivers don't just observe patterns — they actively shape them. When a caregiver says "we're working towards 3-hour wake windows," the recent data might show 2.5-hour windows, but the *desired* prediction is 3 hours. Goals let caregivers express intent.
+
+Goals also solve the cold-start problem: a new family with no history can still get useful predictions by entering their targets.
+
+#### 4.5.2 Goal Fields
+
+```
+ScheduleGoals:
+  targetWakeWindowMinutes: Int       # e.g., 150 (2.5 hrs) or 180 (3 hrs)
+  targetFeedIntervalMinutes: Int     # e.g., 240 (4 hrs)
+  targetNapCount: Int                # e.g., 3 naps per day
+  maxDaytimeNapMinutes: Int          # e.g., 180 (3 hrs total)
+  targetBedtime: String              # e.g., "23:00"
+  targetWakeTime: String             # e.g., "07:00"
+```
+
+These are stored per-family. All caregivers in a family share the same goals.
+
+#### 4.5.3 Blending Algorithm
+
+When goals exist, predictions blend observed data with targets:
+
+```
+IF data_points >= 7:
+  # Enough data — use data but show goal for context
+  predicted_value = median_from_data
+  reasoning includes: "Recent avg: 2.5hr wake windows (your target: 3hr)"
+
+IF data_points >= 3 AND data_points < 7:
+  # Some data — weighted blend
+  predicted_value = (0.4 * median_from_data) + (0.6 * goal)
+  reasoning includes: "Blending recent pattern with your target"
+
+IF data_points < 3:
+  # Not enough data — use goal directly
+  predicted_value = goal
+  reasoning includes: "Using your target (not enough data yet)"
+
+IF no goals AND no data:
+  # No prediction returned for this type
+```
+
+#### 4.5.4 Schedule Goals UX
+
+A new **Schedule** tab in the bottom navigation bar with a settings-style screen:
+
+- Simple form with labeled inputs for each goal field
+- Each field is optional — caregivers fill in what they care about
+- "Typical values" hints shown as placeholder text (e.g., "2-3 hours" for wake window)
+- Changes save immediately (no save button needed — auto-save with debounce)
+- Brief explanation at the top: "Set your targets and we'll blend them with observed patterns"
+
+### 4.6 Schema Changes
+
+#### 4.6.1 New Types
+
+```graphql
+enum PredictionType {
+  NEXT_FEED
+  NEXT_NAP
+  NEXT_WAKE
+  BEDTIME
 }
 
-func PredictNextFeed(factors PredictionFactors) NextFeedPrediction {
-    // 1. Calculate base interval from recent history
-    avgInterval := calculateAverageInterval(factors.RecentFeedIntervals)
+enum PredictionStatus {
+  OVERDUE       # predicted time has passed, activity not logged (shown for up to 30 min)
+  UPCOMING      # high-confidence, near-term predictions
+  PLANNED       # lower-confidence, further-out predictions (rest of day)
+}
 
-    // 2. Adjust for amount consumed
-    amountAdjustment := calculateAmountAdjustment(factors.LastFeedAmountMl)
+type Prediction {
+  id: ID!
+  activityType: ActivityType!
+  predictionType: PredictionType!
+  predictedTime: DateTime!
+  status: PredictionStatus!
+  confidence: PredictionConfidence      # null for OVERDUE predictions
+  reasoning: String
+  predictedAmountMl: Int                # feed predictions only
+  predictedDurationMinutes: Int         # sleep predictions only
+}
 
-    // 3. Adjust for time of day
-    timeOfDayAdjustment := calculateTimeOfDayAdjustment(factors.TimeOfDay)
+type ScheduleGoals {
+  targetWakeWindowMinutes: Int
+  targetFeedIntervalMinutes: Int
+  targetNapCount: Int
+  maxDaytimeNapMinutes: Int
+  targetBedtime: String
+  targetWakeTime: String
+}
 
-    // 4. Adjust for sleep state
-    sleepAdjustment := calculateSleepAdjustment(
-        factors.IsCurrentlySleeping,
-        factors.SleepStartTime
-    )
-
-    // 5. Combine adjustments
-    finalInterval := avgInterval + amountAdjustment + timeOfDayAdjustment + sleepAdjustment
-
-    // 6. Calculate confidence
-    confidence := calculateConfidence(factors)
-
-    // 7. Generate reasoning
-    reasoning := generateReasoning(factors, finalInterval)
-
-    return NextFeedPrediction{
-        PredictedTime: factors.LastFeedTime.Add(finalInterval),
-        Confidence: confidence,
-        Reasoning: reasoning,
-    }
+input ScheduleGoalsInput {
+  targetWakeWindowMinutes: Int
+  targetFeedIntervalMinutes: Int
+  targetNapCount: Int
+  maxDaytimeNapMinutes: Int
+  targetBedtime: String
+  targetWakeTime: String
 }
 ```
 
-### 4.2 Adjustment Rules
+#### 4.6.2 Query/Mutation Changes
 
-#### Amount-Based Adjustment
+```graphql
+type Query {
+  predictions: [Prediction!]!           # replaces predictNextFeed
+  scheduleGoals: ScheduleGoals          # Phase 2
+}
 
-```
-< 50ml  → -30 minutes (hungry sooner)
-50-70ml → -15 minutes
-70-90ml → no adjustment (baseline)
-> 90ml  → +30 minutes (full belly)
-```
-
-#### Time-of-Day Adjustment
-
-```
-Daytime (6am - 10pm):
-  - Standard 3-hour baseline
-
-Night (10pm - 6am):
-  - First night feed: +1 hour (cluster feed pattern)
-  - After midnight: +2 hours (longer stretch)
-  - Early morning (4-6am): -30 min (hungry before wake)
-```
-
-#### Sleep-State Adjustment
-
-```
-If currently sleeping:
-  - Sleep < 1 hour: no adjustment
-  - Sleep 1-3 hours: +30 minutes
-  - Sleep 3-6 hours: +1 hour
-  - Sleep > 6 hours: don't adjust (will wake when ready)
-
-If just woke up (< 15 min ago):
-  - -15 minutes (hungry after nap)
-```
-
-### 4.3 Confidence Calculation
-
-```go
-func calculateConfidence(factors PredictionFactors) PredictionConfidence {
-    score := 100
-
-    // Reduce confidence if:
-    // - Less than 5 recent feeds
-    if len(factors.RecentFeedIntervals) < 5 {
-        score -= 20
-    }
-
-    // - High variance in intervals
-    variance := calculateVariance(factors.RecentFeedIntervals)
-    if variance > 30*time.Minute {
-        score -= 20
-    }
-
-    // - Currently sleeping (unpredictable wake time)
-    if factors.IsCurrentlySleeping {
-        score -= 15
-    }
-
-    // - Unusual feed amount
-    if factors.LastFeedAmountMl < 40 || factors.LastFeedAmountMl > 120 {
-        score -= 10
-    }
-
-    if score >= 80 { return HIGH }
-    if score >= 60 { return MEDIUM }
-    return LOW
+type Mutation {
+  updateScheduleGoals(input: ScheduleGoalsInput!): ScheduleGoals!  # Phase 2
 }
 ```
+
+The existing `predictNextFeed` query will be removed and replaced by `predictions`.
+
+#### 4.6.3 Prediction Status Rules
+
+The backend assigns `PredictionStatus` to each prediction:
+
+- **OVERDUE:** `predictedTime` is in the past and no matching activity has been logged. Shown for up to 30 minutes past the predicted time, then dropped. CTA on the frontend: "Log Activity" (navigates to Log Activity screen, same as `+` button). Exception: `NEXT_WAKE` overdue navigates to the activity detail to "Mark as Awake" instead.
+- **UPCOMING:** `predictedTime` is in the future and the prediction is based directly on observed data (not chained from other predictions). These are the high-confidence, near-term events.
+- **PLANNED:** `predictedTime` is in the future but the prediction is chained (derived from other predictions rather than actual logged events). These are the "rest of day" approximate events.
+
+`confidence` is set to `null` for OVERDUE predictions (it's no longer relevant). For UPCOMING/PLANNED, confidence is calculated per the algorithm in Section 4.4.3.
+
+#### 4.6.4 Database Changes (Phase 2)
+
+New table for schedule goals:
+
+```sql
+CREATE TABLE schedule_goals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  family_id UUID NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+  target_wake_window_minutes INT,
+  target_feed_interval_minutes INT,
+  target_nap_count INT,
+  max_daytime_nap_minutes INT,
+  target_bedtime VARCHAR(5),       -- "HH:MM" format
+  target_wake_time VARCHAR(5),     -- "HH:MM" format
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE(family_id)
+);
+```
+
+### 4.7 Real Data Patterns (Reya, ~6 months old, as of March 2026)
+
+For reference, these are the observed patterns that informed this design:
+
+| Metric | Observed Value |
+|--------|---------------|
+| Daytime feed interval | median 4.5 hrs |
+| Feed amount (formula) | avg 160ml, range 100-220ml |
+| Bedtime | 23:00-23:30 (very consistent) |
+| Morning wake | 6:30-7:15am (but logged as late as 13:00 due to delayed logging) |
+| Daytime nap duration | avg 60 min, range 30-121 min |
+| Wake windows | 2.5-3.5 hrs (with noisy outliers) |
+| Overnight sleep | ~7-8 hrs actual |
+| Naps per day | 2-3 |
+| Solids | being introduced, no amounts tracked |
+
+Schedule evolution over 6 months:
+- 0-3 months: frequent feeds, no sleep training
+- 3-5 months: ~120ml every 3-3.5 hrs daytime, 150ml every 4 hrs night
+- 5-6 months: 160-180ml every 4 hrs
+- 6+ months: 200-210ml every 4-4.5 hrs, 2.5hr wake windows, sleep training active
 
 ---
 
