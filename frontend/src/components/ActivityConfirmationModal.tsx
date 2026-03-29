@@ -13,7 +13,7 @@ import { Utensils, Droplets, Moon } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 
-interface ParsedActivity {
+export interface ParsedActivity {
   activityType: string;
   feedDetails?: {
     startTime: string;

@@ -63,6 +63,12 @@ jest.mock('../screens/CurrentSessionDetailScreen', () => ({
 jest.mock('../screens/SessionDetailScreen', () => ({
   SessionDetailScreen: () => null,
 }));
+jest.mock('../screens/LogActivityScreen', () => ({
+  LogActivityScreen: () => null,
+}));
+jest.mock('../screens/UpcomingScreen', () => ({
+  UpcomingScreen: () => null,
+}));
 jest.mock('../components/CustomHeader', () => ({
   CustomHeader: () => null,
 }));
