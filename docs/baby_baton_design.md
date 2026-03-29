@@ -1053,7 +1053,7 @@ export const getCaregiverColor = (caregiverId: string) => { ... };
 │  Emma's Baton            [Mo] → │
 ├─────────────────────────────────┤
 │                                 │
-│  🔮 Next Feed Prediction     >  │
+│  🗓️ Next Feed Prediction     >  │
 │  ┌─────────────────────────────┐│
 │  │  ░░░░░ gradient card ░░░░░  ││
 │  │  Upcoming Feed              ││
@@ -1910,7 +1910,7 @@ App Launch → Check auth
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        HEADER BAR                               │
-│  [+]           Baby's Name Baton              [🔮]             │
+│  [+]           Baby's Name Baton              [🗓️]             │
 │  Log Activity                                 Upcoming          │
 │  (navigates to                                (navigates to     │
 │   LogActivityScreen)                           UpcomingScreen)   │
@@ -1954,7 +1954,7 @@ Main App (Tab Navigator)
 │   ├── Tap Voice Input → VoiceInputModal → ActivityConfirmationModal → save
 │   └── Tap activity icon (Feed/Diaper/Sleep) → Activity form → save
 │
-└── [🔮] Header Button → UpcomingScreen [NEW]
+└── [🗓️] Header Button → UpcomingScreen [NEW]
     └── (leaf screen, no further navigation)
 ```
 
@@ -1964,7 +1964,7 @@ Main App (Tab Navigator)
 
 ```
 ┌──────────────────────────────────┐
-│ [+]    Emma's Baton        [🔮] │
+│ [+]    Emma's Baton        [🗓️] │
 ├──────────────────────────────────┤
 │                                  │
 │  🍼 Last feed: 45m ago          │
@@ -2040,7 +2040,7 @@ Sleep (active — green border + pulsing 💤):
 - Ended sleep: normal border, shows final duration
 
 **What's removed from dashboard:**
-- PredictionCard (replaced by 🔮 Upcoming screen)
+- PredictionCard (replaced by 🗓️ Upcoming screen)
 - Recent Care Sessions section (replaced by History tab)
 - Bottom sticky Voice/Manual bar (replaced by [+] header button)
 
@@ -2078,7 +2078,7 @@ Accessed via [+] button in header. Replaces the old Voice/Manual bottom bar.
 
 #### 18.3.3 Upcoming Screen — NEW
 
-Accessed via [🔮] button in header. Replaces PredictionDetailScreen.
+Accessed via [🗓️] button in header. Replaces PredictionDetailScreen.
 
 ```
 ┌──────────────────────────────────┐
@@ -2116,7 +2116,7 @@ Accessed via [🔮] button in header. Replaces PredictionDetailScreen.
 2. **PREDICTIONS** — AI-generated predictions (feed, sleep). Shows predicted time, reasoning, confidence.
 3. **SCHEDULED** — Calendar events (vaccinations, appointments). Future feature — section is empty/hidden for MVP.
 
-**🔮 Header icon behavior:**
+**🗓️ Header icon behavior:**
 - Shows a red dot badge when any prediction is within ~10 minutes (Needs Attention threshold)
 - Red dot disappears once the predicted time passes or a relevant activity is logged
 - Tapping always opens the full Upcoming screen regardless of badge state
@@ -2391,8 +2391,8 @@ These screens are not modified in the UI refresh. Mocked here for completeness.
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| `CustomHeader` | **Modified** | Remove avatar. Add [+] left and [🔮] right icons with red dot badge |
-| `PredictionCard` | **Removed** | Replaced by 🔮 Upcoming screen |
+| `CustomHeader` | **Modified** | Remove avatar. Add [+] left and [🗓️] right icons with red dot badge |
+| `PredictionCard` | **Removed** | Replaced by 🗓️ Upcoming screen |
 | `RecentSessionCard` | **Removed** | Replaced by History tab |
 | `CurrentSessionCard` | **Removed** | Replaced by activity grid on dashboard |
 | `ManualEntryModal` | **Modified** | Forms reused in LogActivityScreen; modal wrapper may be removed |
@@ -2483,18 +2483,18 @@ Convert the flat stack navigator to a tab navigator (Home, History, Profile) wit
 
 ---
 
-**Task 2: Redesign CustomHeader with [+] and [🔮] icons**
+**Task 2: Redesign CustomHeader with [+] and [🗓️] icons**
 
-Replace the caregiver avatar in CustomHeader with [+] on the left and [🔮] on the right. The [+] navigates to LogActivityScreen (placeholder for now). The [🔮] navigates to UpcomingScreen (placeholder for now). Add red dot badge support on the 🔮 icon.
+Replace the caregiver avatar in CustomHeader with [+] on the left and [🗓️] on the right. The [+] navigates to LogActivityScreen (placeholder for now). The [🗓️] navigates to UpcomingScreen (placeholder for now). Add red dot badge support on the 🗓️ icon.
 
 *Files to modify:*
-- `frontend/src/components/CustomHeader.tsx` — replace avatar with + and 🔮 icons
+- `frontend/src/components/CustomHeader.tsx` — replace avatar with + and 🗓️ icons
 - `frontend/src/navigation/AppNavigator.tsx` — add LogActivity and Upcoming routes to stack
 
 *Acceptance criteria:*
 - [+] button on left side of header, tappable, navigates to LogActivityScreen (can be empty placeholder)
-- [🔮] icon on right side of header, tappable, navigates to UpcomingScreen (can be empty placeholder)
-- Red dot badge on 🔮 when prediction `minutesUntilFeed` is ≤ 10 (use existing prediction query data)
+- [🗓️] icon on right side of header, tappable, navigates to UpcomingScreen (can be empty placeholder)
+- Red dot badge on 🗓️ when prediction `minutesUntilFeed` is ≤ 10 (use existing prediction query data)
 - Baby name title remains centered
 - Avatar removed from header (settings now accessed via Profile tab)
 - Back button still works on pushed screens
@@ -2596,7 +2596,7 @@ Create the new Log Activity screen with voice input button and activity type ico
 
 **Task 7: Build UpcomingScreen**
 
-Create the Upcoming screen with urgency-based sections. Accessed via [🔮] header button.
+Create the Upcoming screen with urgency-based sections. Accessed via [🗓️] header button.
 
 *Files to create:*
 - `frontend/src/screens/UpcomingScreen.tsx`
