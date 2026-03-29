@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { StackHeaderProps } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@apollo/client/react';
 import { Plus, Calendar } from 'lucide-react-native';
 import { useAuth } from '../hooks/useAuth';
 import { spacing } from '../theme/spacing';
 import { colors } from '../theme/colors';
 import { GetPredictionDocument } from '../types/__generated__/graphql';
+import predictionReadService from '../services/predictionReadService';
 
 const ICON_SIZE = 24;
 
@@ -21,8 +23,19 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
     skip: !isDashboard,
   });
 
-  const minutesUntilFeed = predictionData?.predictNextFeed?.minutesUntilFeed;
-  const showBadge = typeof minutesUntilFeed === 'number' && minutesUntilFeed <= 10;
+  const predictedTime = predictionData?.predictNextFeed?.predictedTime ?? null;
+
+  const [hasUnread, setHasUnread] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isDashboard) {
+        predictionReadService.hasAnyUnread(predictedTime).then(setHasUnread);
+      }
+    }, [isDashboard, predictedTime])
+  );
+
+  const showBadge = hasUnread;
 
   const handleBackPress = () => {
     navigation.goBack();
