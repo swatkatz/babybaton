@@ -164,6 +164,12 @@ func (m *mockStore) DismissPrediction(ctx context.Context, id uuid.UUID) error {
 func (m *mockStore) CleanupOldPredictions(ctx context.Context, olderThan time.Time) error {
 	return nil
 }
+func (m *mockStore) GetScheduleGoals(ctx context.Context, familyID uuid.UUID) (*domain.ScheduleGoals, error) {
+	return nil, nil
+}
+func (m *mockStore) UpsertScheduleGoals(ctx context.Context, familyID uuid.UUID, goals *domain.ScheduleGoals) (*domain.ScheduleGoals, error) {
+	return goals, nil
+}
 func (m *mockStore) Close() error { return nil }
 
 // ==================== Legacy AuthMiddleware Tests ====================

@@ -160,6 +160,7 @@ type ComplexityRoot struct {
 		StartCareSession    func(childComplexity int) int
 		UpdateActivity      func(childComplexity int, activityID string, input model.ActivityInput) int
 		UpdateBabyName      func(childComplexity int, babyName string) int
+		UpdateScheduleGoals func(childComplexity int, input model.ScheduleGoalsInput) int
 	}
 
 	ParsedActivity struct {
@@ -200,6 +201,16 @@ type ComplexityRoot struct {
 		GetMyFamily              func(childComplexity int) int
 		GetRecentCareSessions    func(childComplexity int, limit *int32) int
 		Predictions              func(childComplexity int) int
+		ScheduleGoals            func(childComplexity int) int
+	}
+
+	ScheduleGoals struct {
+		MaxDaytimeNapMinutes      func(childComplexity int) int
+		TargetBedtime             func(childComplexity int) int
+		TargetFeedIntervalMinutes func(childComplexity int) int
+		TargetNapCount            func(childComplexity int) int
+		TargetWakeTime            func(childComplexity int) int
+		TargetWakeWindowMinutes   func(childComplexity int) int
 	}
 
 	SleepActivity struct {
@@ -231,6 +242,7 @@ type MutationResolver interface {
 	DeleteActivity(ctx context.Context, activityID string) (bool, error)
 	UpdateActivity(ctx context.Context, activityID string, input model.ActivityInput) (model.Activity, error)
 	DismissPrediction(ctx context.Context, id string) (bool, error)
+	UpdateScheduleGoals(ctx context.Context, input model.ScheduleGoalsInput) (*model.ScheduleGoals, error)
 }
 type QueryResolver interface {
 	CheckFamilyNameAvailable(ctx context.Context, name string) (bool, error)
@@ -243,6 +255,7 @@ type QueryResolver interface {
 	GetBabyStatus(ctx context.Context) (*model.BabyStatus, error)
 	GetCareSessionHistory(ctx context.Context, first int32, after *string) (*model.CareSessionConnection, error)
 	Predictions(ctx context.Context) ([]*model.Prediction, error)
+	ScheduleGoals(ctx context.Context) (*model.ScheduleGoals, error)
 }
 
 type executableSchema struct {
@@ -770,6 +783,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.UpdateBabyName(childComplexity, args["babyName"].(string)), true
+	case "Mutation.updateScheduleGoals":
+		if e.complexity.Mutation.UpdateScheduleGoals == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateScheduleGoals_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateScheduleGoals(childComplexity, args["input"].(model.ScheduleGoalsInput)), true
 
 	case "ParsedActivity.activityType":
 		if e.complexity.ParsedActivity.ActivityType == nil {
@@ -962,6 +986,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Predictions(childComplexity), true
+	case "Query.scheduleGoals":
+		if e.complexity.Query.ScheduleGoals == nil {
+			break
+		}
+
+		return e.complexity.Query.ScheduleGoals(childComplexity), true
+
+	case "ScheduleGoals.maxDaytimeNapMinutes":
+		if e.complexity.ScheduleGoals.MaxDaytimeNapMinutes == nil {
+			break
+		}
+
+		return e.complexity.ScheduleGoals.MaxDaytimeNapMinutes(childComplexity), true
+	case "ScheduleGoals.targetBedtime":
+		if e.complexity.ScheduleGoals.TargetBedtime == nil {
+			break
+		}
+
+		return e.complexity.ScheduleGoals.TargetBedtime(childComplexity), true
+	case "ScheduleGoals.targetFeedIntervalMinutes":
+		if e.complexity.ScheduleGoals.TargetFeedIntervalMinutes == nil {
+			break
+		}
+
+		return e.complexity.ScheduleGoals.TargetFeedIntervalMinutes(childComplexity), true
+	case "ScheduleGoals.targetNapCount":
+		if e.complexity.ScheduleGoals.TargetNapCount == nil {
+			break
+		}
+
+		return e.complexity.ScheduleGoals.TargetNapCount(childComplexity), true
+	case "ScheduleGoals.targetWakeTime":
+		if e.complexity.ScheduleGoals.TargetWakeTime == nil {
+			break
+		}
+
+		return e.complexity.ScheduleGoals.TargetWakeTime(childComplexity), true
+	case "ScheduleGoals.targetWakeWindowMinutes":
+		if e.complexity.ScheduleGoals.TargetWakeWindowMinutes == nil {
+			break
+		}
+
+		return e.complexity.ScheduleGoals.TargetWakeWindowMinutes(childComplexity), true
 
 	case "SleepActivity.activityType":
 		if e.complexity.SleepActivity.ActivityType == nil {
@@ -1024,6 +1091,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputActivityInput,
 		ec.unmarshalInputDiaperDetailsInput,
 		ec.unmarshalInputFeedDetailsInput,
+		ec.unmarshalInputScheduleGoalsInput,
 		ec.unmarshalInputSleepDetailsInput,
 	)
 	first := true
@@ -1291,6 +1359,24 @@ type Prediction {
   careSessionId: ID
 }
 
+type ScheduleGoals {
+  targetWakeWindowMinutes: Int
+  targetFeedIntervalMinutes: Int
+  targetNapCount: Int
+  maxDaytimeNapMinutes: Int
+  targetBedtime: String
+  targetWakeTime: String
+}
+
+input ScheduleGoalsInput {
+  targetWakeWindowMinutes: Int
+  targetFeedIntervalMinutes: Int
+  targetNapCount: Int
+  maxDaytimeNapMinutes: Int
+  targetBedtime: String
+  targetWakeTime: String
+}
+
 # Simple wrapper without id/createdAt
 type ParsedActivity {
   activityType: ActivityType!
@@ -1363,6 +1449,9 @@ type Query {
 
   # Predictions
   predictions: [Prediction!]!
+
+  # Schedule Goals
+  scheduleGoals: ScheduleGoals
 }
 
 # Mutations
@@ -1408,6 +1497,9 @@ type Mutation {
 
   # Predictions
   dismissPrediction(id: ID!): Boolean!
+
+  # Schedule Goals
+  updateScheduleGoals(input: ScheduleGoalsInput!): ScheduleGoals!
 }
 `, BuiltIn: false},
 }
@@ -1590,6 +1682,17 @@ func (ec *executionContext) field_Mutation_updateBabyName_args(ctx context.Conte
 		return nil, err
 	}
 	args["babyName"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateScheduleGoals_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNScheduleGoalsInput2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐScheduleGoalsInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -4232,6 +4335,61 @@ func (ec *executionContext) fieldContext_Mutation_dismissPrediction(ctx context.
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_updateScheduleGoals(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updateScheduleGoals,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UpdateScheduleGoals(ctx, fc.Args["input"].(model.ScheduleGoalsInput))
+		},
+		nil,
+		ec.marshalNScheduleGoals2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐScheduleGoals,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateScheduleGoals(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "targetWakeWindowMinutes":
+				return ec.fieldContext_ScheduleGoals_targetWakeWindowMinutes(ctx, field)
+			case "targetFeedIntervalMinutes":
+				return ec.fieldContext_ScheduleGoals_targetFeedIntervalMinutes(ctx, field)
+			case "targetNapCount":
+				return ec.fieldContext_ScheduleGoals_targetNapCount(ctx, field)
+			case "maxDaytimeNapMinutes":
+				return ec.fieldContext_ScheduleGoals_maxDaytimeNapMinutes(ctx, field)
+			case "targetBedtime":
+				return ec.fieldContext_ScheduleGoals_targetBedtime(ctx, field)
+			case "targetWakeTime":
+				return ec.fieldContext_ScheduleGoals_targetWakeTime(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ScheduleGoals", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateScheduleGoals_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ParsedActivity_activityType(ctx context.Context, field graphql.CollectedField, obj *model.ParsedActivity) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5276,6 +5434,49 @@ func (ec *executionContext) fieldContext_Query_predictions(_ context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_scheduleGoals(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_scheduleGoals,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().ScheduleGoals(ctx)
+		},
+		nil,
+		ec.marshalOScheduleGoals2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐScheduleGoals,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_scheduleGoals(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "targetWakeWindowMinutes":
+				return ec.fieldContext_ScheduleGoals_targetWakeWindowMinutes(ctx, field)
+			case "targetFeedIntervalMinutes":
+				return ec.fieldContext_ScheduleGoals_targetFeedIntervalMinutes(ctx, field)
+			case "targetNapCount":
+				return ec.fieldContext_ScheduleGoals_targetNapCount(ctx, field)
+			case "maxDaytimeNapMinutes":
+				return ec.fieldContext_ScheduleGoals_maxDaytimeNapMinutes(ctx, field)
+			case "targetBedtime":
+				return ec.fieldContext_ScheduleGoals_targetBedtime(ctx, field)
+			case "targetWakeTime":
+				return ec.fieldContext_ScheduleGoals_targetWakeTime(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ScheduleGoals", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5379,6 +5580,180 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleGoals_targetWakeWindowMinutes(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleGoals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleGoals_targetWakeWindowMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.TargetWakeWindowMinutes, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint32,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleGoals_targetWakeWindowMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleGoals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleGoals_targetFeedIntervalMinutes(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleGoals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleGoals_targetFeedIntervalMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.TargetFeedIntervalMinutes, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint32,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleGoals_targetFeedIntervalMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleGoals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleGoals_targetNapCount(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleGoals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleGoals_targetNapCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TargetNapCount, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint32,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleGoals_targetNapCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleGoals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleGoals_maxDaytimeNapMinutes(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleGoals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleGoals_maxDaytimeNapMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.MaxDaytimeNapMinutes, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint32,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleGoals_maxDaytimeNapMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleGoals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleGoals_targetBedtime(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleGoals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleGoals_targetBedtime,
+		func(ctx context.Context) (any, error) {
+			return obj.TargetBedtime, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleGoals_targetBedtime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleGoals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleGoals_targetWakeTime(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleGoals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleGoals_targetWakeTime,
+		func(ctx context.Context) (any, error) {
+			return obj.TargetWakeTime, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleGoals_targetWakeTime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleGoals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7230,6 +7605,68 @@ func (ec *executionContext) unmarshalInputFeedDetailsInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputScheduleGoalsInput(ctx context.Context, obj any) (model.ScheduleGoalsInput, error) {
+	var it model.ScheduleGoalsInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"targetWakeWindowMinutes", "targetFeedIntervalMinutes", "targetNapCount", "maxDaytimeNapMinutes", "targetBedtime", "targetWakeTime"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "targetWakeWindowMinutes":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("targetWakeWindowMinutes"))
+			data, err := ec.unmarshalOInt2ᚖint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TargetWakeWindowMinutes = data
+		case "targetFeedIntervalMinutes":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("targetFeedIntervalMinutes"))
+			data, err := ec.unmarshalOInt2ᚖint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TargetFeedIntervalMinutes = data
+		case "targetNapCount":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("targetNapCount"))
+			data, err := ec.unmarshalOInt2ᚖint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TargetNapCount = data
+		case "maxDaytimeNapMinutes":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxDaytimeNapMinutes"))
+			data, err := ec.unmarshalOInt2ᚖint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxDaytimeNapMinutes = data
+		case "targetBedtime":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("targetBedtime"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TargetBedtime = data
+		case "targetWakeTime":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("targetWakeTime"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TargetWakeTime = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputSleepDetailsInput(ctx context.Context, obj any) (model.SleepDetailsInput, error) {
 	var it model.SleepDetailsInput
 	asMap := map[string]any{}
@@ -8091,6 +8528,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateScheduleGoals":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateScheduleGoals(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8506,6 +8950,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "scheduleGoals":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_scheduleGoals(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -8514,6 +8977,52 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var scheduleGoalsImplementors = []string{"ScheduleGoals"}
+
+func (ec *executionContext) _ScheduleGoals(ctx context.Context, sel ast.SelectionSet, obj *model.ScheduleGoals) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, scheduleGoalsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ScheduleGoals")
+		case "targetWakeWindowMinutes":
+			out.Values[i] = ec._ScheduleGoals_targetWakeWindowMinutes(ctx, field, obj)
+		case "targetFeedIntervalMinutes":
+			out.Values[i] = ec._ScheduleGoals_targetFeedIntervalMinutes(ctx, field, obj)
+		case "targetNapCount":
+			out.Values[i] = ec._ScheduleGoals_targetNapCount(ctx, field, obj)
+		case "maxDaytimeNapMinutes":
+			out.Values[i] = ec._ScheduleGoals_maxDaytimeNapMinutes(ctx, field, obj)
+		case "targetBedtime":
+			out.Values[i] = ec._ScheduleGoals_targetBedtime(ctx, field, obj)
+		case "targetWakeTime":
+			out.Values[i] = ec._ScheduleGoals_targetWakeTime(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -9563,6 +10072,25 @@ func (ec *executionContext) marshalNPredictionType2githubᚗcomᚋswatkatzᚋbab
 	return v
 }
 
+func (ec *executionContext) marshalNScheduleGoals2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐScheduleGoals(ctx context.Context, sel ast.SelectionSet, v model.ScheduleGoals) graphql.Marshaler {
+	return ec._ScheduleGoals(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNScheduleGoals2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐScheduleGoals(ctx context.Context, sel ast.SelectionSet, v *model.ScheduleGoals) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ScheduleGoals(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNScheduleGoalsInput2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐScheduleGoalsInput(ctx context.Context, v any) (model.ScheduleGoalsInput, error) {
+	res, err := ec.unmarshalInputScheduleGoalsInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -10044,6 +10572,13 @@ func (ec *executionContext) marshalOPredictionConfidence2ᚖgithubᚗcomᚋswatk
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOScheduleGoals2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐScheduleGoals(ctx context.Context, sel ast.SelectionSet, v *model.ScheduleGoals) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ScheduleGoals(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOSleepActivity2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐSleepActivity(ctx context.Context, sel ast.SelectionSet, v *model.SleepActivity) graphql.Marshaler {

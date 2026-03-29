@@ -141,6 +141,19 @@ const (
 	PredictionConfidenceLow    PredictionConfidence = "low"
 )
 
+type ScheduleGoals struct {
+	ID                        uuid.UUID
+	FamilyID                  uuid.UUID
+	TargetWakeWindowMinutes   *int
+	TargetFeedIntervalMinutes *int
+	TargetNapCount            *int
+	MaxDaytimeNapMinutes      *int
+	TargetBedtime             *string
+	TargetWakeTime            *string
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+}
+
 type Prediction struct {
 	ID                       uuid.UUID
 	FamilyID                 uuid.UUID

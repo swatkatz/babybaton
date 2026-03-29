@@ -167,6 +167,24 @@ type Prediction {
   careSessionId: ID
 }
 
+type ScheduleGoals {
+  targetWakeWindowMinutes: Int
+  targetFeedIntervalMinutes: Int
+  targetNapCount: Int
+  maxDaytimeNapMinutes: Int
+  targetBedtime: String
+  targetWakeTime: String
+}
+
+input ScheduleGoalsInput {
+  targetWakeWindowMinutes: Int
+  targetFeedIntervalMinutes: Int
+  targetNapCount: Int
+  maxDaytimeNapMinutes: Int
+  targetBedtime: String
+  targetWakeTime: String
+}
+
 # Simple wrapper without id/createdAt
 type ParsedActivity {
   activityType: ActivityType!
@@ -239,6 +257,9 @@ type Query {
 
   # Predictions
   predictions: [Prediction!]!
+
+  # Schedule Goals
+  scheduleGoals: ScheduleGoals
 }
 
 # Mutations
@@ -284,4 +305,7 @@ type Mutation {
 
   # Predictions
   dismissPrediction(id: ID!): Boolean!
+
+  # Schedule Goals
+  updateScheduleGoals(input: ScheduleGoalsInput!): ScheduleGoals!
 }
