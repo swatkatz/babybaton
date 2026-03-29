@@ -28,6 +28,12 @@ type AuthResult struct {
 	Error     *string    `json:"error,omitempty"`
 }
 
+type BabyStatus struct {
+	LastFeed   *FeedActivity   `json:"lastFeed,omitempty"`
+	LastDiaper *DiaperActivity `json:"lastDiaper,omitempty"`
+	LastSleep  *SleepActivity  `json:"lastSleep,omitempty"`
+}
+
 type CareSession struct {
 	ID          string              `json:"id"`
 	Caregiver   *Caregiver          `json:"caregiver"`

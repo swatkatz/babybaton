@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -82,6 +83,36 @@ func (s *PostgresStore) GetActivitiesForSession(ctx context.Context, sessionID u
 	}
 
 	return activities, nil
+}
+
+// GetLatestActivityByTypeForFamily returns the most recent activity of a given type
+// across all sessions for a family. Returns (nil, nil) if no matching activity exists.
+func (s *PostgresStore) GetLatestActivityByTypeForFamily(ctx context.Context, familyID uuid.UUID, activityType domain.ActivityType) (*domain.Activity, error) {
+	activity := &domain.Activity{}
+
+	err := s.db.QueryRowContext(ctx, `
+		SELECT a.id, a.care_session_id, a.activity_type, a.created_at, a.updated_at
+		FROM activities a
+		JOIN care_sessions cs ON a.care_session_id = cs.id
+		WHERE cs.family_id = $1 AND a.activity_type = $2
+		ORDER BY a.created_at DESC
+		LIMIT 1
+	`, familyID, activityType).Scan(
+		&activity.ID,
+		&activity.CareSessionID,
+		&activity.ActivityType,
+		&activity.CreatedAt,
+		&activity.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest activity by type: %w", err)
+	}
+
+	return activity, nil
 }
 
 // DeleteActivity deletes an activity (cascades to activity details)

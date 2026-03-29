@@ -1023,6 +1023,72 @@ func (r *queryResolver) GetCareSession(ctx context.Context, id string) (*model.C
 	return r.loadCareSessionWithActivities(ctx, session)
 }
 
+// GetBabyStatus is the resolver for the getBabyStatus field.
+func (r *queryResolver) GetBabyStatus(ctx context.Context) (*model.BabyStatus, error) {
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	status := &model.BabyStatus{}
+
+	// Get latest feed
+	feedActivity, err := r.store.GetLatestActivityByTypeForFamily(ctx, familyID, domain.ActivityTypeFeed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest feed: %w", err)
+	}
+	if feedActivity != nil {
+		feedDetails, err := r.store.GetFeedDetails(ctx, feedActivity.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get feed details: %w", err)
+		}
+		status.LastFeed = &model.FeedActivity{
+			ID:           feedActivity.ID.String(),
+			ActivityType: model.ActivityTypeFeed,
+			CreatedAt:    feedActivity.CreatedAt,
+			FeedDetails:  mapper.FeedDetailsToGraphQL(feedDetails),
+		}
+	}
+
+	// Get latest diaper
+	diaperActivity, err := r.store.GetLatestActivityByTypeForFamily(ctx, familyID, domain.ActivityTypeDiaper)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest diaper: %w", err)
+	}
+	if diaperActivity != nil {
+		diaperDetails, err := r.store.GetDiaperDetails(ctx, diaperActivity.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get diaper details: %w", err)
+		}
+		status.LastDiaper = &model.DiaperActivity{
+			ID:           diaperActivity.ID.String(),
+			ActivityType: model.ActivityTypeDiaper,
+			CreatedAt:    diaperActivity.CreatedAt,
+			DiaperDetails: mapper.DiaperDetailsToGraphQL(diaperDetails),
+		}
+	}
+
+	// Get latest sleep
+	sleepActivity, err := r.store.GetLatestActivityByTypeForFamily(ctx, familyID, domain.ActivityTypeSleep)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest sleep: %w", err)
+	}
+	if sleepActivity != nil {
+		sleepDetails, err := r.store.GetSleepDetails(ctx, sleepActivity.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sleep details: %w", err)
+		}
+		status.LastSleep = &model.SleepActivity{
+			ID:           sleepActivity.ID.String(),
+			ActivityType: model.ActivityTypeSleep,
+			CreatedAt:    sleepActivity.CreatedAt,
+			SleepDetails: mapper.SleepDetailsToGraphQL(sleepDetails),
+		}
+	}
+
+	return status, nil
+}
+
 // PredictNextFeed is the resolver for the predictNextFeed field.
 func (r *queryResolver) PredictNextFeed(ctx context.Context) (*model.NextFeedPrediction, error) {
 	return GetMockPrediction(), nil

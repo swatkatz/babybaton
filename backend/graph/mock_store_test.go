@@ -29,6 +29,12 @@ type mockStore struct {
 	caregiverByUserAndFamily      *domain.Caregiver
 	getCaregiverByUserAndFamilyErr error
 
+	// Baby status
+	latestActivityByType map[domain.ActivityType]*domain.Activity
+	feedDetails          *domain.FeedDetails
+	diaperDetails        *domain.DiaperDetails
+	sleepDetails         *domain.SleepDetails
+
 	// Tracking calls
 	lastCreatedCaregiver      *domain.Caregiver
 	linkCaregiverToUserCalled bool
@@ -156,11 +162,22 @@ func (m *mockStore) GetActivityByID(_ context.Context, _ uuid.UUID) (*domain.Act
 func (m *mockStore) GetActivitiesForSession(_ context.Context, _ uuid.UUID) ([]*domain.Activity, error) {
 	return nil, nil
 }
+func (m *mockStore) GetLatestActivityByTypeForFamily(_ context.Context, _ uuid.UUID, activityType domain.ActivityType) (*domain.Activity, error) {
+	if m.latestActivityByType != nil {
+		if act, ok := m.latestActivityByType[activityType]; ok {
+			return act, nil
+		}
+	}
+	return nil, nil
+}
 func (m *mockStore) DeleteActivity(_ context.Context, _ uuid.UUID) error { return nil }
 
 // Activity detail operations
 func (m *mockStore) CreateFeedDetails(_ context.Context, _ *domain.FeedDetails) error { return nil }
 func (m *mockStore) GetFeedDetails(_ context.Context, _ uuid.UUID) (*domain.FeedDetails, error) {
+	if m.feedDetails != nil {
+		return m.feedDetails, nil
+	}
 	return nil, errNotFound
 }
 func (m *mockStore) GetRecentFeedDetailsForFamily(_ context.Context, _ uuid.UUID, _ int) ([]*domain.FeedDetails, error) {
@@ -172,6 +189,9 @@ func (m *mockStore) CreateDiaperDetails(_ context.Context, _ *domain.DiaperDetai
 	return nil
 }
 func (m *mockStore) GetDiaperDetails(_ context.Context, _ uuid.UUID) (*domain.DiaperDetails, error) {
+	if m.diaperDetails != nil {
+		return m.diaperDetails, nil
+	}
 	return nil, errNotFound
 }
 func (m *mockStore) UpdateDiaperDetails(_ context.Context, _ *domain.DiaperDetails) error {
@@ -180,6 +200,9 @@ func (m *mockStore) UpdateDiaperDetails(_ context.Context, _ *domain.DiaperDetai
 
 func (m *mockStore) CreateSleepDetails(_ context.Context, _ *domain.SleepDetails) error { return nil }
 func (m *mockStore) GetSleepDetails(_ context.Context, _ uuid.UUID) (*domain.SleepDetails, error) {
+	if m.sleepDetails != nil {
+		return m.sleepDetails, nil
+	}
 	return nil, errNotFound
 }
 func (m *mockStore) UpdateSleepDetails(_ context.Context, _ *domain.SleepDetails) error { return nil }
