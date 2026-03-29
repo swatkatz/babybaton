@@ -1061,9 +1061,9 @@ func (r *queryResolver) GetBabyStatus(ctx context.Context) (*model.BabyStatus, e
 			return nil, fmt.Errorf("failed to get diaper details: %w", err)
 		}
 		status.LastDiaper = &model.DiaperActivity{
-			ID:           diaperActivity.ID.String(),
-			ActivityType: model.ActivityTypeDiaper,
-			CreatedAt:    diaperActivity.CreatedAt,
+			ID:            diaperActivity.ID.String(),
+			ActivityType:  model.ActivityTypeDiaper,
+			CreatedAt:     diaperActivity.CreatedAt,
 			DiaperDetails: mapper.DiaperDetailsToGraphQL(diaperDetails),
 		}
 	}
@@ -1087,6 +1087,67 @@ func (r *queryResolver) GetBabyStatus(ctx context.Context) (*model.BabyStatus, e
 	}
 
 	return status, nil
+}
+
+// GetCareSessionHistory is the resolver for the getCareSessionHistory field.
+func (r *queryResolver) GetCareSessionHistory(ctx context.Context, first int32, after *string) (*model.CareSessionConnection, error) {
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	if first <= 0 {
+		return nil, fmt.Errorf("first must be greater than 0")
+	}
+
+	var afterTime *time.Time
+	var afterID *uuid.UUID
+	if after != nil {
+		t, id, err := domain.DecodeCursor(*after)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cursor: %w", err)
+		}
+		afterTime = &t
+		afterID = &id
+	}
+
+	// Fetch first+1 to determine hasNextPage
+	fetchLimit := int(first) + 1
+	sessions, err := r.store.GetCareSessionHistoryForFamily(ctx, familyID, fetchLimit, afterTime, afterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session history: %w", err)
+	}
+
+	hasNextPage := len(sessions) > int(first)
+	if hasNextPage {
+		sessions = sessions[:first]
+	}
+
+	edges := make([]*model.CareSessionEdge, 0, len(sessions))
+	for _, session := range sessions {
+		loaded, err := r.loadCareSessionWithActivities(ctx, session)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load session %s: %w", session.ID, err)
+		}
+		cursor := domain.EncodeCursor(session.StartedAt, session.ID)
+		edges = append(edges, &model.CareSessionEdge{
+			Node:   loaded,
+			Cursor: cursor,
+		})
+	}
+
+	var endCursor *string
+	if len(edges) > 0 {
+		endCursor = &edges[len(edges)-1].Cursor
+	}
+
+	return &model.CareSessionConnection{
+		Edges: edges,
+		PageInfo: &model.CareSessionPageInfo{
+			HasNextPage: hasNextPage,
+			EndCursor:   endCursor,
+		},
+	}, nil
 }
 
 // PredictNextFeed is the resolver for the predictNextFeed field.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
@@ -99,6 +100,63 @@ func (s *PostgresStore) GetRecentCareSessionsForFamily(ctx context.Context, fami
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recent sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []*domain.CareSession
+	for rows.Next() {
+		session := &domain.CareSession{}
+		err := rows.Scan(
+			&session.ID,
+			&session.CaregiverID,
+			&session.FamilyID,
+			&session.Status,
+			&session.StartedAt,
+			&session.CompletedAt,
+			&session.Notes,
+			&session.CreatedAt,
+			&session.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan session: %w", err)
+		}
+		sessions = append(sessions, session)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating sessions: %w", err)
+	}
+
+	return sessions, nil
+}
+
+// GetCareSessionHistoryForFamily retrieves paginated sessions for a family using keyset pagination.
+// Returns all statuses (in_progress + completed), ordered newest first.
+// When afterTime/afterID are provided, returns sessions after that cursor position.
+func (s *PostgresStore) GetCareSessionHistoryForFamily(ctx context.Context, familyID uuid.UUID, limit int, afterTime *time.Time, afterID *uuid.UUID) ([]*domain.CareSession, error) {
+	var rows *sql.Rows
+	var err error
+
+	if afterTime != nil && afterID != nil {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT id, caregiver_id, family_id, status, started_at, completed_at, notes, created_at, updated_at
+			FROM care_sessions
+			WHERE family_id = $1 AND (started_at < $2 OR (started_at = $2 AND id < $3))
+			ORDER BY started_at DESC, id DESC
+			LIMIT $4
+		`, familyID, *afterTime, *afterID, limit)
+	} else {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT id, caregiver_id, family_id, status, started_at, completed_at, notes, created_at, updated_at
+			FROM care_sessions
+			WHERE family_id = $1
+			ORDER BY started_at DESC, id DESC
+			LIMIT $2
+		`, familyID, limit)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query session history: %w", err)
 	}
 	defer rows.Close()
 

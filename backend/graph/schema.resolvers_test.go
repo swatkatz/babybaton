@@ -657,3 +657,137 @@ func TestGetBabyStatus_Unauthenticated(t *testing.T) {
 func testing_time() time.Time {
 	return time.Date(2026, 3, 28, 12, 0, 0, 0, time.UTC)
 }
+
+// ==================== GetCareSessionHistory Tests ====================
+
+func makeTestSessions(familyID, caregiverID uuid.UUID, count int) []*domain.CareSession {
+	now := time.Now().UTC()
+	sessions := make([]*domain.CareSession, count)
+	for i := 0; i < count; i++ {
+		sessions[i] = &domain.CareSession{
+			ID:          uuid.New(),
+			CaregiverID: caregiverID,
+			FamilyID:    familyID,
+			Status:      domain.StatusCompleted,
+			StartedAt:   now.Add(time.Duration(-i) * time.Hour),
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+	}
+	return sessions
+}
+
+func TestGetCareSessionHistory_FirstPage(t *testing.T) {
+	familyID := uuid.New()
+	caregiverID := uuid.New()
+	sessions := makeTestSessions(familyID, caregiverID, 3)
+
+	store := newMockStore()
+	store.caregiverByID = &domain.Caregiver{ID: caregiverID, FamilyID: familyID, Name: "Test"}
+	// Mock returns first+1 = 3 sessions to indicate hasNextPage
+	store.careSessionHistory = sessions
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	result, err := qr.GetCareSessionHistory(ctx, 2, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Edges) != 2 {
+		t.Fatalf("expected 2 edges, got %d", len(result.Edges))
+	}
+	if !result.PageInfo.HasNextPage {
+		t.Error("expected hasNextPage to be true")
+	}
+	if result.PageInfo.EndCursor == nil {
+		t.Error("expected endCursor to be set")
+	}
+}
+
+func TestGetCareSessionHistory_LastPage(t *testing.T) {
+	familyID := uuid.New()
+	caregiverID := uuid.New()
+	sessions := makeTestSessions(familyID, caregiverID, 1)
+
+	store := newMockStore()
+	store.caregiverByID = &domain.Caregiver{ID: caregiverID, FamilyID: familyID, Name: "Test"}
+	store.careSessionHistory = sessions
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	result, err := qr.GetCareSessionHistory(ctx, 2, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Edges) != 1 {
+		t.Fatalf("expected 1 edge, got %d", len(result.Edges))
+	}
+	if result.PageInfo.HasNextPage {
+		t.Error("expected hasNextPage to be false")
+	}
+}
+
+func TestGetCareSessionHistory_EmptyResults(t *testing.T) {
+	familyID := uuid.New()
+	caregiverID := uuid.New()
+
+	store := newMockStore()
+	store.careSessionHistory = []*domain.CareSession{}
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	result, err := qr.GetCareSessionHistory(ctx, 10, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Edges) != 0 {
+		t.Errorf("expected 0 edges, got %d", len(result.Edges))
+	}
+	if result.PageInfo.HasNextPage {
+		t.Error("expected hasNextPage to be false")
+	}
+	if result.PageInfo.EndCursor != nil {
+		t.Error("expected endCursor to be nil")
+	}
+}
+
+func TestGetCareSessionHistory_NotAuthenticated(t *testing.T) {
+	store := newMockStore()
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+	ctx := context.Background() // no auth
+
+	_, err := qr.GetCareSessionHistory(ctx, 10, nil)
+	if err == nil {
+		t.Fatal("expected error for unauthenticated request")
+	}
+}
+
+func TestGetCareSessionHistory_EdgesHaveCursors(t *testing.T) {
+	familyID := uuid.New()
+	caregiverID := uuid.New()
+	sessions := makeTestSessions(familyID, caregiverID, 2)
+
+	store := newMockStore()
+	store.caregiverByID = &domain.Caregiver{ID: caregiverID, FamilyID: familyID, Name: "Test"}
+	store.careSessionHistory = sessions
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	result, err := qr.GetCareSessionHistory(ctx, 10, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for i, edge := range result.Edges {
+		if edge.Cursor == "" {
+			t.Errorf("edge %d has empty cursor", i)
+		}
+		if edge.Node == nil {
+			t.Errorf("edge %d has nil node", i)
+		}
+	}
+}

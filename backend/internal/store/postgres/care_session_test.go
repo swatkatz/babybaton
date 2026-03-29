@@ -156,6 +156,170 @@ func TestCareSessionOperations(t *testing.T) {
 	})
 }
 
+func TestGetCareSessionHistoryForFamily(t *testing.T) {
+	store, err := NewPostgresStore("postgres://postgres:postgres@localhost:5432/baby_baton_test?sslmode=disable")
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+
+	family, caregiver, err := CreateTestFamily(ctx, store)
+	if err != nil {
+		t.Fatalf("Failed to create test family: %v", err)
+	}
+	t.Cleanup(func() {
+		store.DeleteFamily(ctx, family.ID)
+	})
+
+	// Create 5 sessions with distinct timestamps and statuses
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	sessions := make([]*domain.CareSession, 5)
+	for i := 0; i < 5; i++ {
+		status := domain.StatusCompleted
+		var completedAt *time.Time
+		if i == 0 {
+			// newest session is in_progress
+			status = domain.StatusInProgress
+		} else {
+			ct := now.Add(time.Duration(-i) * time.Hour).Add(30 * time.Minute)
+			completedAt = &ct
+		}
+		sessions[i] = &domain.CareSession{
+			ID:          uuid.New(),
+			CaregiverID: caregiver.ID,
+			FamilyID:    family.ID,
+			Status:      status,
+			StartedAt:   now.Add(time.Duration(-i) * time.Hour),
+			CompletedAt: completedAt,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		if err := store.CreateCareSession(ctx, sessions[i]); err != nil {
+			t.Fatalf("Failed to create session %d: %v", i, err)
+		}
+	}
+
+	t.Run("FirstPage", func(t *testing.T) {
+		results, err := store.GetCareSessionHistoryForFamily(ctx, family.ID, 3, nil, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(results) != 3 {
+			t.Fatalf("expected 3 sessions, got %d", len(results))
+		}
+		// Should be newest first (sessions[0] is newest)
+		if results[0].ID != sessions[0].ID {
+			t.Errorf("expected first result to be newest session")
+		}
+	})
+
+	t.Run("NextPage_WithCursor", func(t *testing.T) {
+		// Get first page
+		firstPage, err := store.GetCareSessionHistoryForFamily(ctx, family.ID, 3, nil, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Use last item of first page as cursor
+		lastSession := firstPage[len(firstPage)-1]
+		afterTime := lastSession.StartedAt
+		afterID := lastSession.ID
+
+		secondPage, err := store.GetCareSessionHistoryForFamily(ctx, family.ID, 3, &afterTime, &afterID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(secondPage) != 2 {
+			t.Fatalf("expected 2 sessions on second page, got %d", len(secondPage))
+		}
+
+		// No overlap with first page
+		firstPageIDs := map[uuid.UUID]bool{}
+		for _, s := range firstPage {
+			firstPageIDs[s.ID] = true
+		}
+		for _, s := range secondPage {
+			if firstPageIDs[s.ID] {
+				t.Errorf("session %s appears in both pages", s.ID)
+			}
+		}
+	})
+
+	t.Run("IncludesBothStatuses", func(t *testing.T) {
+		results, err := store.GetCareSessionHistoryForFamily(ctx, family.ID, 10, nil, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		hasInProgress := false
+		hasCompleted := false
+		for _, s := range results {
+			if s.Status == domain.StatusInProgress {
+				hasInProgress = true
+			}
+			if s.Status == domain.StatusCompleted {
+				hasCompleted = true
+			}
+		}
+		if !hasInProgress {
+			t.Error("expected at least one in_progress session")
+		}
+		if !hasCompleted {
+			t.Error("expected at least one completed session")
+		}
+	})
+
+	t.Run("EmptyResults", func(t *testing.T) {
+		nonExistentFamily := uuid.New()
+		results, err := store.GetCareSessionHistoryForFamily(ctx, nonExistentFamily, 10, nil, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(results) != 0 {
+			t.Errorf("expected 0 sessions, got %d", len(results))
+		}
+	})
+
+	t.Run("SingleItemPage", func(t *testing.T) {
+		results, err := store.GetCareSessionHistoryForFamily(ctx, family.ID, 1, nil, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 session, got %d", len(results))
+		}
+		if results[0].ID != sessions[0].ID {
+			t.Errorf("expected newest session")
+		}
+	})
+
+	t.Run("BeyondLastPage", func(t *testing.T) {
+		// Use a cursor that's older than all sessions
+		oldTime := now.Add(-100 * time.Hour)
+		oldID := uuid.New()
+		results, err := store.GetCareSessionHistoryForFamily(ctx, family.ID, 10, &oldTime, &oldID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(results) != 0 {
+			t.Errorf("expected 0 sessions beyond last page, got %d", len(results))
+		}
+	})
+
+	t.Run("OrderIsNewestFirst", func(t *testing.T) {
+		results, err := store.GetCareSessionHistoryForFamily(ctx, family.ID, 10, nil, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		for i := 1; i < len(results); i++ {
+			if results[i].StartedAt.After(results[i-1].StartedAt) {
+				t.Errorf("session %d started after session %d (not DESC order)", i, i-1)
+			}
+		}
+	})
+}
+
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
