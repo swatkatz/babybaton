@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { PredictionCard } from '../components/PredictionCard';
+import { StatusSummary } from '../components/StatusSummary';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { CurrentSessionCard } from '../components/CurrentSessionCard';
@@ -18,12 +19,14 @@ import { RecentSessionCard } from '../components/RecentSessionCard';
 import { VoiceInputModal } from '../components/VoiceInputModal';
 import { ActivityConfirmationModal } from '../components/ActivityConfirmationModal';
 import { ManualEntryModal } from '../components/ManualEntryModal';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { StackScreenProps } from '@react-navigation/stack';
 import { HomeStackParamList } from '../navigation/MainTabNavigator';
 import {
   GetPredictionDocument,
   GetCurrentSessionDocument,
   GetRecentSessionsDocument,
+  GetBabyStatusDocument,
   AddActivitiesDocument,
   ActivityInput,
 } from '../types/__generated__/graphql';
@@ -42,6 +45,13 @@ export function DashboardScreen({ navigation }: Props) {
   const [confirmationModalVisible, setConfirmationModalVisible] =
     useState(false);
   const [parsedResult, setParsedResult] = useState<any>(null);
+
+  // Re-render every 30s for relative time freshness
+  useAutoRefresh(30_000);
+
+  const { data: statusData } = useQuery(GetBabyStatusDocument, {
+    pollInterval: 60_000,
+  });
 
   const {
     data: predictionData,
@@ -185,6 +195,14 @@ export function DashboardScreen({ navigation }: Props) {
         // Add padding bottom to prevent content from being hidden by sticky button
         style={{ paddingBottom: 80 }}
       >
+        {/* Baby Status Summary */}
+        {statusData?.getBabyStatus && (
+          <>
+            <StatusSummary status={statusData.getBabyStatus} />
+            <View style={{ height: spacing.md }} />
+          </>
+        )}
+
         {/* Next Feed Prediction */}
         {predictionLoading && <Text>Loading prediction...</Text>}
         {predictionError && <Text>Error loading prediction</Text>}

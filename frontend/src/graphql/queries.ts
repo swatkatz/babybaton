@@ -229,6 +229,46 @@ export const GET_MY_CAREGIVER = gql`
   }
 `;
 
+export const GET_BABY_STATUS = gql`
+  query GetBabyStatus {
+    getBabyStatus {
+      lastFeed {
+        id
+        activityType
+        createdAt
+        feedDetails {
+          startTime
+          endTime
+          amountMl
+          feedType
+          foodName
+        }
+      }
+      lastDiaper {
+        id
+        activityType
+        createdAt
+        diaperDetails {
+          changedAt
+          hadPoop
+          hadPee
+        }
+      }
+      lastSleep {
+        id
+        activityType
+        createdAt
+        sleepDetails {
+          startTime
+          endTime
+          durationMinutes
+          isActive
+        }
+      }
+    }
+  }
+`;
+
 export const GET_FAMILY_SETTINGS = gql`
   query GetFamilySettings {
     getMyFamily {

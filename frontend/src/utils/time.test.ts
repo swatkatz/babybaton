@@ -1,4 +1,9 @@
-import { formatTime, formatDuration, formatMinutesToDuration } from './time';
+import {
+  formatTime,
+  formatDuration,
+  formatRelativeTime,
+  formatMinutesToDuration,
+} from './time';
 
 describe('formatTime', () => {
   it('should format a morning time correctly', () => {
@@ -70,6 +75,60 @@ describe('formatDuration', () => {
     const start = new Date(2025, 0, 15, 22, 0, 0);
     const end = new Date(2025, 0, 16, 6, 30, 0);
     expect(formatDuration(start, end)).toBe('8h 30m');
+  });
+});
+
+describe('formatRelativeTime', () => {
+  const now = new Date(2025, 0, 15, 12, 0, 0);
+
+  it('should return "just now" for less than 1 minute ago', () => {
+    const date = new Date(now.getTime() - 30_000); // 30 seconds ago
+    expect(formatRelativeTime(date, now)).toBe('just now');
+  });
+
+  it('should return "1m ago" for 1 minute ago', () => {
+    const date = new Date(now.getTime() - 60_000);
+    expect(formatRelativeTime(date, now)).toBe('1m ago');
+  });
+
+  it('should return "5m ago" for 5 minutes ago', () => {
+    const date = new Date(now.getTime() - 5 * 60_000);
+    expect(formatRelativeTime(date, now)).toBe('5m ago');
+  });
+
+  it('should return "59m ago" for 59 minutes ago', () => {
+    const date = new Date(now.getTime() - 59 * 60_000);
+    expect(formatRelativeTime(date, now)).toBe('59m ago');
+  });
+
+  it('should return "1h ago" for 1 hour ago', () => {
+    const date = new Date(now.getTime() - 60 * 60_000);
+    expect(formatRelativeTime(date, now)).toBe('1h ago');
+  });
+
+  it('should return "2h ago" for 2 hours ago', () => {
+    const date = new Date(now.getTime() - 2 * 60 * 60_000);
+    expect(formatRelativeTime(date, now)).toBe('2h ago');
+  });
+
+  it('should return "23h ago" for 23 hours ago', () => {
+    const date = new Date(now.getTime() - 23 * 60 * 60_000);
+    expect(formatRelativeTime(date, now)).toBe('23h ago');
+  });
+
+  it('should return "1d ago" for 24 hours ago', () => {
+    const date = new Date(now.getTime() - 24 * 60 * 60_000);
+    expect(formatRelativeTime(date, now)).toBe('1d ago');
+  });
+
+  it('should return "2d ago" for 48 hours ago', () => {
+    const date = new Date(now.getTime() - 48 * 60 * 60_000);
+    expect(formatRelativeTime(date, now)).toBe('2d ago');
+  });
+
+  it('should return "just now" for future dates', () => {
+    const date = new Date(now.getTime() + 60_000);
+    expect(formatRelativeTime(date, now)).toBe('just now');
   });
 });
 
