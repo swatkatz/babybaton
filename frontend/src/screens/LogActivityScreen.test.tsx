@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { LogActivityScreen } from './LogActivityScreen';
 
@@ -207,6 +207,91 @@ describe('LogActivityScreen', () => {
       await waitFor(() => {
         expect(mockAddActivities).toHaveBeenCalled();
         expect(mockGoBack).toHaveBeenCalled();
+      });
+    });
+
+    it('strips non-schema fields (durationMinutes, isActive) before saving', async () => {
+      const { getByTestId } = render(
+        <LogActivityScreen navigation={mockNavigation as any} route={mockRoute as any} />
+      );
+
+      // Open voice modal
+      fireEvent.press(getByTestId('mic-button'));
+
+      // Simulate AI parser returning extra fields not in GraphQL input types
+      const voiceOnParsed = mockVoiceProps.onActivitiesParsed as (result: any) => void;
+      act(() => {
+        voiceOnParsed({
+        rawText: 'Fed baby 120ml formula, changed diaper with poop, slept for 2 hours',
+        parsedActivities: [
+          {
+            activityType: 'FEED',
+            feedDetails: {
+              startTime: '2025-01-01T12:00:00Z',
+              endTime: '2025-01-01T12:30:00Z',
+              amountMl: 120,
+              feedType: 'FORMULA',
+              foodName: undefined,
+              quantity: undefined,
+              quantityUnit: undefined,
+              durationMinutes: 30, // extra field - not in FeedDetailsInput
+            },
+          },
+          {
+            activityType: 'DIAPER',
+            diaperDetails: {
+              changedAt: '2025-01-01T13:00:00Z',
+              hadPoop: true,
+              hadPee: false,
+            },
+          },
+          {
+            activityType: 'SLEEP',
+            sleepDetails: {
+              startTime: '2025-01-01T14:00:00Z',
+              endTime: '2025-01-01T16:00:00Z',
+              durationMinutes: 120, // extra field - not in SleepDetailsInput
+              isActive: false, // extra field - not in SleepDetailsInput
+            },
+          },
+        ],
+        errors: [],
+      });
+      });
+
+      // Confirm & Save
+      fireEvent.press(getByTestId('confirm-save'));
+
+      await waitFor(() => {
+        expect(mockAddActivities).toHaveBeenCalledTimes(1);
+        const { activities } = mockAddActivities.mock.calls[0][0].variables;
+
+        // Feed: should NOT have durationMinutes
+        expect(activities[0].feedDetails).toEqual({
+          startTime: '2025-01-01T12:00:00Z',
+          endTime: '2025-01-01T12:30:00Z',
+          amountMl: 120,
+          feedType: 'FORMULA',
+          foodName: undefined,
+          quantity: undefined,
+          quantityUnit: undefined,
+        });
+        expect(activities[0].feedDetails).not.toHaveProperty('durationMinutes');
+
+        // Diaper: should pass through cleanly
+        expect(activities[1].diaperDetails).toEqual({
+          changedAt: '2025-01-01T13:00:00Z',
+          hadPoop: true,
+          hadPee: false,
+        });
+
+        // Sleep: should NOT have durationMinutes or isActive
+        expect(activities[2].sleepDetails).toEqual({
+          startTime: '2025-01-01T14:00:00Z',
+          endTime: '2025-01-01T16:00:00Z',
+        });
+        expect(activities[2].sleepDetails).not.toHaveProperty('durationMinutes');
+        expect(activities[2].sleepDetails).not.toHaveProperty('isActive');
       });
     });
 

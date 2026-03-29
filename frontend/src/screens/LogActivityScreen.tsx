@@ -21,6 +21,7 @@ import {
   GetCurrentSessionDocument,
   GetBabyStatusDocument,
   ActivityInput,
+  FeedDetailsInput,
 } from '../types/__generated__/graphql';
 
 type Props = StackScreenProps<HomeStackParamList, 'LogActivity'>;
@@ -109,15 +110,32 @@ export function LogActivityScreen({ navigation }: Props) {
 
     setSaving(true);
     try {
+      // Map to only schema-valid fields (ParsedActivity has extra fields
+      // like durationMinutes/isActive that aren't in the GraphQL input types)
+      const activities = parsedResult.parsedActivities.map((a) => ({
+        activityType: a.activityType as ActivityInput['activityType'],
+        feedDetails: a.feedDetails ? {
+          startTime: a.feedDetails.startTime,
+          endTime: a.feedDetails.endTime,
+          amountMl: a.feedDetails.amountMl,
+          feedType: a.feedDetails.feedType as FeedDetailsInput['feedType'],
+          foodName: a.feedDetails.foodName,
+          quantity: a.feedDetails.quantity,
+          quantityUnit: a.feedDetails.quantityUnit as FeedDetailsInput['quantityUnit'],
+        } : undefined,
+        diaperDetails: a.diaperDetails ? {
+          changedAt: a.diaperDetails.changedAt,
+          hadPoop: a.diaperDetails.hadPoop,
+          hadPee: a.diaperDetails.hadPee,
+        } : undefined,
+        sleepDetails: a.sleepDetails ? {
+          startTime: a.sleepDetails.startTime,
+          endTime: a.sleepDetails.endTime,
+        } : undefined,
+      }));
+
       await addActivities({
-        variables: {
-          activities: parsedResult.parsedActivities.map((a) => ({
-            activityType: a.activityType as ActivityInput['activityType'],
-            feedDetails: a.feedDetails as ActivityInput['feedDetails'],
-            diaperDetails: a.diaperDetails as ActivityInput['diaperDetails'],
-            sleepDetails: a.sleepDetails as ActivityInput['sleepDetails'],
-          })),
-        },
+        variables: { activities },
       });
       setConfirmationModalVisible(false);
       setParsedResult(null);
