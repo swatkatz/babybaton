@@ -114,3 +114,46 @@ type SleepDetails struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
+
+// Prediction enums
+type PredictionType string
+
+const (
+	PredictionTypeNextFeed PredictionType = "next_feed"
+	PredictionTypeNextNap  PredictionType = "next_nap"
+	PredictionTypeNextWake PredictionType = "next_wake"
+	PredictionTypeBedtime  PredictionType = "bedtime"
+)
+
+type PredictionStatus string
+
+const (
+	PredictionStatusOverdue  PredictionStatus = "overdue"
+	PredictionStatusUpcoming PredictionStatus = "upcoming"
+	PredictionStatusPlanned  PredictionStatus = "planned"
+)
+
+type PredictionConfidence string
+
+const (
+	PredictionConfidenceHigh   PredictionConfidence = "high"
+	PredictionConfidenceMedium PredictionConfidence = "medium"
+	PredictionConfidenceLow    PredictionConfidence = "low"
+)
+
+type Prediction struct {
+	ID                       uuid.UUID
+	FamilyID                 uuid.UUID
+	CareSessionID            *uuid.UUID
+	ActivityType             ActivityType
+	PredictionType           PredictionType
+	PredictedTime            time.Time
+	Status                   PredictionStatus
+	Confidence               *PredictionConfidence
+	Reasoning                *string
+	PredictedAmountMl        *int
+	PredictedDurationMinutes *int
+	DismissedAt              *time.Time
+	ComputedAt               time.Time
+	CreatedAt                time.Time
+}

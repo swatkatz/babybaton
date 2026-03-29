@@ -64,6 +64,12 @@ type Store interface {
 	GetSleepDetails(ctx context.Context, activityID uuid.UUID) (*domain.SleepDetails, error)
 	UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error
 
+	// Prediction operations
+	UpsertPredictions(ctx context.Context, familyID uuid.UUID, predictions []*domain.Prediction) error
+	GetPredictionsForFamily(ctx context.Context, familyID uuid.UUID) ([]*domain.Prediction, error)
+	DismissPrediction(ctx context.Context, id uuid.UUID) error
+	CleanupOldPredictions(ctx context.Context, olderThan time.Time) error
+
 	// Lifecycle
 	Close() error
 }

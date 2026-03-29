@@ -185,6 +185,12 @@ export const LINK_CAREGIVER_TO_USER = gql`
   }
 `;
 
+export const DISMISS_PREDICTION = gql`
+  mutation DismissPrediction($id: ID!) {
+    dismissPrediction(id: $id)
+  }
+`;
+
 export const END_ACTIVITY = gql`
   mutation EndActivity($activityId: ID!, $endTime: DateTime) {
     endActivity(activityId: $activityId, endTime: $endTime) {

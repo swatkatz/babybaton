@@ -8,7 +8,7 @@ import { Plus, Calendar } from 'lucide-react-native';
 import { useAuth } from '../hooks/useAuth';
 import { spacing } from '../theme/spacing';
 import { colors } from '../theme/colors';
-import { GetPredictionDocument } from '../types/__generated__/graphql';
+import { GetPredictionsDocument } from '../types/__generated__/graphql';
 import predictionReadService from '../services/predictionReadService';
 
 const ICON_SIZE = 24;
@@ -19,20 +19,20 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
 
   const isDashboard = route.name === 'Dashboard';
 
-  const { data: predictionData } = useQuery(GetPredictionDocument, {
+  const { data: predictionData } = useQuery(GetPredictionsDocument, {
     skip: !isDashboard,
   });
 
-  const predictedTime = predictionData?.predictNextFeed?.predictedTime ?? null;
+  const predictionIds = (predictionData?.predictions ?? []).map(p => p.id);
 
   const [hasUnread, setHasUnread] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       if (isDashboard) {
-        predictionReadService.hasAnyUnread(predictedTime).then(setHasUnread);
+        predictionReadService.hasAnyUnread(predictionIds).then(setHasUnread);
       }
-    }, [isDashboard, predictedTime])
+    }, [isDashboard, predictionIds])
   );
 
   const showBadge = hasUnread;

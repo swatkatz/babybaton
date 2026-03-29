@@ -151,6 +151,16 @@ func (m *mockStore) GetSleepDetails(ctx context.Context, activityID uuid.UUID) (
 func (m *mockStore) UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error {
 	return nil
 }
+func (m *mockStore) UpsertPredictions(ctx context.Context, familyID uuid.UUID, predictions []*domain.Prediction) error {
+	return nil
+}
+func (m *mockStore) GetPredictionsForFamily(ctx context.Context, familyID uuid.UUID) ([]*domain.Prediction, error) {
+	return nil, nil
+}
+func (m *mockStore) DismissPrediction(ctx context.Context, id uuid.UUID) error { return nil }
+func (m *mockStore) CleanupOldPredictions(ctx context.Context, olderThan time.Time) error {
+	return nil
+}
 func (m *mockStore) Close() error { return nil }
 
 // ==================== Legacy AuthMiddleware Tests ====================
