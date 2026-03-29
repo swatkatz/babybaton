@@ -1215,24 +1215,12 @@ func (r *queryResolver) Predictions(ctx context.Context) ([]*model.Prediction, e
 	// Cleanup old predictions
 	_ = r.store.CleanupOldPredictions(ctx, now.Add(-24*time.Hour))
 
-	// Check if existing predictions are fresh (computed within last 5 minutes)
+	// Check if existing predictions are fresh (computed within last 1 minute)
 	existing, err := r.store.GetPredictionsForFamily(ctx, familyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get predictions: %w", err)
 	}
-	if len(existing) > 0 && now.Sub(existing[0].ComputedAt) < 5*time.Minute {
-		// Re-evaluate statuses against current time (a prediction may have become overdue since it was cached)
-		for _, dp := range existing {
-			if dp.Status == domain.PredictionStatusPlanned {
-				continue // PLANNED stays PLANNED
-			}
-			if dp.PredictedTime.Before(now) {
-				dp.Status = domain.PredictionStatusOverdue
-				dp.Confidence = nil
-			} else {
-				dp.Status = domain.PredictionStatusUpcoming
-			}
-		}
+	if len(existing) > 0 && now.Sub(existing[0].ComputedAt) < 1*time.Minute {
 		result := make([]*model.Prediction, 0, len(existing))
 		for _, dp := range existing {
 			result = append(result, mapper.PredictionToGraphQL(dp))

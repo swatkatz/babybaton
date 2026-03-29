@@ -959,7 +959,7 @@ func TestPredictions_FreshCache_ReturnsCached(t *testing.T) {
 	confidence := domain.PredictionConfidenceHigh
 	reasoning := "cached prediction"
 
-	// Set up existing fresh predictions (computed less than 5 min ago)
+	// Set up existing fresh predictions (computed less than 1 min ago)
 	store.predictions = []*domain.Prediction{
 		{
 			ID:             uuid.New(),
@@ -970,8 +970,8 @@ func TestPredictions_FreshCache_ReturnsCached(t *testing.T) {
 			Status:         domain.PredictionStatusUpcoming,
 			Confidence:     &confidence,
 			Reasoning:      &reasoning,
-			ComputedAt:     now.Add(-2 * time.Minute), // 2 minutes ago = fresh
-			CreatedAt:      now.Add(-2 * time.Minute),
+			ComputedAt:     now.Add(-30 * time.Second), // 30 seconds ago = fresh
+			CreatedAt:      now.Add(-30 * time.Second),
 		},
 	}
 
