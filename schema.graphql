@@ -32,6 +32,19 @@ enum PredictionConfidence {
   LOW
 }
 
+enum PredictionType {
+  NEXT_FEED
+  NEXT_NAP
+  NEXT_WAKE
+  BEDTIME
+}
+
+enum PredictionStatus {
+  OVERDUE
+  UPCOMING
+  PLANNED
+}
+
 # Types
 type Family {
   id: ID!
@@ -141,11 +154,17 @@ type BabyStatus {
   lastSleep: SleepActivity
 }
 
-type NextFeedPrediction {
+type Prediction {
+  id: ID!
+  activityType: ActivityType!
+  predictionType: PredictionType!
   predictedTime: DateTime!
-  confidence: PredictionConfidence!
+  status: PredictionStatus!
+  confidence: PredictionConfidence
   reasoning: String
-  minutesUntilFeed: Int!
+  predictedAmountMl: Int
+  predictedDurationMinutes: Int
+  careSessionId: ID
 }
 
 # Simple wrapper without id/createdAt
@@ -219,7 +238,7 @@ type Query {
   getCareSessionHistory(first: Int!, after: String): CareSessionConnection!
 
   # Predictions
-  predictNextFeed: NextFeedPrediction!
+  predictions: [Prediction!]!
 }
 
 # Mutations
@@ -262,4 +281,7 @@ type Mutation {
   deleteActivity(activityId: ID!): Boolean!
 
   updateActivity(activityId: ID!, input: ActivityInput!): Activity!
+
+  # Predictions
+  dismissPrediction(id: ID!): Boolean!
 }

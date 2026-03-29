@@ -8,45 +8,45 @@ describe('PredictionReadService', () => {
 
   describe('isRead', () => {
     it('returns false for unread prediction', async () => {
-      const result = await predictionReadService.isRead('2026-03-29T18:30:00Z');
+      const result = await predictionReadService.isRead('pred-123');
       expect(result).toBe(false);
     });
 
     it('returns true after markAsRead', async () => {
-      const predictedTime = '2026-03-29T18:30:00Z';
-      await predictionReadService.markAsRead(predictedTime);
-      const result = await predictionReadService.isRead(predictedTime);
+      const predictionId = 'pred-123';
+      await predictionReadService.markAsRead(predictionId);
+      const result = await predictionReadService.isRead(predictionId);
       expect(result).toBe(true);
     });
   });
 
   describe('markAsRead', () => {
     it('writes correct key to AsyncStorage', async () => {
-      const predictedTime = '2026-03-29T18:30:00Z';
-      await predictionReadService.markAsRead(predictedTime);
+      const predictionId = 'pred-456';
+      await predictionReadService.markAsRead(predictionId);
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-        '@baby_baton:prediction_read:2026-03-29T18:30:00Z',
+        '@baby_baton:prediction_read:pred-456',
         'true'
       );
     });
   });
 
   describe('hasAnyUnread', () => {
-    it('returns true when prediction is not read', async () => {
-      const result = await predictionReadService.hasAnyUnread('2026-03-29T18:30:00Z');
+    it('returns true when at least one prediction is not read', async () => {
+      const result = await predictionReadService.hasAnyUnread(['pred-1', 'pred-2']);
       expect(result).toBe(true);
     });
 
-    it('returns false when prediction is read', async () => {
-      const predictedTime = '2026-03-29T18:30:00Z';
-      await predictionReadService.markAsRead(predictedTime);
-      const result = await predictionReadService.hasAnyUnread(predictedTime);
+    it('returns false when all predictions are read', async () => {
+      await predictionReadService.markAsRead('pred-1');
+      await predictionReadService.markAsRead('pred-2');
+      const result = await predictionReadService.hasAnyUnread(['pred-1', 'pred-2']);
       expect(result).toBe(false);
     });
 
-    it('returns false when predictedTime is null', async () => {
-      const result = await predictionReadService.hasAnyUnread(null);
+    it('returns false when ids array is empty', async () => {
+      const result = await predictionReadService.hasAnyUnread([]);
       expect(result).toBe(false);
     });
   });

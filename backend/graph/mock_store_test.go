@@ -218,4 +218,18 @@ func (m *mockStore) GetSleepDetails(_ context.Context, _ uuid.UUID) (*domain.Sle
 }
 func (m *mockStore) UpdateSleepDetails(_ context.Context, _ *domain.SleepDetails) error { return nil }
 
+// Prediction operations
+func (m *mockStore) UpsertPredictions(_ context.Context, _ uuid.UUID, _ []*domain.Prediction) error {
+	return nil
+}
+func (m *mockStore) GetPredictionsForFamily(_ context.Context, _ uuid.UUID) ([]*domain.Prediction, error) {
+	return nil, nil
+}
+func (m *mockStore) DismissPrediction(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+func (m *mockStore) CleanupOldPredictions(_ context.Context, _ time.Time) error {
+	return nil
+}
+
 func (m *mockStore) Close() error { return nil }

@@ -25,8 +25,22 @@ jest.mock('../services/predictionReadService', () => ({
 }));
 
 // Mock Apollo useQuery
+type PredictionMock = {
+  __typename: 'Prediction';
+  id: string;
+  activityType: string;
+  predictionType: string;
+  predictedTime: string;
+  status: string;
+  confidence: string | null;
+  reasoning: string | null;
+  predictedAmountMl: number | null;
+  predictedDurationMinutes: number | null;
+  careSessionId: string | null;
+};
+
 let mockQueryResult: {
-  data: { predictNextFeed: { __typename: string; predictedTime: string; confidence: string; minutesUntilFeed: number; reasoning: string | null } } | undefined;
+  data: { predictions: PredictionMock[] } | undefined;
   loading: boolean;
   error: Error | undefined;
   refetch: jest.Mock;
@@ -36,12 +50,18 @@ jest.mock('@apollo/client/react', () => ({
   useQuery: () => mockQueryResult,
 }));
 
-const basePrediction = {
-  __typename: 'NextFeedPrediction' as const,
-  predictedTime: '2026-03-29T18:30:00Z',
-  confidence: 'HIGH' as const,
-  minutesUntilFeed: 45,
+const basePrediction: PredictionMock = {
+  __typename: 'Prediction',
+  id: 'pred-1',
+  activityType: 'FEED',
+  predictionType: 'NEXT_FEED',
+  predictedTime: new Date(Date.now() + 45 * 60000).toISOString(),
+  status: 'UPCOMING',
+  confidence: 'HIGH',
   reasoning: 'Baby has been feeding every 3 hours',
+  predictedAmountMl: null,
+  predictedDurationMinutes: null,
+  careSessionId: null,
 };
 
 describe('UpcomingScreen', () => {
@@ -50,7 +70,7 @@ describe('UpcomingScreen', () => {
     (predictionReadService.isRead as jest.Mock).mockResolvedValue(false);
     (predictionReadService.markAsRead as jest.Mock).mockResolvedValue(undefined);
     mockQueryResult = {
-      data: { predictNextFeed: { ...basePrediction } },
+      data: { predictions: [{ ...basePrediction }] },
       loading: false,
       error: undefined,
       refetch: jest.fn(),
@@ -68,7 +88,18 @@ describe('UpcomingScreen', () => {
     expect(getByTestId('loading-indicator')).toBeTruthy();
   });
 
-  it('shows empty state when no prediction data', () => {
+  it('shows empty state when no predictions', () => {
+    mockQueryResult = {
+      data: { predictions: [] },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    };
+    const { getByText } = render(<UpcomingScreen />);
+    expect(getByText('No predictions yet')).toBeTruthy();
+  });
+
+  it('shows empty state when data is undefined', () => {
     mockQueryResult = {
       data: undefined,
       loading: false,
@@ -98,7 +129,7 @@ describe('UpcomingScreen', () => {
       expect(getByText(/PREDICTIONS/)).toBeTruthy();
     });
 
-    it('renders predicted time', () => {
+    it('renders prediction label', () => {
       const { getByText } = render(<UpcomingScreen />);
       expect(getByText('Next feed')).toBeTruthy();
     });
@@ -115,45 +146,34 @@ describe('UpcomingScreen', () => {
 
     it('does not render reasoning when null', () => {
       mockQueryResult.data = {
-        predictNextFeed: { ...basePrediction, reasoning: null },
+        predictions: [{ ...basePrediction, reasoning: null }],
       };
       const { queryByText } = render(<UpcomingScreen />);
       expect(queryByText('Baby has been feeding every 3 hours')).toBeNull();
     });
+
+    it('does not render confidence badge when null', () => {
+      mockQueryResult.data = {
+        predictions: [{ ...basePrediction, confidence: null }],
+      };
+      const { queryByText } = render(<UpcomingScreen />);
+      expect(queryByText(/confidence/)).toBeNull();
+    });
   });
 
   describe('Needs Attention section', () => {
-    it('is NOT rendered when minutesUntilFeed > 10', () => {
-      mockQueryResult.data = {
-        predictNextFeed: { ...basePrediction, minutesUntilFeed: 30 },
-      };
+    it('is NOT rendered when status is UPCOMING', () => {
       const { queryByTestId } = render(<UpcomingScreen />);
       expect(queryByTestId('needs-attention-section')).toBeNull();
     });
 
-    it('IS rendered when minutesUntilFeed <= 10', () => {
+    it('IS rendered when status is OVERDUE', () => {
       mockQueryResult.data = {
-        predictNextFeed: { ...basePrediction, minutesUntilFeed: 8 },
+        predictions: [{ ...basePrediction, status: 'OVERDUE', confidence: null }],
       };
       const { getByTestId, getByText } = render(<UpcomingScreen />);
       expect(getByTestId('needs-attention-section')).toBeTruthy();
       expect(getByText(/NEEDS ATTENTION/)).toBeTruthy();
-    });
-
-    it('IS rendered when minutesUntilFeed is 0 (overdue)', () => {
-      mockQueryResult.data = {
-        predictNextFeed: { ...basePrediction, minutesUntilFeed: 0 },
-      };
-      const { getByTestId } = render(<UpcomingScreen />);
-      expect(getByTestId('needs-attention-section')).toBeTruthy();
-    });
-
-    it('IS rendered when minutesUntilFeed is negative', () => {
-      mockQueryResult.data = {
-        predictNextFeed: { ...basePrediction, minutesUntilFeed: -5 },
-      };
-      const { getByTestId } = render(<UpcomingScreen />);
-      expect(getByTestId('needs-attention-section')).toBeTruthy();
     });
   });
 
@@ -168,22 +188,17 @@ describe('UpcomingScreen', () => {
       await act(async () => {
         fireEvent.press(getByTestId('mark-read-button'));
       });
-      expect(predictionReadService.markAsRead).toHaveBeenCalledWith(
-        '2026-03-29T18:30:00Z'
-      );
+      expect(predictionReadService.markAsRead).toHaveBeenCalledWith('pred-1');
     });
 
     it('hides mark as read button after marking read', async () => {
-      // After markAsRead is called, isRead should resolve to true on next check
       (predictionReadService.isRead as jest.Mock).mockResolvedValue(false);
       const { getByTestId, queryByTestId } = render(<UpcomingScreen />);
 
-      // Button should be visible initially
       await waitFor(() => {
         expect(getByTestId('mark-read-button')).toBeTruthy();
       });
 
-      // After marking read, the service now returns true
       (predictionReadService.isRead as jest.Mock).mockResolvedValue(true);
       await act(async () => {
         fireEvent.press(getByTestId('mark-read-button'));
@@ -193,12 +208,12 @@ describe('UpcomingScreen', () => {
       });
     });
 
-    it('shows mark as read in needs attention section when imminent', () => {
+    it('shows mark as read in needs attention section when overdue', () => {
       mockQueryResult.data = {
-        predictNextFeed: { ...basePrediction, minutesUntilFeed: 5 },
+        predictions: [{ ...basePrediction, status: 'OVERDUE', confidence: null }],
       };
-      const { getByTestId } = render(<UpcomingScreen />);
-      expect(getByTestId('mark-read-button')).toBeTruthy();
+      const { getAllByTestId } = render(<UpcomingScreen />);
+      expect(getAllByTestId('mark-read-button').length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -206,6 +221,20 @@ describe('UpcomingScreen', () => {
     it('is NOT rendered for MVP', () => {
       const { queryByText } = render(<UpcomingScreen />);
       expect(queryByText(/SCHEDULED/i)).toBeNull();
+    });
+  });
+
+  describe('Multiple prediction types', () => {
+    it('renders different emojis for different prediction types', () => {
+      mockQueryResult.data = {
+        predictions: [
+          { ...basePrediction, id: 'pred-1', predictionType: 'NEXT_FEED' },
+          { ...basePrediction, id: 'pred-2', predictionType: 'NEXT_NAP', activityType: 'SLEEP' },
+        ],
+      };
+      const { getByText } = render(<UpcomingScreen />);
+      expect(getByText('Next feed')).toBeTruthy();
+      expect(getByText('Next nap')).toBeTruthy();
     });
   });
 });

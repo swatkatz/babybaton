@@ -143,13 +143,6 @@ type FeedDetailsInput struct {
 type Mutation struct {
 }
 
-type NextFeedPrediction struct {
-	PredictedTime    time.Time            `json:"predictedTime"`
-	Confidence       PredictionConfidence `json:"confidence"`
-	Reasoning        *string              `json:"reasoning,omitempty"`
-	MinutesUntilFeed int32                `json:"minutesUntilFeed"`
-}
-
 type ParsedActivity struct {
 	ActivityType  ActivityType   `json:"activityType"`
 	FeedDetails   *FeedDetails   `json:"feedDetails,omitempty"`
@@ -162,6 +155,19 @@ type ParsedVoiceResult struct {
 	ParsedActivities []*ParsedActivity `json:"parsedActivities"`
 	Errors           []string          `json:"errors,omitempty"`
 	RawText          string            `json:"rawText"`
+}
+
+type Prediction struct {
+	ID                       string                `json:"id"`
+	ActivityType             ActivityType          `json:"activityType"`
+	PredictionType           PredictionType        `json:"predictionType"`
+	PredictedTime            time.Time             `json:"predictedTime"`
+	Status                   PredictionStatus      `json:"status"`
+	Confidence               *PredictionConfidence `json:"confidence,omitempty"`
+	Reasoning                *string               `json:"reasoning,omitempty"`
+	PredictedAmountMl        *int32                `json:"predictedAmountMl,omitempty"`
+	PredictedDurationMinutes *int32                `json:"predictedDurationMinutes,omitempty"`
+	CareSessionID            *string               `json:"careSessionId,omitempty"`
 }
 
 type Query struct {
@@ -352,6 +358,122 @@ func (e *PredictionConfidence) UnmarshalJSON(b []byte) error {
 }
 
 func (e PredictionConfidence) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type PredictionStatus string
+
+const (
+	PredictionStatusOverdue  PredictionStatus = "OVERDUE"
+	PredictionStatusUpcoming PredictionStatus = "UPCOMING"
+	PredictionStatusPlanned  PredictionStatus = "PLANNED"
+)
+
+var AllPredictionStatus = []PredictionStatus{
+	PredictionStatusOverdue,
+	PredictionStatusUpcoming,
+	PredictionStatusPlanned,
+}
+
+func (e PredictionStatus) IsValid() bool {
+	switch e {
+	case PredictionStatusOverdue, PredictionStatusUpcoming, PredictionStatusPlanned:
+		return true
+	}
+	return false
+}
+
+func (e PredictionStatus) String() string {
+	return string(e)
+}
+
+func (e *PredictionStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PredictionStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PredictionStatus", str)
+	}
+	return nil
+}
+
+func (e PredictionStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *PredictionStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e PredictionStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type PredictionType string
+
+const (
+	PredictionTypeNextFeed PredictionType = "NEXT_FEED"
+	PredictionTypeNextNap  PredictionType = "NEXT_NAP"
+	PredictionTypeNextWake PredictionType = "NEXT_WAKE"
+	PredictionTypeBedtime  PredictionType = "BEDTIME"
+)
+
+var AllPredictionType = []PredictionType{
+	PredictionTypeNextFeed,
+	PredictionTypeNextNap,
+	PredictionTypeNextWake,
+	PredictionTypeBedtime,
+}
+
+func (e PredictionType) IsValid() bool {
+	switch e {
+	case PredictionTypeNextFeed, PredictionTypeNextNap, PredictionTypeNextWake, PredictionTypeBedtime:
+		return true
+	}
+	return false
+}
+
+func (e PredictionType) String() string {
+	return string(e)
+}
+
+func (e *PredictionType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PredictionType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PredictionType", str)
+	}
+	return nil
+}
+
+func (e PredictionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *PredictionType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e PredictionType) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

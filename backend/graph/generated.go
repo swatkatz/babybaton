@@ -151,6 +151,7 @@ type ComplexityRoot struct {
 		CompleteCareSession func(childComplexity int, notes *string) int
 		CreateFamily        func(childComplexity int, familyName string, password string, babyName string, caregiverName string, deviceID *string, deviceName *string) int
 		DeleteActivity      func(childComplexity int, activityID string) int
+		DismissPrediction   func(childComplexity int, id string) int
 		EndActivity         func(childComplexity int, activityID string, endTime *time.Time) int
 		JoinFamily          func(childComplexity int, familyName string, password string, caregiverName string, deviceID *string, deviceName *string) int
 		LeaveFamily         func(childComplexity int) int
@@ -159,13 +160,6 @@ type ComplexityRoot struct {
 		StartCareSession    func(childComplexity int) int
 		UpdateActivity      func(childComplexity int, activityID string, input model.ActivityInput) int
 		UpdateBabyName      func(childComplexity int, babyName string) int
-	}
-
-	NextFeedPrediction struct {
-		Confidence       func(childComplexity int) int
-		MinutesUntilFeed func(childComplexity int) int
-		PredictedTime    func(childComplexity int) int
-		Reasoning        func(childComplexity int) int
 	}
 
 	ParsedActivity struct {
@@ -182,6 +176,19 @@ type ComplexityRoot struct {
 		Success          func(childComplexity int) int
 	}
 
+	Prediction struct {
+		ActivityType             func(childComplexity int) int
+		CareSessionID            func(childComplexity int) int
+		Confidence               func(childComplexity int) int
+		ID                       func(childComplexity int) int
+		PredictedAmountMl        func(childComplexity int) int
+		PredictedDurationMinutes func(childComplexity int) int
+		PredictedTime            func(childComplexity int) int
+		PredictionType           func(childComplexity int) int
+		Reasoning                func(childComplexity int) int
+		Status                   func(childComplexity int) int
+	}
+
 	Query struct {
 		CheckFamilyNameAvailable func(childComplexity int, name string) int
 		GetBabyStatus            func(childComplexity int) int
@@ -192,7 +199,7 @@ type ComplexityRoot struct {
 		GetMyFamilies            func(childComplexity int) int
 		GetMyFamily              func(childComplexity int) int
 		GetRecentCareSessions    func(childComplexity int, limit *int32) int
-		PredictNextFeed          func(childComplexity int) int
+		Predictions              func(childComplexity int) int
 	}
 
 	SleepActivity struct {
@@ -223,6 +230,7 @@ type MutationResolver interface {
 	CompleteCareSession(ctx context.Context, notes *string) (*model.CareSession, error)
 	DeleteActivity(ctx context.Context, activityID string) (bool, error)
 	UpdateActivity(ctx context.Context, activityID string, input model.ActivityInput) (model.Activity, error)
+	DismissPrediction(ctx context.Context, id string) (bool, error)
 }
 type QueryResolver interface {
 	CheckFamilyNameAvailable(ctx context.Context, name string) (bool, error)
@@ -234,7 +242,7 @@ type QueryResolver interface {
 	GetCareSession(ctx context.Context, id string) (*model.CareSession, error)
 	GetBabyStatus(ctx context.Context) (*model.BabyStatus, error)
 	GetCareSessionHistory(ctx context.Context, first int32, after *string) (*model.CareSessionConnection, error)
-	PredictNextFeed(ctx context.Context) (*model.NextFeedPrediction, error)
+	Predictions(ctx context.Context) ([]*model.Prediction, error)
 }
 
 type executableSchema struct {
@@ -673,6 +681,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.DeleteActivity(childComplexity, args["activityId"].(string)), true
+	case "Mutation.dismissPrediction":
+		if e.complexity.Mutation.DismissPrediction == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_dismissPrediction_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DismissPrediction(childComplexity, args["id"].(string)), true
 	case "Mutation.endActivity":
 		if e.complexity.Mutation.EndActivity == nil {
 			break
@@ -752,31 +771,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.UpdateBabyName(childComplexity, args["babyName"].(string)), true
 
-	case "NextFeedPrediction.confidence":
-		if e.complexity.NextFeedPrediction.Confidence == nil {
-			break
-		}
-
-		return e.complexity.NextFeedPrediction.Confidence(childComplexity), true
-	case "NextFeedPrediction.minutesUntilFeed":
-		if e.complexity.NextFeedPrediction.MinutesUntilFeed == nil {
-			break
-		}
-
-		return e.complexity.NextFeedPrediction.MinutesUntilFeed(childComplexity), true
-	case "NextFeedPrediction.predictedTime":
-		if e.complexity.NextFeedPrediction.PredictedTime == nil {
-			break
-		}
-
-		return e.complexity.NextFeedPrediction.PredictedTime(childComplexity), true
-	case "NextFeedPrediction.reasoning":
-		if e.complexity.NextFeedPrediction.Reasoning == nil {
-			break
-		}
-
-		return e.complexity.NextFeedPrediction.Reasoning(childComplexity), true
-
 	case "ParsedActivity.activityType":
 		if e.complexity.ParsedActivity.ActivityType == nil {
 			break
@@ -826,6 +820,67 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ParsedVoiceResult.Success(childComplexity), true
+
+	case "Prediction.activityType":
+		if e.complexity.Prediction.ActivityType == nil {
+			break
+		}
+
+		return e.complexity.Prediction.ActivityType(childComplexity), true
+	case "Prediction.careSessionId":
+		if e.complexity.Prediction.CareSessionID == nil {
+			break
+		}
+
+		return e.complexity.Prediction.CareSessionID(childComplexity), true
+	case "Prediction.confidence":
+		if e.complexity.Prediction.Confidence == nil {
+			break
+		}
+
+		return e.complexity.Prediction.Confidence(childComplexity), true
+	case "Prediction.id":
+		if e.complexity.Prediction.ID == nil {
+			break
+		}
+
+		return e.complexity.Prediction.ID(childComplexity), true
+	case "Prediction.predictedAmountMl":
+		if e.complexity.Prediction.PredictedAmountMl == nil {
+			break
+		}
+
+		return e.complexity.Prediction.PredictedAmountMl(childComplexity), true
+	case "Prediction.predictedDurationMinutes":
+		if e.complexity.Prediction.PredictedDurationMinutes == nil {
+			break
+		}
+
+		return e.complexity.Prediction.PredictedDurationMinutes(childComplexity), true
+	case "Prediction.predictedTime":
+		if e.complexity.Prediction.PredictedTime == nil {
+			break
+		}
+
+		return e.complexity.Prediction.PredictedTime(childComplexity), true
+	case "Prediction.predictionType":
+		if e.complexity.Prediction.PredictionType == nil {
+			break
+		}
+
+		return e.complexity.Prediction.PredictionType(childComplexity), true
+	case "Prediction.reasoning":
+		if e.complexity.Prediction.Reasoning == nil {
+			break
+		}
+
+		return e.complexity.Prediction.Reasoning(childComplexity), true
+	case "Prediction.status":
+		if e.complexity.Prediction.Status == nil {
+			break
+		}
+
+		return e.complexity.Prediction.Status(childComplexity), true
 
 	case "Query.checkFamilyNameAvailable":
 		if e.complexity.Query.CheckFamilyNameAvailable == nil {
@@ -901,12 +956,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.GetRecentCareSessions(childComplexity, args["limit"].(*int32)), true
-	case "Query.predictNextFeed":
-		if e.complexity.Query.PredictNextFeed == nil {
+	case "Query.predictions":
+		if e.complexity.Query.Predictions == nil {
 			break
 		}
 
-		return e.complexity.Query.PredictNextFeed(childComplexity), true
+		return e.complexity.Query.Predictions(childComplexity), true
 
 	case "SleepActivity.activityType":
 		if e.complexity.SleepActivity.ActivityType == nil {
@@ -1101,6 +1156,19 @@ enum PredictionConfidence {
   LOW
 }
 
+enum PredictionType {
+  NEXT_FEED
+  NEXT_NAP
+  NEXT_WAKE
+  BEDTIME
+}
+
+enum PredictionStatus {
+  OVERDUE
+  UPCOMING
+  PLANNED
+}
+
 # Types
 type Family {
   id: ID!
@@ -1210,11 +1278,17 @@ type BabyStatus {
   lastSleep: SleepActivity
 }
 
-type NextFeedPrediction {
+type Prediction {
+  id: ID!
+  activityType: ActivityType!
+  predictionType: PredictionType!
   predictedTime: DateTime!
-  confidence: PredictionConfidence!
+  status: PredictionStatus!
+  confidence: PredictionConfidence
   reasoning: String
-  minutesUntilFeed: Int!
+  predictedAmountMl: Int
+  predictedDurationMinutes: Int
+  careSessionId: ID
 }
 
 # Simple wrapper without id/createdAt
@@ -1288,7 +1362,7 @@ type Query {
   getCareSessionHistory(first: Int!, after: String): CareSessionConnection!
 
   # Predictions
-  predictNextFeed: NextFeedPrediction!
+  predictions: [Prediction!]!
 }
 
 # Mutations
@@ -1331,6 +1405,9 @@ type Mutation {
   deleteActivity(activityId: ID!): Boolean!
 
   updateActivity(activityId: ID!, input: ActivityInput!): Activity!
+
+  # Predictions
+  dismissPrediction(id: ID!): Boolean!
 }
 `, BuiltIn: false},
 }
@@ -1406,6 +1483,17 @@ func (ec *executionContext) field_Mutation_deleteActivity_args(ctx context.Conte
 		return nil, err
 	}
 	args["activityId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_dismissPrediction_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -4103,118 +4191,43 @@ func (ec *executionContext) fieldContext_Mutation_updateActivity(ctx context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _NextFeedPrediction_predictedTime(ctx context.Context, field graphql.CollectedField, obj *model.NextFeedPrediction) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_dismissPrediction(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_NextFeedPrediction_predictedTime,
+		ec.fieldContext_Mutation_dismissPrediction,
 		func(ctx context.Context) (any, error) {
-			return obj.PredictedTime, nil
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().DismissPrediction(ctx, fc.Args["id"].(string))
 		},
 		nil,
-		ec.marshalNDateTime2timeᚐTime,
+		ec.marshalNBoolean2bool,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_NextFeedPrediction_predictedTime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_dismissPrediction(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "NextFeedPrediction",
+		Object:     "Mutation",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type DateTime does not have child fields")
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
-	return fc, nil
-}
-
-func (ec *executionContext) _NextFeedPrediction_confidence(ctx context.Context, field graphql.CollectedField, obj *model.NextFeedPrediction) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_NextFeedPrediction_confidence,
-		func(ctx context.Context) (any, error) {
-			return obj.Confidence, nil
-		},
-		nil,
-		ec.marshalNPredictionConfidence2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionConfidence,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_NextFeedPrediction_confidence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "NextFeedPrediction",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type PredictionConfidence does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _NextFeedPrediction_reasoning(ctx context.Context, field graphql.CollectedField, obj *model.NextFeedPrediction) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_NextFeedPrediction_reasoning,
-		func(ctx context.Context) (any, error) {
-			return obj.Reasoning, nil
-		},
-		nil,
-		ec.marshalOString2ᚖstring,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_NextFeedPrediction_reasoning(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "NextFeedPrediction",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _NextFeedPrediction_minutesUntilFeed(ctx context.Context, field graphql.CollectedField, obj *model.NextFeedPrediction) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_NextFeedPrediction_minutesUntilFeed,
-		func(ctx context.Context) (any, error) {
-			return obj.MinutesUntilFeed, nil
-		},
-		nil,
-		ec.marshalNInt2int32,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_NextFeedPrediction_minutesUntilFeed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "NextFeedPrediction",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_dismissPrediction_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -4492,6 +4505,296 @@ func (ec *executionContext) fieldContext_ParsedVoiceResult_rawText(_ context.Con
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_id(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_activityType(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_activityType,
+		func(ctx context.Context) (any, error) {
+			return obj.ActivityType, nil
+		},
+		nil,
+		ec.marshalNActivityType2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐActivityType,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_activityType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ActivityType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_predictionType(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_predictionType,
+		func(ctx context.Context) (any, error) {
+			return obj.PredictionType, nil
+		},
+		nil,
+		ec.marshalNPredictionType2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionType,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_predictionType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type PredictionType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_predictedTime(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_predictedTime,
+		func(ctx context.Context) (any, error) {
+			return obj.PredictedTime, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_predictedTime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_status(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNPredictionStatus2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type PredictionStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_confidence(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_confidence,
+		func(ctx context.Context) (any, error) {
+			return obj.Confidence, nil
+		},
+		nil,
+		ec.marshalOPredictionConfidence2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionConfidence,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_confidence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type PredictionConfidence does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_reasoning(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_reasoning,
+		func(ctx context.Context) (any, error) {
+			return obj.Reasoning, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_reasoning(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_predictedAmountMl(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_predictedAmountMl,
+		func(ctx context.Context) (any, error) {
+			return obj.PredictedAmountMl, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint32,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_predictedAmountMl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_predictedDurationMinutes(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_predictedDurationMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.PredictedDurationMinutes, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint32,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_predictedDurationMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Prediction_careSessionId(ctx context.Context, field graphql.CollectedField, obj *model.Prediction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Prediction_careSessionId,
+		func(ctx context.Context) (any, error) {
+			return obj.CareSessionID, nil
+		},
+		nil,
+		ec.marshalOID2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Prediction_careSessionId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Prediction",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4922,23 +5225,23 @@ func (ec *executionContext) fieldContext_Query_getCareSessionHistory(ctx context
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_predictNextFeed(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_predictions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Query_predictNextFeed,
+		ec.fieldContext_Query_predictions,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Query().PredictNextFeed(ctx)
+			return ec.resolvers.Query().Predictions(ctx)
 		},
 		nil,
-		ec.marshalNNextFeedPrediction2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐNextFeedPrediction,
+		ec.marshalNPrediction2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionᚄ,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_Query_predictNextFeed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_predictions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -4946,16 +5249,28 @@ func (ec *executionContext) fieldContext_Query_predictNextFeed(_ context.Context
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "id":
+				return ec.fieldContext_Prediction_id(ctx, field)
+			case "activityType":
+				return ec.fieldContext_Prediction_activityType(ctx, field)
+			case "predictionType":
+				return ec.fieldContext_Prediction_predictionType(ctx, field)
 			case "predictedTime":
-				return ec.fieldContext_NextFeedPrediction_predictedTime(ctx, field)
+				return ec.fieldContext_Prediction_predictedTime(ctx, field)
+			case "status":
+				return ec.fieldContext_Prediction_status(ctx, field)
 			case "confidence":
-				return ec.fieldContext_NextFeedPrediction_confidence(ctx, field)
+				return ec.fieldContext_Prediction_confidence(ctx, field)
 			case "reasoning":
-				return ec.fieldContext_NextFeedPrediction_reasoning(ctx, field)
-			case "minutesUntilFeed":
-				return ec.fieldContext_NextFeedPrediction_minutesUntilFeed(ctx, field)
+				return ec.fieldContext_Prediction_reasoning(ctx, field)
+			case "predictedAmountMl":
+				return ec.fieldContext_Prediction_predictedAmountMl(ctx, field)
+			case "predictedDurationMinutes":
+				return ec.fieldContext_Prediction_predictedDurationMinutes(ctx, field)
+			case "careSessionId":
+				return ec.fieldContext_Prediction_careSessionId(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type NextFeedPrediction", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type Prediction", field.Name)
 		},
 	}
 	return fc, nil
@@ -7769,54 +8084,10 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
-var nextFeedPredictionImplementors = []string{"NextFeedPrediction"}
-
-func (ec *executionContext) _NextFeedPrediction(ctx context.Context, sel ast.SelectionSet, obj *model.NextFeedPrediction) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, nextFeedPredictionImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("NextFeedPrediction")
-		case "predictedTime":
-			out.Values[i] = ec._NextFeedPrediction_predictedTime(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "confidence":
-			out.Values[i] = ec._NextFeedPrediction_confidence(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "reasoning":
-			out.Values[i] = ec._NextFeedPrediction_reasoning(ctx, field, obj)
-		case "minutesUntilFeed":
-			out.Values[i] = ec._NextFeedPrediction_minutesUntilFeed(ctx, field, obj)
+		case "dismissPrediction":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_dismissPrediction(ctx, field)
+			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -7916,6 +8187,75 @@ func (ec *executionContext) _ParsedVoiceResult(ctx context.Context, sel ast.Sele
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var predictionImplementors = []string{"Prediction"}
+
+func (ec *executionContext) _Prediction(ctx context.Context, sel ast.SelectionSet, obj *model.Prediction) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, predictionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Prediction")
+		case "id":
+			out.Values[i] = ec._Prediction_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "activityType":
+			out.Values[i] = ec._Prediction_activityType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "predictionType":
+			out.Values[i] = ec._Prediction_predictionType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "predictedTime":
+			out.Values[i] = ec._Prediction_predictedTime(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._Prediction_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "confidence":
+			out.Values[i] = ec._Prediction_confidence(ctx, field, obj)
+		case "reasoning":
+			out.Values[i] = ec._Prediction_reasoning(ctx, field, obj)
+		case "predictedAmountMl":
+			out.Values[i] = ec._Prediction_predictedAmountMl(ctx, field, obj)
+		case "predictedDurationMinutes":
+			out.Values[i] = ec._Prediction_predictedDurationMinutes(ctx, field, obj)
+		case "careSessionId":
+			out.Values[i] = ec._Prediction_careSessionId(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8144,7 +8484,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "predictNextFeed":
+		case "predictions":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -8153,7 +8493,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_predictNextFeed(ctx, field)
+				res = ec._Query_predictions(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -9081,20 +9421,6 @@ func (ec *executionContext) marshalNInt2int32(ctx context.Context, sel ast.Selec
 	return res
 }
 
-func (ec *executionContext) marshalNNextFeedPrediction2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐNextFeedPrediction(ctx context.Context, sel ast.SelectionSet, v model.NextFeedPrediction) graphql.Marshaler {
-	return ec._NextFeedPrediction(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNNextFeedPrediction2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐNextFeedPrediction(ctx context.Context, sel ast.SelectionSet, v *model.NextFeedPrediction) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._NextFeedPrediction(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalNParsedActivity2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐParsedActivityᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ParsedActivity) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -9163,13 +9489,77 @@ func (ec *executionContext) marshalNParsedVoiceResult2ᚖgithubᚗcomᚋswatkatz
 	return ec._ParsedVoiceResult(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNPredictionConfidence2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionConfidence(ctx context.Context, v any) (model.PredictionConfidence, error) {
-	var res model.PredictionConfidence
+func (ec *executionContext) marshalNPrediction2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Prediction) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPrediction2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPrediction(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPrediction2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPrediction(ctx context.Context, sel ast.SelectionSet, v *model.Prediction) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Prediction(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNPredictionStatus2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionStatus(ctx context.Context, v any) (model.PredictionStatus, error) {
+	var res model.PredictionStatus
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNPredictionConfidence2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionConfidence(ctx context.Context, sel ast.SelectionSet, v model.PredictionConfidence) graphql.Marshaler {
+func (ec *executionContext) marshalNPredictionStatus2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionStatus(ctx context.Context, sel ast.SelectionSet, v model.PredictionStatus) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNPredictionType2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionType(ctx context.Context, v any) (model.PredictionType, error) {
+	var res model.PredictionType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPredictionType2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionType(ctx context.Context, sel ast.SelectionSet, v model.PredictionType) graphql.Marshaler {
 	return v
 }
 
@@ -9604,6 +9994,24 @@ func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel as
 	return graphql.WrapContextMarshaler(ctx, res)
 }
 
+func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalID(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOID2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalID(*v)
+	return res
+}
+
 func (ec *executionContext) unmarshalOInt2ᚖint32(ctx context.Context, v any) (*int32, error) {
 	if v == nil {
 		return nil, nil
@@ -9620,6 +10028,22 @@ func (ec *executionContext) marshalOInt2ᚖint32(ctx context.Context, sel ast.Se
 	_ = ctx
 	res := graphql.MarshalInt32(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOPredictionConfidence2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionConfidence(ctx context.Context, v any) (*model.PredictionConfidence, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.PredictionConfidence)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOPredictionConfidence2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionConfidence(ctx context.Context, sel ast.SelectionSet, v *model.PredictionConfidence) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) marshalOSleepActivity2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐSleepActivity(ctx context.Context, sel ast.SelectionSet, v *model.SleepActivity) graphql.Marshaler {

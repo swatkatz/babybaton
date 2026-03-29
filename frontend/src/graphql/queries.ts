@@ -1,12 +1,18 @@
 import { gql } from '@apollo/client';
 
-export const GET_PREDICTION = gql`
-  query GetPrediction {
-    predictNextFeed {
+export const GET_PREDICTIONS = gql`
+  query GetPredictions {
+    predictions {
+      id
+      activityType
+      predictionType
       predictedTime
+      status
       confidence
-      minutesUntilFeed
       reasoning
+      predictedAmountMl
+      predictedDurationMinutes
+      careSessionId
     }
   }
 `;

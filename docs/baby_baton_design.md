@@ -375,11 +375,30 @@ type SleepActivity {
   sleepDetails: SleepDetails
 }
 
-type NextFeedPrediction {
+enum PredictionType {
+  NEXT_FEED
+  NEXT_NAP
+  NEXT_WAKE
+  BEDTIME
+}
+
+enum PredictionStatus {
+  OVERDUE
+  UPCOMING
+  PLANNED
+}
+
+type Prediction {
+  id: ID!
+  activityType: ActivityType!
+  predictionType: PredictionType!
   predictedTime: DateTime!
-  confidence: PredictionConfidence!
+  status: PredictionStatus!
+  confidence: PredictionConfidence
   reasoning: String
-  minutesUntilFeed: Int!
+  predictedAmountMl: Int
+  predictedDurationMinutes: Int
+  careSessionId: ID
 }
 
 # Separate output type for parsed voice results (no id/createdAt)
@@ -443,7 +462,7 @@ type Query {
   getCareSession(id: ID!): CareSession
 
   # Predictions
-  predictNextFeed: NextFeedPrediction!
+  predictions: [Prediction!]!
 }
 
 # Mutations
@@ -586,7 +605,7 @@ Based on real production data, the algorithm must handle:
 
 #### 4.4.1 Prediction Types
 
-The system returns a **timeline of upcoming predictions**, replacing the single `predictNextFeed` query:
+The system returns a **timeline of upcoming predictions** via the `predictions` query:
 
 | Prediction | Inputs | Algorithm |
 |------------|--------|-----------|
@@ -797,7 +816,7 @@ type Mutation {
 }
 ```
 
-The existing `predictNextFeed` query will be removed and replaced by `predictions`.
+The `predictNextFeed` query has been removed and replaced by `predictions`.
 
 #### 4.6.3 Prediction Status Rules
 
@@ -1998,10 +2017,17 @@ query GetDashboard {
     }
   }
 
-  predictNextFeed {
+  predictions {
+    id
+    activityType
+    predictionType
     predictedTime
+    status
     confidence
     reasoning
+    predictedAmountMl
+    predictedDurationMinutes
+    careSessionId
   }
 }
 ```
@@ -2303,7 +2329,7 @@ Accessed via [🗓️] button in header. Replaces PredictionDetailScreen.
 - Red dot disappears once the predicted time passes or a relevant activity is logged
 - Tapping always opens the full Upcoming screen regardless of badge state
 
-**MVP scope:** Only feed predictions (existing `predictNextFeed` query). Sleep predictions and scheduled events are future work — sections hidden when empty.
+**MVP scope:** Predictions timeline via `predictions` query supporting feed, nap, wake, and bedtime prediction types. Scheduled events are future work — sections hidden when empty.
 
 #### 18.3.4 History Tab — NEW
 
@@ -2789,7 +2815,7 @@ Create the Upcoming screen with urgency-based sections. Accessed via [🗓️] h
 *Acceptance criteria:*
 - Three sections: "Needs Attention" (items ≤ 10 min), "Predictions" (AI predictions), "Scheduled" (future — hidden when empty)
 - "Needs Attention" section only visible when a prediction is ≤ 10 minutes away, styled with warning colors
-- "Predictions" section shows feed prediction (reuse data from existing `predictNextFeed` query): predicted time, confidence, reasoning
+- "Predictions" section shows predictions from `predictions` query: predicted time, type, status, confidence, reasoning
 - "Scheduled" section hidden for MVP (no scheduled events feature yet)
 - Section cards styled distinctly (warning for Needs Attention, neutral for Predictions, calendar style for Scheduled)
 

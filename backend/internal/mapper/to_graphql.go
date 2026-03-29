@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/swatkatz/babybaton/backend/graph/model"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
@@ -211,4 +212,57 @@ func SleepDetailsToGraphQL(sd *domain.SleepDetails) *model.SleepDetails {
 		DurationMinutes: durationMinutes, // Calculated field
 		IsActive:        isActive,        // Calculated field
 	}
+}
+
+// domainPredictionTypeToGraphQL maps domain PredictionType to GraphQL PredictionType.
+func domainPredictionTypeToGraphQL(pt domain.PredictionType) model.PredictionType {
+	return model.PredictionType(strings.ToUpper(string(pt)))
+}
+
+// domainPredictionStatusToGraphQL maps domain PredictionStatus to GraphQL PredictionStatus.
+func domainPredictionStatusToGraphQL(ps domain.PredictionStatus) model.PredictionStatus {
+	return model.PredictionStatus(strings.ToUpper(string(ps)))
+}
+
+// domainPredictionConfidenceToGraphQL maps domain PredictionConfidence to GraphQL PredictionConfidence.
+func domainPredictionConfidenceToGraphQL(pc domain.PredictionConfidence) model.PredictionConfidence {
+	return model.PredictionConfidence(strings.ToUpper(string(pc)))
+}
+
+// PredictionToGraphQL converts a domain Prediction to a GraphQL model
+func PredictionToGraphQL(p *domain.Prediction) *model.Prediction {
+	if p == nil {
+		return nil
+	}
+
+	gql := &model.Prediction{
+		ID:             p.ID.String(),
+		ActivityType:   model.ActivityType(p.ActivityType),
+		PredictionType: domainPredictionTypeToGraphQL(p.PredictionType),
+		PredictedTime:  p.PredictedTime,
+		Status:         domainPredictionStatusToGraphQL(p.Status),
+		Reasoning:      p.Reasoning,
+	}
+
+	if p.Confidence != nil {
+		c := domainPredictionConfidenceToGraphQL(*p.Confidence)
+		gql.Confidence = &c
+	}
+
+	if p.PredictedAmountMl != nil {
+		amt := int32(*p.PredictedAmountMl)
+		gql.PredictedAmountMl = &amt
+	}
+
+	if p.PredictedDurationMinutes != nil {
+		dur := int32(*p.PredictedDurationMinutes)
+		gql.PredictedDurationMinutes = &dur
+	}
+
+	if p.CareSessionID != nil {
+		csID := p.CareSessionID.String()
+		gql.CareSessionID = &csID
+	}
+
+	return gql
 }

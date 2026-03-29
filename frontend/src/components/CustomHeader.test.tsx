@@ -41,7 +41,7 @@ jest.mock('../services/predictionReadService', () => ({
 }));
 
 // Mock Apollo useQuery
-let mockPredictionData: { predictNextFeed: { predictedTime: string; minutesUntilFeed: number } | null } | undefined;
+let mockPredictionData: { predictions: Array<{ id: string; predictionType: string }> } | undefined;
 jest.mock('@apollo/client/react', () => ({
   useQuery: () => ({
     data: mockPredictionData,
@@ -166,7 +166,7 @@ describe('CustomHeader', () => {
 
   describe('red dot badge', () => {
     it('shows red dot when prediction is unread', async () => {
-      mockPredictionData = { predictNextFeed: { predictedTime: '2026-03-29T18:30:00Z', minutesUntilFeed: 5 } };
+      mockPredictionData = { predictions: [{ id: 'pred-1', predictionType: 'NEXT_FEED' }] };
       (predictionReadService.hasAnyUnread as jest.Mock).mockResolvedValue(true);
       const { findByTestId } = render(
         <CustomHeader {...createHeaderProps('Dashboard')} />
@@ -175,7 +175,7 @@ describe('CustomHeader', () => {
     });
 
     it('hides red dot when prediction is read', async () => {
-      mockPredictionData = { predictNextFeed: { predictedTime: '2026-03-29T18:30:00Z', minutesUntilFeed: 5 } };
+      mockPredictionData = { predictions: [{ id: 'pred-1', predictionType: 'NEXT_FEED' }] };
       (predictionReadService.hasAnyUnread as jest.Mock).mockResolvedValue(false);
       const { queryByTestId } = render(
         <CustomHeader {...createHeaderProps('Dashboard')} />
@@ -197,13 +197,13 @@ describe('CustomHeader', () => {
     });
 
     it('checks read state using predictionReadService', async () => {
-      mockPredictionData = { predictNextFeed: { predictedTime: '2026-03-29T18:30:00Z', minutesUntilFeed: 30 } };
+      mockPredictionData = { predictions: [{ id: 'pred-1', predictionType: 'NEXT_FEED' }] };
       (predictionReadService.hasAnyUnread as jest.Mock).mockResolvedValue(true);
       const { findByTestId } = render(
         <CustomHeader {...createHeaderProps('Dashboard')} />
       );
       await findByTestId('upcoming-badge');
-      expect(predictionReadService.hasAnyUnread).toHaveBeenCalledWith('2026-03-29T18:30:00Z');
+      expect(predictionReadService.hasAnyUnread).toHaveBeenCalledWith(['pred-1']);
     });
   });
 });

@@ -891,6 +891,26 @@ func (r *mutationResolver) UpdateActivity(ctx context.Context, activityID string
 	}
 }
 
+// DismissPrediction is the resolver for the dismissPrediction field.
+func (r *mutationResolver) DismissPrediction(ctx context.Context, id string) (bool, error) {
+	_, _, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return false, fmt.Errorf("authentication required")
+	}
+
+	predictionID, err := uuid.Parse(id)
+	if err != nil {
+		return false, fmt.Errorf("invalid prediction ID: %w", err)
+	}
+
+	err = r.store.DismissPrediction(ctx, predictionID)
+	if err != nil {
+		return false, fmt.Errorf("failed to dismiss prediction: %w", err)
+	}
+
+	return true, nil
+}
+
 // CheckFamilyNameAvailable is the resolver for the checkFamilyNameAvailable field.
 func (r *queryResolver) CheckFamilyNameAvailable(ctx context.Context, name string) (bool, error) {
 	exists, err := r.store.FamilyNameExists(ctx, name)
@@ -1150,9 +1170,23 @@ func (r *queryResolver) GetCareSessionHistory(ctx context.Context, first int32, 
 	}, nil
 }
 
-// PredictNextFeed is the resolver for the predictNextFeed field.
-func (r *queryResolver) PredictNextFeed(ctx context.Context) (*model.NextFeedPrediction, error) {
-	return GetMockPrediction(), nil
+// Predictions is the resolver for the predictions field.
+func (r *queryResolver) Predictions(ctx context.Context) ([]*model.Prediction, error) {
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required")
+	}
+
+	domainPredictions, err := r.store.GetPredictionsForFamily(ctx, familyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get predictions: %w", err)
+	}
+
+	result := make([]*model.Prediction, 0, len(domainPredictions))
+	for _, dp := range domainPredictions {
+		result = append(result, mapper.PredictionToGraphQL(dp))
+	}
+	return result, nil
 }
 
 // Mutation returns MutationResolver implementation.
