@@ -223,6 +223,7 @@ export function DashboardScreen({ navigation }: Props) {
           <CurrentSessionCard
             session={currentSession}
             onPress={handleSessionPress}
+            onActivityPress={() => handleSessionPress()}
           />
         )}
 

@@ -3,17 +3,19 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, getCaregiverColor } from '../theme/colors';
 import { spacing, layout, typography } from '../theme/spacing';
 import { ChevronRight } from 'lucide-react-native';
-import { ActivityItem } from './ActivityItem';
+import { ActivityGrid } from './ActivityGrid';
 import { formatDuration, formatTime } from '../utils/time';
 import { GetCurrentSessionQuery } from '../types/__generated__/graphql';
 
 interface CurrentSessionCardProps {
   session: NonNullable<GetCurrentSessionQuery['getCurrentSession']>;
   onPress: () => void;
+  onActivityPress?: (activityId: string) => void;
 }
 export function CurrentSessionCard({
   session,
   onPress,
+  onActivityPress,
 }: CurrentSessionCardProps) {
   const caregiverColor = getCaregiverColor(session.caregiver.id);
   const duration = formatDuration(new Date(session.startedAt));
@@ -49,11 +51,13 @@ export function CurrentSessionCard({
           </Text>
         </View>
 
-        {/* Activities List */}
+        {/* Activity Grid */}
         <View style={styles.activitiesList}>
-          {session.activities.map((activity) => (
-            <ActivityItem key={activity.id} activity={activity} />
-          ))}
+          <ActivityGrid
+            activities={session.activities}
+            onActivityPress={onActivityPress ?? (() => onPress())}
+            onSeeAll={onPress}
+          />
         </View>
 
         {/* Footer Summary */}

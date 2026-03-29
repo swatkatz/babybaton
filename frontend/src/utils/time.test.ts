@@ -3,6 +3,7 @@ import {
   formatDuration,
   formatRelativeTime,
   formatMinutesToDuration,
+  formatShortTime,
 } from './time';
 
 describe('formatTime', () => {
@@ -129,6 +130,33 @@ describe('formatRelativeTime', () => {
   it('should return "just now" for future dates', () => {
     const date = new Date(now.getTime() + 60_000);
     expect(formatRelativeTime(date, now)).toBe('just now');
+  });
+});
+
+describe('formatShortTime', () => {
+  it('should format afternoon time as "3:15p"', () => {
+    const date = new Date(2025, 0, 15, 15, 15, 0);
+    expect(formatShortTime(date)).toBe('3:15p');
+  });
+
+  it('should format midnight as "12:00a"', () => {
+    const date = new Date(2025, 0, 15, 0, 0, 0);
+    expect(formatShortTime(date)).toBe('12:00a');
+  });
+
+  it('should format noon as "12:00p"', () => {
+    const date = new Date(2025, 0, 15, 12, 0, 0);
+    expect(formatShortTime(date)).toBe('12:00p');
+  });
+
+  it('should format morning time as "9:05a"', () => {
+    const date = new Date(2025, 0, 15, 9, 5, 0);
+    expect(formatShortTime(date)).toBe('9:05a');
+  });
+
+  it('should format 11:59 PM as "11:59p"', () => {
+    const date = new Date(2025, 0, 15, 23, 59, 0);
+    expect(formatShortTime(date)).toBe('11:59p');
   });
 });
 

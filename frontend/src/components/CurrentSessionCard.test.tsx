@@ -10,20 +10,7 @@ import {
 // Mock lucide icons
 jest.mock('lucide-react-native', () => ({
   ChevronRight: () => 'ChevronRight',
-  Utensils: () => 'Utensils',
-  Droplets: () => 'Droplets',
-  Moon: () => 'Moon',
 }));
-
-// Mock react-native-gesture-handler
-jest.mock('react-native-gesture-handler', () => {
-  const { View, TouchableOpacity } = require('react-native');
-  return {
-    Swipeable: ({ children }: any) => children,
-    GestureHandlerRootView: View,
-    TouchableOpacity,
-  };
-});
 
 // Mock colors module
 jest.mock('../theme/colors', () => ({
@@ -45,6 +32,8 @@ jest.mock('../theme/colors', () => ({
 jest.mock('../utils/time', () => ({
   formatTime: jest.fn(() => '10:00 AM'),
   formatDuration: jest.fn(() => '2h 15m'),
+  formatShortTime: jest.fn(() => '10:30a'),
+  formatMinutesToDuration: jest.fn((m: number) => `${m}m`),
 }));
 
 const makeSession = (activityOverrides?: any[]) => ({
@@ -173,14 +162,14 @@ describe('CurrentSessionCard', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('should render each activity item', () => {
+  it('should render activity grid with cells', () => {
     const { getByText } = render(
       <CurrentSessionCard session={makeSession()} onPress={onPress} />
     );
-    // Feed activity text
-    expect(getByText(/Fed 120ml/)).toBeTruthy();
-    // Diaper activity text
-    expect(getByText(/Changed diaper/)).toBeTruthy();
+    // Feed activity shows amount in grid cell
+    expect(getByText('120ml')).toBeTruthy();
+    // Diaper activity shows type in grid cell
+    expect(getByText('pee')).toBeTruthy();
   });
 
   it('should handle sessions with no activities', () => {
