@@ -148,6 +148,9 @@ func (m *mockStore) CreateSleepDetails(ctx context.Context, details *domain.Slee
 func (m *mockStore) GetSleepDetails(ctx context.Context, activityID uuid.UUID) (*domain.SleepDetails, error) {
 	return nil, nil
 }
+func (m *mockStore) GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.SleepDetails, error) {
+	return nil, nil
+}
 func (m *mockStore) UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error {
 	return nil
 }

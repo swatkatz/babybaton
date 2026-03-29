@@ -62,6 +62,7 @@ type Store interface {
 
 	CreateSleepDetails(ctx context.Context, details *domain.SleepDetails) error
 	GetSleepDetails(ctx context.Context, activityID uuid.UUID) (*domain.SleepDetails, error)
+	GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.SleepDetails, error)
 	UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error
 
 	// Prediction operations

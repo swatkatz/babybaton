@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -789,5 +790,219 @@ func TestGetCareSessionHistory_EdgesHaveCursors(t *testing.T) {
 		if edge.Node == nil {
 			t.Errorf("edge %d has nil node", i)
 		}
+	}
+}
+
+// ==================== Predictions Tests ====================
+
+func withTimezone(ctx context.Context, tz string) context.Context {
+	return context.WithValue(ctx, middleware.TimezoneKey, tz)
+}
+
+func TestPredictions_NoAuth_ReturnsError(t *testing.T) {
+	store := newMockStore()
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+
+	_, err := qr.Predictions(context.Background())
+	if err == nil {
+		t.Error("expected error when not authenticated")
+	}
+}
+
+func TestPredictions_WithFeedData_ReturnsPredictions(t *testing.T) {
+	store := newMockStore()
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+
+	caregiverID := uuid.New()
+	familyID := uuid.New()
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+	ctx = withTimezone(ctx, "America/Los_Angeles")
+
+	now := time.Now()
+	breastMilk := domain.FeedTypeBreastMilk
+
+	// Provide 10 feeds every ~3 hours during daytime
+	var feeds []*domain.FeedDetails
+	for i := range 10 {
+		startTime := now.Add(-time.Duration(i) * 3 * time.Hour)
+		amt := 120
+		feeds = append(feeds, &domain.FeedDetails{
+			ID:        uuid.New(),
+			StartTime: startTime,
+			FeedType:  &breastMilk,
+			AmountMl:  &amt,
+		})
+	}
+	store.recentFeedDetails = feeds
+
+	result, err := qr.Predictions(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) == 0 {
+		t.Fatal("expected at least 1 prediction")
+	}
+
+	hasNextFeed := false
+	for _, p := range result {
+		if p.PredictionType.String() == "NEXT_FEED" {
+			hasNextFeed = true
+			break
+		}
+	}
+	if !hasNextFeed {
+		t.Error("expected NEXT_FEED prediction")
+	}
+}
+
+func TestPredictions_WithFeedAndSleepData_ReturnsMultipleTypes(t *testing.T) {
+	store := newMockStore()
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+
+	caregiverID := uuid.New()
+	familyID := uuid.New()
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+	ctx = withTimezone(ctx, "America/Los_Angeles")
+
+	now := time.Now()
+	breastMilk := domain.FeedTypeBreastMilk
+
+	// Feeds
+	var feeds []*domain.FeedDetails
+	for i := range 12 {
+		startTime := now.Add(-time.Duration(i) * 3 * time.Hour)
+		amt := 120
+		feeds = append(feeds, &domain.FeedDetails{
+			ID:        uuid.New(),
+			StartTime: startTime,
+			FeedType:  &breastMilk,
+			AmountMl:  &amt,
+		})
+	}
+	store.recentFeedDetails = feeds
+
+	// Naps + overnight
+	var sleeps []*domain.SleepDetails
+	for i := range 5 {
+		start := now.Add(-time.Duration(1+i*4) * time.Hour)
+		end := start.Add(90 * time.Minute)
+		dur := 90
+		sleeps = append(sleeps, &domain.SleepDetails{
+			ID:              uuid.New(),
+			StartTime:       start,
+			EndTime:         &end,
+			DurationMinutes: &dur,
+		})
+	}
+	// Add overnight sleeps
+	for i := range 2 {
+		start := now.Add(-time.Duration(24+i*24) * time.Hour)
+		end := start.Add(600 * time.Minute)
+		dur := 600
+		sleeps = append(sleeps, &domain.SleepDetails{
+			ID:              uuid.New(),
+			StartTime:       start,
+			EndTime:         &end,
+			DurationMinutes: &dur,
+		})
+	}
+	store.recentSleepDetails = sleeps
+
+	result, err := qr.Predictions(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	types := make(map[string]bool)
+	for _, p := range result {
+		types[p.PredictionType.String()] = true
+	}
+
+	if !types["NEXT_FEED"] {
+		t.Error("expected NEXT_FEED prediction type")
+	}
+	if len(types) < 2 {
+		t.Errorf("expected multiple prediction types, got %d: %v", len(types), types)
+	}
+}
+
+func TestPredictions_StoreError_ReturnsError(t *testing.T) {
+	store := newMockStore()
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+
+	caregiverID := uuid.New()
+	familyID := uuid.New()
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	store.recentFeedErr = fmt.Errorf("database connection failed")
+
+	_, err := qr.Predictions(ctx)
+	if err == nil {
+		t.Error("expected error when store fails")
+	}
+}
+
+func TestPredictions_FreshCache_ReturnsCached(t *testing.T) {
+	store := newMockStore()
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+
+	caregiverID := uuid.New()
+	familyID := uuid.New()
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	now := time.Now()
+	confidence := domain.PredictionConfidenceHigh
+	reasoning := "cached prediction"
+
+	// Set up existing fresh predictions (computed less than 5 min ago)
+	store.predictions = []*domain.Prediction{
+		{
+			ID:             uuid.New(),
+			FamilyID:       familyID,
+			ActivityType:   domain.ActivityTypeFeed,
+			PredictionType: domain.PredictionTypeNextFeed,
+			PredictedTime:  now.Add(2 * time.Hour),
+			Status:         domain.PredictionStatusUpcoming,
+			Confidence:     &confidence,
+			Reasoning:      &reasoning,
+			ComputedAt:     now.Add(-2 * time.Minute), // 2 minutes ago = fresh
+			CreatedAt:      now.Add(-2 * time.Minute),
+		},
+	}
+
+	result, err := qr.Predictions(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should return the cached prediction without recomputing
+	if len(result) != 1 {
+		t.Fatalf("expected 1 cached prediction, got %d", len(result))
+	}
+	if result[0].Reasoning == nil || *result[0].Reasoning != "cached prediction" {
+		t.Error("expected cached prediction to be returned")
+	}
+}
+
+func TestPredictions_NoData_ReturnsEmpty(t *testing.T) {
+	store := newMockStore()
+	resolver := NewResolver(store)
+	qr := &queryResolver{resolver}
+
+	caregiverID := uuid.New()
+	familyID := uuid.New()
+	ctx := withAuth(context.Background(), caregiverID, familyID)
+
+	result, err := qr.Predictions(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("expected 0 predictions for new family, got %d", len(result))
 	}
 }

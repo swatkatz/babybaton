@@ -19,6 +19,7 @@ import (
 	"github.com/swatkatz/babybaton/backend/internal/domain"
 	"github.com/swatkatz/babybaton/backend/internal/mapper"
 	"github.com/swatkatz/babybaton/backend/internal/middleware"
+	"github.com/swatkatz/babybaton/backend/internal/prediction"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -1177,13 +1178,77 @@ func (r *queryResolver) Predictions(ctx context.Context) ([]*model.Prediction, e
 		return nil, fmt.Errorf("authentication required")
 	}
 
-	domainPredictions, err := r.store.GetPredictionsForFamily(ctx, familyID)
+	now := time.Now()
+
+	// Cleanup old predictions
+	_ = r.store.CleanupOldPredictions(ctx, now.Add(-24*time.Hour))
+
+	// Check if existing predictions are fresh (computed within last 5 minutes)
+	existing, err := r.store.GetPredictionsForFamily(ctx, familyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get predictions: %w", err)
 	}
+	if len(existing) > 0 && now.Sub(existing[0].ComputedAt) < 5*time.Minute {
+		result := make([]*model.Prediction, 0, len(existing))
+		for _, dp := range existing {
+			result = append(result, mapper.PredictionToGraphQL(dp))
+		}
+		return result, nil
+	}
 
-	result := make([]*model.Prediction, 0, len(domainPredictions))
-	for _, dp := range domainPredictions {
+	// Fetch recent activity data (last 14 days)
+	since14Days := now.Add(-14 * 24 * time.Hour)
+	_ = since14Days // used conceptually below
+
+	feedDetails, err := r.store.GetRecentFeedDetailsForFamily(ctx, familyID, 200)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get feed details: %w", err)
+	}
+
+	sleepDetails, err := r.store.GetRecentSleepDetailsForFamily(ctx, familyID, 200)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sleep details: %w", err)
+	}
+
+	// Convert domain models to prediction engine input types
+	feeds := make([]prediction.FeedRecord, 0, len(feedDetails))
+	for _, fd := range feedDetails {
+		feeds = append(feeds, prediction.FeedRecord{
+			StartTime: fd.StartTime,
+			EndTime:   fd.EndTime,
+			AmountMl:  fd.AmountMl,
+			FeedType:  fd.FeedType,
+		})
+	}
+
+	sleeps := make([]prediction.SleepRecord, 0, len(sleepDetails))
+	for _, sd := range sleepDetails {
+		sleeps = append(sleeps, prediction.SleepRecord{
+			StartTime:       sd.StartTime,
+			EndTime:         sd.EndTime,
+			DurationMinutes: sd.DurationMinutes,
+		})
+	}
+
+	// Generate predictions
+	timezone := middleware.GetTimezone(ctx)
+	predictions := prediction.GeneratePredictions(now, feeds, sleeps, timezone)
+
+	// Set family ID on all predictions
+	for _, p := range predictions {
+		p.FamilyID = familyID
+	}
+
+	// Persist predictions
+	if len(predictions) > 0 {
+		if err := r.store.UpsertPredictions(ctx, familyID, predictions); err != nil {
+			return nil, fmt.Errorf("failed to save predictions: %w", err)
+		}
+	}
+
+	// Map to GraphQL
+	result := make([]*model.Prediction, 0, len(predictions))
+	for _, dp := range predictions {
 		result = append(result, mapper.PredictionToGraphQL(dp))
 	}
 	return result, nil
