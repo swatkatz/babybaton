@@ -148,7 +148,7 @@ describe('CustomHeader', () => {
     it('shows back button and no action icons', () => {
       mockCanGoBack.mockReturnValue(true);
       const { queryByTestId } = render(
-        <CustomHeader {...createHeaderProps('PredictionDetail', 'Prediction Details')} />
+        <CustomHeader {...createHeaderProps('CurrentSessionDetail', 'Ongoing Session')} />
       );
       expect(queryByTestId('log-activity-button')).toBeNull();
       expect(queryByTestId('upcoming-button')).toBeNull();
@@ -157,7 +157,7 @@ describe('CustomHeader', () => {
     it('back button calls goBack', () => {
       mockCanGoBack.mockReturnValue(true);
       const { getByText } = render(
-        <CustomHeader {...createHeaderProps('PredictionDetail', 'Prediction Details')} />
+        <CustomHeader {...createHeaderProps('CurrentSessionDetail', 'Ongoing Session')} />
       );
       fireEvent.press(getByText('←'));
       expect(mockGoBack).toHaveBeenCalled();

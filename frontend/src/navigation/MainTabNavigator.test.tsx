@@ -54,9 +54,6 @@ jest.mock('../screens/SettingsScreen', () => ({
     return <Text>Settings Screen</Text>;
   },
 }));
-jest.mock('../screens/PredictionDetailScreen', () => ({
-  PredictionDetailScreen: () => null,
-}));
 jest.mock('../screens/CurrentSessionDetailScreen', () => ({
   CurrentSessionDetailScreen: () => null,
 }));

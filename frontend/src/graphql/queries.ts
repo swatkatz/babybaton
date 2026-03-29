@@ -76,68 +76,6 @@ export const GET_CURRENT_SESSION = gql`
   }
 `;
 
-export const GET_RECENT_SESSIONS = gql`
-  query GetRecentSessions($limit: Int) {
-    getRecentCareSessions(limit: $limit) {
-      id
-      status
-      startedAt
-      completedAt
-      caregiver {
-        id
-        name
-      }
-      activities {
-        ... on FeedActivity {
-          id
-          activityType
-          createdAt
-          feedDetails {
-            startTime
-            endTime
-            amountMl
-            feedType
-            durationMinutes
-            foodName
-            quantity
-            quantityUnit
-          }
-        }
-        ... on DiaperActivity {
-          id
-          activityType
-          createdAt
-          diaperDetails {
-            changedAt
-            hadPoop
-            hadPee
-          }
-        }
-        ... on SleepActivity {
-          id
-          activityType
-          createdAt
-          sleepDetails {
-            startTime
-            endTime
-            durationMinutes
-            isActive
-          }
-        }
-      }
-      summary {
-        totalFeeds
-        totalMl
-        totalDiaperChanges
-        totalSleepMinutes
-        lastFeedTime
-        lastSleepTime
-        currentlyAsleep
-      }
-    }
-  }
-`;
-
 export const CARE_SESSION_FRAGMENT = gql`
   fragment CareSessionDetail on CareSession {
     id

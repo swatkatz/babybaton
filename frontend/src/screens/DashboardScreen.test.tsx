@@ -203,19 +203,6 @@ describe('DashboardScreen', () => {
     expect(await findByText('120ml')).toBeTruthy();
   });
 
-  it('does not render PredictionCard', async () => {
-    const { findByText, queryByText } = renderScreen(createDefaultMocks());
-    // Wait for data to load
-    await findByText('Swati');
-    expect(queryByText('Loading prediction...')).toBeNull();
-    expect(queryByText('Error loading prediction')).toBeNull();
-  });
-
-  it('does not render recent sessions section', async () => {
-    const { findByText, queryByText } = renderScreen(createDefaultMocks());
-    await findByText('Swati');
-    expect(queryByText('Recent Care Sessions')).toBeNull();
-  });
 
   it('does not render bottom voice/manual bar', async () => {
     const { findByText, queryByText } = renderScreen(createDefaultMocks());
