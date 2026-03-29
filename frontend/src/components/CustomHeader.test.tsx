@@ -1,7 +1,8 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { StackHeaderProps } from '@react-navigation/stack';
 import { CustomHeader } from './CustomHeader';
+import predictionReadService from '../services/predictionReadService';
 
 // Mock useAuth
 const mockAuthData = {
@@ -22,8 +23,25 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+// Mock navigation focus effect — execute immediately
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: (callback: () => void) => {
+    callback();
+  },
+}));
+
+// Mock predictionReadService
+jest.mock('../services/predictionReadService', () => ({
+  __esModule: true,
+  default: {
+    isRead: jest.fn().mockResolvedValue(false),
+    markAsRead: jest.fn().mockResolvedValue(undefined),
+    hasAnyUnread: jest.fn().mockResolvedValue(false),
+  },
+}));
+
 // Mock Apollo useQuery
-let mockPredictionData: { predictNextFeed: { minutesUntilFeed: number } | null } | undefined;
+let mockPredictionData: { predictNextFeed: { predictedTime: string; minutesUntilFeed: number } | null } | undefined;
 jest.mock('@apollo/client/react', () => ({
   useQuery: () => ({
     data: mockPredictionData,
@@ -77,6 +95,7 @@ describe('CustomHeader', () => {
     jest.clearAllMocks();
     mockPredictionData = undefined;
     mockCanGoBack.mockReturnValue(false);
+    (predictionReadService.hasAnyUnread as jest.Mock).mockResolvedValue(false);
   });
 
   describe('Dashboard screen', () => {
@@ -146,44 +165,45 @@ describe('CustomHeader', () => {
   });
 
   describe('red dot badge', () => {
-    it('shows red dot when minutesUntilFeed <= 10', () => {
-      mockPredictionData = { predictNextFeed: { minutesUntilFeed: 5 } };
-      const { getByTestId } = render(
+    it('shows red dot when prediction is unread', async () => {
+      mockPredictionData = { predictNextFeed: { predictedTime: '2026-03-29T18:30:00Z', minutesUntilFeed: 5 } };
+      (predictionReadService.hasAnyUnread as jest.Mock).mockResolvedValue(true);
+      const { findByTestId } = render(
         <CustomHeader {...createHeaderProps('Dashboard')} />
       );
-      expect(getByTestId('upcoming-badge')).toBeTruthy();
+      expect(await findByTestId('upcoming-badge')).toBeTruthy();
     });
 
-    it('shows red dot when minutesUntilFeed is 0', () => {
-      mockPredictionData = { predictNextFeed: { minutesUntilFeed: 0 } };
-      const { getByTestId } = render(
-        <CustomHeader {...createHeaderProps('Dashboard')} />
-      );
-      expect(getByTestId('upcoming-badge')).toBeTruthy();
-    });
-
-    it('shows red dot when minutesUntilFeed is negative', () => {
-      mockPredictionData = { predictNextFeed: { minutesUntilFeed: -3 } };
-      const { getByTestId } = render(
-        <CustomHeader {...createHeaderProps('Dashboard')} />
-      );
-      expect(getByTestId('upcoming-badge')).toBeTruthy();
-    });
-
-    it('hides red dot when minutesUntilFeed > 10', () => {
-      mockPredictionData = { predictNextFeed: { minutesUntilFeed: 30 } };
+    it('hides red dot when prediction is read', async () => {
+      mockPredictionData = { predictNextFeed: { predictedTime: '2026-03-29T18:30:00Z', minutesUntilFeed: 5 } };
+      (predictionReadService.hasAnyUnread as jest.Mock).mockResolvedValue(false);
       const { queryByTestId } = render(
         <CustomHeader {...createHeaderProps('Dashboard')} />
       );
-      expect(queryByTestId('upcoming-badge')).toBeNull();
+      await waitFor(() => {
+        expect(queryByTestId('upcoming-badge')).toBeNull();
+      });
     });
 
-    it('hides red dot when no prediction data', () => {
+    it('hides red dot when no prediction data', async () => {
       mockPredictionData = undefined;
+      (predictionReadService.hasAnyUnread as jest.Mock).mockResolvedValue(false);
       const { queryByTestId } = render(
         <CustomHeader {...createHeaderProps('Dashboard')} />
       );
-      expect(queryByTestId('upcoming-badge')).toBeNull();
+      await waitFor(() => {
+        expect(queryByTestId('upcoming-badge')).toBeNull();
+      });
+    });
+
+    it('checks read state using predictionReadService', async () => {
+      mockPredictionData = { predictNextFeed: { predictedTime: '2026-03-29T18:30:00Z', minutesUntilFeed: 30 } };
+      (predictionReadService.hasAnyUnread as jest.Mock).mockResolvedValue(true);
+      const { findByTestId } = render(
+        <CustomHeader {...createHeaderProps('Dashboard')} />
+      );
+      await findByTestId('upcoming-badge');
+      expect(predictionReadService.hasAnyUnread).toHaveBeenCalledWith('2026-03-29T18:30:00Z');
     });
   });
 });
