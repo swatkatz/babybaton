@@ -184,6 +184,20 @@ EOF
     --output-format text
 
   # -------------------------------------------------------
+  # Check if there are any new commits on this branch
+  # -------------------------------------------------------
+  commit_count=$(git rev-list main.."$branch_name" --count 2>/dev/null || echo "0")
+
+  if [ "$commit_count" -eq 0 ]; then
+    echo "=== No new commits for issue #${issue_number}. Skipping PR creation. ==="
+    gh issue edit "$issue_number" --remove-label "in development"
+    git checkout main
+    git branch -D "$branch_name"
+    echo "=== Cleaned up issue #${issue_number}. Looping back... ==="
+    continue
+  fi
+
+  # -------------------------------------------------------
   # Step 6 & 7: Create a PR directly with gh
   # -------------------------------------------------------
   echo "=== Creating PR for issue #${issue_number}... ==="
