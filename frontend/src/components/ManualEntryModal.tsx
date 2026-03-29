@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,13 +17,14 @@ import { colors } from '../theme/colors';
 import { spacing, typography, layout } from '../theme/spacing';
 import { ActivityType, FeedType, SolidsUnit, ActivityInput } from '../types/__generated__/graphql';
 
-type SelectedActivityType = 'FEED' | 'DIAPER' | 'SLEEP';
+export type SelectedActivityType = 'FEED' | 'DIAPER' | 'SLEEP';
 
 interface ManualEntryModalProps {
   visible: boolean;
   onClose: () => void;
   onSave: (activities: ActivityInput[]) => void;
   saving: boolean;
+  initialActivityType?: SelectedActivityType;
 }
 
 export function ManualEntryModal({
@@ -31,8 +32,15 @@ export function ManualEntryModal({
   onClose,
   onSave,
   saving,
+  initialActivityType,
 }: ManualEntryModalProps) {
-  const [selectedType, setSelectedType] = useState<SelectedActivityType | null>(null);
+  const [selectedType, setSelectedType] = useState<SelectedActivityType | null>(initialActivityType ?? null);
+
+  useEffect(() => {
+    if (visible) {
+      setSelectedType(initialActivityType ?? null);
+    }
+  }, [visible, initialActivityType]);
 
   // Feed state
   const [feedTime, setFeedTime] = useState(new Date());
@@ -59,7 +67,7 @@ export function ManualEntryModal({
   const [showPicker, setShowPicker] = useState<string | null>(null);
 
   const resetForm = () => {
-    setSelectedType(null);
+    setSelectedType(initialActivityType ?? null);
     setFeedTime(new Date());
     setFeedAmount('');
     setFeedType(FeedType.Formula);
@@ -542,7 +550,7 @@ export function ManualEntryModal({
             style={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            {renderActivityTypeSelector()}
+            {!initialActivityType && renderActivityTypeSelector()}
             {renderForm()}
           </ScrollView>
 

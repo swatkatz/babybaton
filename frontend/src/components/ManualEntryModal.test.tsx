@@ -330,4 +330,52 @@ describe('ManualEntryModal', () => {
       expect(getByText('Pee')).toBeTruthy();
     });
   });
+
+  describe('initialActivityType prop', () => {
+    it('should render Feed form directly when initialActivityType="FEED"', () => {
+      const { getByText, queryByText } = render(
+        <ManualEntryModal {...baseProps} initialActivityType="FEED" />
+      );
+      expect(queryByText('What would you like to log?')).toBeNull();
+      expect(getByText('Amount (ml)')).toBeTruthy();
+      expect(getByText('Feed Type')).toBeTruthy();
+      expect(getByText('Save Activity')).toBeTruthy();
+    });
+
+    it('should render Diaper form directly when initialActivityType="DIAPER"', () => {
+      const { getByText, queryByText } = render(
+        <ManualEntryModal {...baseProps} initialActivityType="DIAPER" />
+      );
+      expect(queryByText('What would you like to log?')).toBeNull();
+      expect(getByText('Pee')).toBeTruthy();
+      expect(getByText('Poop')).toBeTruthy();
+    });
+
+    it('should render Sleep form directly when initialActivityType="SLEEP"', () => {
+      const { getByText, queryByText } = render(
+        <ManualEntryModal {...baseProps} initialActivityType="SLEEP" />
+      );
+      expect(queryByText('What would you like to log?')).toBeNull();
+      expect(getByText('Start Time')).toBeTruthy();
+      expect(getByText('Set End Time')).toBeTruthy();
+    });
+
+    it('should still show type selector when initialActivityType is not provided', () => {
+      const { getByText } = render(<ManualEntryModal {...baseProps} />);
+      expect(getByText('What would you like to log?')).toBeTruthy();
+    });
+
+    it('should save correctly with pre-selected type', () => {
+      const { getByText, getByPlaceholderText } = render(
+        <ManualEntryModal {...baseProps} initialActivityType="FEED" />
+      );
+      fireEvent.changeText(getByPlaceholderText('e.g., 120'), '150');
+      fireEvent.press(getByText('Save Activity'));
+
+      expect(baseProps.onSave).toHaveBeenCalledTimes(1);
+      const savedActivities = baseProps.onSave.mock.calls[0][0];
+      expect(savedActivities[0].activityType).toBe(ActivityType.Feed);
+      expect(savedActivities[0].feedDetails.amountMl).toBe(150);
+    });
+  });
 });
