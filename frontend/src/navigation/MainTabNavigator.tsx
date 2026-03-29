@@ -25,6 +25,11 @@ export type HomeStackParamList = {
   Upcoming: undefined;
 };
 
+export type HistoryStackParamList = {
+  HistoryHome: undefined;
+  SessionDetail: { sessionId: string };
+};
+
 export type MainTabParamList = {
   HomeTab: undefined;
   HistoryTab: undefined;
@@ -33,6 +38,7 @@ export type MainTabParamList = {
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createStackNavigator<HomeStackParamList>();
+const HistoryStack = createStackNavigator<HistoryStackParamList>();
 
 function HomeStackNavigator() {
   return (
@@ -88,6 +94,29 @@ function HomeStackNavigator() {
   );
 }
 
+function HistoryStackNavigator() {
+  return (
+    <HistoryStack.Navigator>
+      <HistoryStack.Screen
+        name="HistoryHome"
+        component={HistoryScreen}
+        options={{
+          title: 'History',
+          header: (props) => <CustomHeader {...props} />,
+        }}
+      />
+      <HistoryStack.Screen
+        name="SessionDetail"
+        component={SessionDetailScreen}
+        options={{
+          title: 'Session Details',
+          header: (props) => <CustomHeader {...props} />,
+        }}
+      />
+    </HistoryStack.Navigator>
+  );
+}
+
 const TAB_ICON_SIZE = 24;
 
 export function MainTabNavigator() {
@@ -115,7 +144,7 @@ export function MainTabNavigator() {
       />
       <Tab.Screen
         name="HistoryTab"
-        component={HistoryScreen}
+        component={HistoryStackNavigator}
         options={{
           tabBarIcon: ({ color }) => (
             <Clock size={TAB_ICON_SIZE} color={color} />

@@ -97,6 +97,24 @@ export const client = new ApolloClient({
       Activity: {
         keyFields: ['id'],
       },
+      Query: {
+        fields: {
+          getCareSessionHistory: {
+            keyArgs: false,
+            merge(existing, incoming, { args }) {
+              // If no cursor (initial load or refetch), replace entirely
+              if (!args?.after) {
+                return incoming;
+              }
+              // For fetchMore, append edges and take latest pageInfo
+              return {
+                ...incoming,
+                edges: [...(existing?.edges ?? []), ...incoming.edges],
+              };
+            },
+          },
+        },
+      },
     },
   }),
 });
