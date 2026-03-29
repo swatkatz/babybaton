@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Home, Clock, User } from 'lucide-react-native';
+import { Home, Clock, Target, User } from 'lucide-react-native';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { CurrentSessionDetailScreen } from '../screens/CurrentSessionDetailScreen';
 import { SessionDetailScreen } from '../screens/SessionDetailScreen';
@@ -10,6 +10,7 @@ import { UpcomingScreen } from '../screens/UpcomingScreen';
 import { PredictionDetailScreen } from '../screens/PredictionDetailScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { ScheduleGoalsScreen } from '../screens/ScheduleGoalsScreen';
 import { CustomHeader } from '../components/CustomHeader';
 import { colors } from '../theme/colors';
 
@@ -30,6 +31,7 @@ export type HistoryStackParamList = {
 export type MainTabParamList = {
   HomeTab: undefined;
   HistoryTab: undefined;
+  ScheduleTab: undefined;
   ProfileTab: undefined;
 };
 
@@ -147,6 +149,16 @@ export function MainTabNavigator() {
             <Clock size={TAB_ICON_SIZE} color={color} />
           ),
           tabBarAccessibilityLabel: 'History',
+        }}
+      />
+      <Tab.Screen
+        name="ScheduleTab"
+        component={ScheduleGoalsScreen}
+        options={{
+          tabBarIcon: ({ color }) => (
+            <Target size={TAB_ICON_SIZE} color={color} />
+          ),
+          tabBarAccessibilityLabel: 'Schedule',
         }}
       />
       <Tab.Screen

@@ -54,6 +54,12 @@ jest.mock('../screens/SettingsScreen', () => ({
     return <Text>Settings Screen</Text>;
   },
 }));
+jest.mock('../screens/ScheduleGoalsScreen', () => ({
+  ScheduleGoalsScreen: () => {
+    const { Text } = require('react-native');
+    return <Text>Schedule Goals Screen</Text>;
+  },
+}));
 jest.mock('../screens/CurrentSessionDetailScreen', () => ({
   CurrentSessionDetailScreen: () => null,
 }));
@@ -76,6 +82,7 @@ jest.mock('lucide-react-native', () => {
   return {
     Home: (props: Record<string, unknown>) => <View testID="icon-home" {...props} />,
     Clock: (props: Record<string, unknown>) => <View testID="icon-clock" {...props} />,
+    Target: (props: Record<string, unknown>) => <View testID="icon-target" {...props} />,
     User: (props: Record<string, unknown>) => <View testID="icon-user" {...props} />,
   };
 });
@@ -106,10 +113,17 @@ describe('MainTabNavigator', () => {
     expect(getByText('Settings Screen')).toBeTruthy();
   });
 
-  it('renders three tab icons', () => {
+  it('renders Schedule tab content when Schedule tab pressed', () => {
+    const { getByText, getByLabelText } = renderTabs();
+    fireEvent.press(getByLabelText('Schedule'));
+    expect(getByText('Schedule Goals Screen')).toBeTruthy();
+  });
+
+  it('renders four tab icons', () => {
     const { getAllByTestId } = renderTabs();
     expect(getAllByTestId('icon-home').length).toBeGreaterThan(0);
     expect(getAllByTestId('icon-clock').length).toBeGreaterThan(0);
+    expect(getAllByTestId('icon-target').length).toBeGreaterThan(0);
     expect(getAllByTestId('icon-user').length).toBeGreaterThan(0);
   });
 });
