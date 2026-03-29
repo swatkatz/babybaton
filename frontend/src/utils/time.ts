@@ -57,14 +57,50 @@ export const formatRelativeTime = (
 
 /**
  * Format a Date as short time: "3:15p", "12:00a"
+ * Prefixes with "Yest " or "Mon 27 " when not today.
  */
-export const formatShortTime = (date: Date): string => {
+export const formatShortTime = (
+  date: Date,
+  now: Date = new Date()
+): string => {
   const hours = date.getHours();
   const minutes = date.getMinutes();
   const period = hours >= 12 ? 'p' : 'a';
   const displayHour = hours % 12 || 12;
   const displayMinute = minutes.toString().padStart(2, '0');
-  return `${displayHour}:${displayMinute}${period}`;
+  const time = `${displayHour}:${displayMinute}${period}`;
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const activityDay = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+
+  if (activityDay.getTime() === today.getTime()) {
+    return time;
+  }
+  if (activityDay.getTime() === yesterday.getTime()) {
+    return `Yest ${time}`;
+  }
+
+  const monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return `${monthNames[date.getMonth()]} ${date.getDate()} ${time}`;
 };
 
 export const formatMinutesToDuration = (totalMinutes: number): string => {

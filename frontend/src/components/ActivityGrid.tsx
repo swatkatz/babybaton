@@ -7,6 +7,22 @@ import { GetCurrentSessionQuery } from '../types/__generated__/graphql';
 type CurrentSession = NonNullable<GetCurrentSessionQuery['getCurrentSession']>;
 type Activity = CurrentSession['activities'][number];
 
+function getActivityTime(activity: Activity): number {
+  let time: string | undefined;
+  switch (activity.__typename) {
+    case 'FeedActivity':
+      time = activity.feedDetails?.startTime;
+      break;
+    case 'DiaperActivity':
+      time = activity.diaperDetails?.changedAt;
+      break;
+    case 'SleepActivity':
+      time = activity.sleepDetails?.startTime;
+      break;
+  }
+  return new Date(time ?? activity.createdAt).getTime();
+}
+
 interface ActivityGridProps {
   activities: Activity[];
   onActivityPress: (activityId: string) => void;
@@ -20,9 +36,9 @@ export function ActivityGrid({
 }: ActivityGridProps) {
   if (activities.length === 0) return null;
 
-  // Sort most recent first by createdAt
+  // Sort most recent first by the activity's actual time
   const sorted = [...activities].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (a, b) => getActivityTime(b) - getActivityTime(a)
   );
 
   const showSeeAll = sorted.length >= 6;

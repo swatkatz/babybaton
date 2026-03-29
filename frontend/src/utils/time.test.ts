@@ -134,29 +134,46 @@ describe('formatRelativeTime', () => {
 });
 
 describe('formatShortTime', () => {
-  it('should format afternoon time as "3:15p"', () => {
+  const now = new Date(2025, 0, 15, 18, 0, 0); // Jan 15, 2025 6:00 PM
+
+  it('should format today time as just time', () => {
     const date = new Date(2025, 0, 15, 15, 15, 0);
-    expect(formatShortTime(date)).toBe('3:15p');
+    expect(formatShortTime(date, now)).toBe('3:15p');
   });
 
   it('should format midnight as "12:00a"', () => {
     const date = new Date(2025, 0, 15, 0, 0, 0);
-    expect(formatShortTime(date)).toBe('12:00a');
+    expect(formatShortTime(date, now)).toBe('12:00a');
   });
 
   it('should format noon as "12:00p"', () => {
     const date = new Date(2025, 0, 15, 12, 0, 0);
-    expect(formatShortTime(date)).toBe('12:00p');
+    expect(formatShortTime(date, now)).toBe('12:00p');
   });
 
   it('should format morning time as "9:05a"', () => {
     const date = new Date(2025, 0, 15, 9, 5, 0);
-    expect(formatShortTime(date)).toBe('9:05a');
+    expect(formatShortTime(date, now)).toBe('9:05a');
   });
 
   it('should format 11:59 PM as "11:59p"', () => {
     const date = new Date(2025, 0, 15, 23, 59, 0);
-    expect(formatShortTime(date)).toBe('11:59p');
+    expect(formatShortTime(date, now)).toBe('11:59p');
+  });
+
+  it('should prefix yesterday time with "Yest"', () => {
+    const date = new Date(2025, 0, 14, 19, 30, 0);
+    expect(formatShortTime(date, now)).toBe('Yest 7:30p');
+  });
+
+  it('should prefix older dates with month and day', () => {
+    const date = new Date(2025, 0, 10, 8, 0, 0);
+    expect(formatShortTime(date, now)).toBe('Jan 10 8:00a');
+  });
+
+  it('should show month and day for dates from a different month', () => {
+    const date = new Date(2024, 11, 25, 14, 45, 0);
+    expect(formatShortTime(date, now)).toBe('Dec 25 2:45p');
   });
 });
 

@@ -51,10 +51,13 @@ func (s *PostgresStore) GetActivityByID(ctx context.Context, id uuid.UUID) (*dom
 // GetActivitiesForSession retrieves all activities for a care session
 func (s *PostgresStore) GetActivitiesForSession(ctx context.Context, sessionID uuid.UUID) ([]*domain.Activity, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, care_session_id, activity_type, created_at, updated_at
-		FROM activities
-		WHERE care_session_id = $1
-		ORDER BY created_at ASC
+		SELECT a.id, a.care_session_id, a.activity_type, a.created_at, a.updated_at
+		FROM activities a
+		LEFT JOIN feed_details fd ON a.id = fd.activity_id
+		LEFT JOIN sleep_details sd ON a.id = sd.activity_id
+		LEFT JOIN diaper_details dd ON a.id = dd.activity_id
+		WHERE a.care_session_id = $1
+		ORDER BY COALESCE(fd.start_time, sd.start_time, dd.changed_at, a.created_at) ASC
 	`, sessionID)
 
 	if err != nil {
@@ -86,7 +89,9 @@ func (s *PostgresStore) GetActivitiesForSession(ctx context.Context, sessionID u
 }
 
 // GetLatestActivityByTypeForFamily returns the most recent activity of a given type
-// across all sessions for a family. Returns (nil, nil) if no matching activity exists.
+// across all sessions for a family, ordered by the activity's own time (e.g. startTime
+// for feeds/sleeps, changedAt for diapers) with created_at as fallback.
+// Returns (nil, nil) if no matching activity exists.
 func (s *PostgresStore) GetLatestActivityByTypeForFamily(ctx context.Context, familyID uuid.UUID, activityType domain.ActivityType) (*domain.Activity, error) {
 	activity := &domain.Activity{}
 
@@ -94,8 +99,11 @@ func (s *PostgresStore) GetLatestActivityByTypeForFamily(ctx context.Context, fa
 		SELECT a.id, a.care_session_id, a.activity_type, a.created_at, a.updated_at
 		FROM activities a
 		JOIN care_sessions cs ON a.care_session_id = cs.id
+		LEFT JOIN feed_details fd ON a.id = fd.activity_id
+		LEFT JOIN sleep_details sd ON a.id = sd.activity_id
+		LEFT JOIN diaper_details dd ON a.id = dd.activity_id
 		WHERE cs.family_id = $1 AND a.activity_type = $2
-		ORDER BY a.created_at DESC
+		ORDER BY COALESCE(fd.start_time, sd.start_time, dd.changed_at, a.created_at) DESC
 		LIMIT 1
 	`, familyID, activityType).Scan(
 		&activity.ID,
