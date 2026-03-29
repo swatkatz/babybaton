@@ -46,6 +46,21 @@ type CareSession struct {
 	Summary     *CareSessionSummary `json:"summary"`
 }
 
+type CareSessionConnection struct {
+	Edges    []*CareSessionEdge   `json:"edges"`
+	PageInfo *CareSessionPageInfo `json:"pageInfo"`
+}
+
+type CareSessionEdge struct {
+	Node   *CareSession `json:"node"`
+	Cursor string       `json:"cursor"`
+}
+
+type CareSessionPageInfo struct {
+	HasNextPage bool    `json:"hasNextPage"`
+	EndCursor   *string `json:"endCursor,omitempty"`
+}
+
 type CareSessionSummary struct {
 	TotalFeeds         int32      `json:"totalFeeds"`
 	TotalMl            int32      `json:"totalMl"`

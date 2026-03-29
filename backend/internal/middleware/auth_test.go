@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
@@ -98,6 +99,9 @@ func (m *mockStore) GetInProgressSessionForFamily(ctx context.Context, familyID 
 	return nil, nil
 }
 func (m *mockStore) GetRecentCareSessionsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.CareSession, error) {
+	return nil, nil
+}
+func (m *mockStore) GetCareSessionHistoryForFamily(ctx context.Context, familyID uuid.UUID, limit int, afterTime *time.Time, afterID *uuid.UUID) ([]*domain.CareSession, error) {
 	return nil, nil
 }
 func (m *mockStore) UpdateCareSession(ctx context.Context, session *domain.CareSession) error {

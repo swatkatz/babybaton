@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
@@ -28,6 +29,10 @@ type mockStore struct {
 	getCaregiverByDeviceIDErr     error
 	caregiverByUserAndFamily      *domain.Caregiver
 	getCaregiverByUserAndFamilyErr error
+
+	// Session history
+	careSessionHistory    []*domain.CareSession
+	careSessionHistoryErr error
 
 	// Baby status
 	latestActivityByType map[domain.ActivityType]*domain.Activity
@@ -150,6 +155,12 @@ func (m *mockStore) GetInProgressSessionForFamily(_ context.Context, _ uuid.UUID
 }
 func (m *mockStore) GetRecentCareSessionsForFamily(_ context.Context, _ uuid.UUID, _ int) ([]*domain.CareSession, error) {
 	return nil, nil
+}
+func (m *mockStore) GetCareSessionHistoryForFamily(_ context.Context, _ uuid.UUID, _ int, _ *time.Time, _ *uuid.UUID) ([]*domain.CareSession, error) {
+	if m.careSessionHistoryErr != nil {
+		return nil, m.careSessionHistoryErr
+	}
+	return m.careSessionHistory, nil
 }
 func (m *mockStore) UpdateCareSession(_ context.Context, _ *domain.CareSession) error { return nil }
 func (m *mockStore) DeleteCareSession(_ context.Context, _ uuid.UUID) error            { return nil }

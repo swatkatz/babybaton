@@ -72,6 +72,21 @@ type ComplexityRoot struct {
 		Summary     func(childComplexity int) int
 	}
 
+	CareSessionConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
+	CareSessionEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	CareSessionPageInfo struct {
+		EndCursor   func(childComplexity int) int
+		HasNextPage func(childComplexity int) int
+	}
+
 	CareSessionSummary struct {
 		CurrentlyAsleep    func(childComplexity int) int
 		LastFeedTime       func(childComplexity int) int
@@ -171,6 +186,7 @@ type ComplexityRoot struct {
 		CheckFamilyNameAvailable func(childComplexity int, name string) int
 		GetBabyStatus            func(childComplexity int) int
 		GetCareSession           func(childComplexity int, id string) int
+		GetCareSessionHistory    func(childComplexity int, first int32, after *string) int
 		GetCurrentSession        func(childComplexity int) int
 		GetMyCaregiver           func(childComplexity int) int
 		GetMyFamilies            func(childComplexity int) int
@@ -217,6 +233,7 @@ type QueryResolver interface {
 	GetCurrentSession(ctx context.Context) (*model.CareSession, error)
 	GetCareSession(ctx context.Context, id string) (*model.CareSession, error)
 	GetBabyStatus(ctx context.Context) (*model.BabyStatus, error)
+	GetCareSessionHistory(ctx context.Context, first int32, after *string) (*model.CareSessionConnection, error)
 	PredictNextFeed(ctx context.Context) (*model.NextFeedPrediction, error)
 }
 
@@ -337,6 +354,45 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.CareSession.Summary(childComplexity), true
+
+	case "CareSessionConnection.edges":
+		if e.complexity.CareSessionConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.CareSessionConnection.Edges(childComplexity), true
+	case "CareSessionConnection.pageInfo":
+		if e.complexity.CareSessionConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.CareSessionConnection.PageInfo(childComplexity), true
+
+	case "CareSessionEdge.cursor":
+		if e.complexity.CareSessionEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.CareSessionEdge.Cursor(childComplexity), true
+	case "CareSessionEdge.node":
+		if e.complexity.CareSessionEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.CareSessionEdge.Node(childComplexity), true
+
+	case "CareSessionPageInfo.endCursor":
+		if e.complexity.CareSessionPageInfo.EndCursor == nil {
+			break
+		}
+
+		return e.complexity.CareSessionPageInfo.EndCursor(childComplexity), true
+	case "CareSessionPageInfo.hasNextPage":
+		if e.complexity.CareSessionPageInfo.HasNextPage == nil {
+			break
+		}
+
+		return e.complexity.CareSessionPageInfo.HasNextPage(childComplexity), true
 
 	case "CareSessionSummary.currentlyAsleep":
 		if e.complexity.CareSessionSummary.CurrentlyAsleep == nil {
@@ -799,6 +855,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.GetCareSession(childComplexity, args["id"].(string)), true
+	case "Query.getCareSessionHistory":
+		if e.complexity.Query.GetCareSessionHistory == nil {
+			break
+		}
+
+		args, err := ec.field_Query_getCareSessionHistory_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.GetCareSessionHistory(childComplexity, args["first"].(int32), args["after"].(*string)), true
 	case "Query.getCurrentSession":
 		if e.complexity.Query.GetCurrentSession == nil {
 			break
@@ -1122,6 +1189,21 @@ type SleepActivity {
   sleepDetails: SleepDetails
 }
 
+type CareSessionEdge {
+  node: CareSession!
+  cursor: String!
+}
+
+type CareSessionPageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type CareSessionConnection {
+  edges: [CareSessionEdge!]!
+  pageInfo: CareSessionPageInfo!
+}
+
 type BabyStatus {
   lastFeed: FeedActivity
   lastDiaper: DiaperActivity
@@ -1201,6 +1283,9 @@ type Query {
 
   # Baby Status
   getBabyStatus: BabyStatus!
+
+  # Session History (paginated)
+  getCareSessionHistory(first: Int!, after: String): CareSessionConnection!
 
   # Predictions
   predictNextFeed: NextFeedPrediction!
@@ -1439,6 +1524,22 @@ func (ec *executionContext) field_Query_checkFamilyNameAvailable_args(ctx contex
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_getCareSessionHistory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalNInt2int32)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
 	return args, nil
 }
 
@@ -2063,6 +2164,212 @@ func (ec *executionContext) fieldContext_CareSession_summary(_ context.Context, 
 				return ec.fieldContext_CareSessionSummary_currentlyAsleep(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CareSessionSummary", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareSessionConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.CareSessionConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareSessionConnection_edges,
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		ec.marshalNCareSessionEdge2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionEdgeᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareSessionConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareSessionConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_CareSessionEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_CareSessionEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CareSessionEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareSessionConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.CareSessionConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareSessionConnection_pageInfo,
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		ec.marshalNCareSessionPageInfo2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionPageInfo,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareSessionConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareSessionConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hasNextPage":
+				return ec.fieldContext_CareSessionPageInfo_hasNextPage(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_CareSessionPageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CareSessionPageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareSessionEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.CareSessionEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareSessionEdge_node,
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		ec.marshalNCareSession2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSession,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareSessionEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareSessionEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_CareSession_id(ctx, field)
+			case "caregiver":
+				return ec.fieldContext_CareSession_caregiver(ctx, field)
+			case "familyId":
+				return ec.fieldContext_CareSession_familyId(ctx, field)
+			case "status":
+				return ec.fieldContext_CareSession_status(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_CareSession_startedAt(ctx, field)
+			case "completedAt":
+				return ec.fieldContext_CareSession_completedAt(ctx, field)
+			case "activities":
+				return ec.fieldContext_CareSession_activities(ctx, field)
+			case "notes":
+				return ec.fieldContext_CareSession_notes(ctx, field)
+			case "summary":
+				return ec.fieldContext_CareSession_summary(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CareSession", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareSessionEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.CareSessionEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareSessionEdge_cursor,
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareSessionEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareSessionEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareSessionPageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *model.CareSessionPageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareSessionPageInfo_hasNextPage,
+		func(ctx context.Context) (any, error) {
+			return obj.HasNextPage, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareSessionPageInfo_hasNextPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareSessionPageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareSessionPageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *model.CareSessionPageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareSessionPageInfo_endCursor,
+		func(ctx context.Context) (any, error) {
+			return obj.EndCursor, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareSessionPageInfo_endCursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareSessionPageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4568,6 +4875,53 @@ func (ec *executionContext) fieldContext_Query_getBabyStatus(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_getCareSessionHistory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_getCareSessionHistory,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().GetCareSessionHistory(ctx, fc.Args["first"].(int32), fc.Args["after"].(*string))
+		},
+		nil,
+		ec.marshalNCareSessionConnection2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionConnection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_getCareSessionHistory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_CareSessionConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_CareSessionConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CareSessionConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_getCareSessionHistory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_predictNextFeed(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6791,6 +7145,135 @@ func (ec *executionContext) _CareSession(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var careSessionConnectionImplementors = []string{"CareSessionConnection"}
+
+func (ec *executionContext) _CareSessionConnection(ctx context.Context, sel ast.SelectionSet, obj *model.CareSessionConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, careSessionConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CareSessionConnection")
+		case "edges":
+			out.Values[i] = ec._CareSessionConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._CareSessionConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var careSessionEdgeImplementors = []string{"CareSessionEdge"}
+
+func (ec *executionContext) _CareSessionEdge(ctx context.Context, sel ast.SelectionSet, obj *model.CareSessionEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, careSessionEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CareSessionEdge")
+		case "node":
+			out.Values[i] = ec._CareSessionEdge_node(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cursor":
+			out.Values[i] = ec._CareSessionEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var careSessionPageInfoImplementors = []string{"CareSessionPageInfo"}
+
+func (ec *executionContext) _CareSessionPageInfo(ctx context.Context, sel ast.SelectionSet, obj *model.CareSessionPageInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, careSessionPageInfoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CareSessionPageInfo")
+		case "hasNextPage":
+			out.Values[i] = ec._CareSessionPageInfo_hasNextPage(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "endCursor":
+			out.Values[i] = ec._CareSessionPageInfo_endCursor(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var careSessionSummaryImplementors = []string{"CareSessionSummary"}
 
 func (ec *executionContext) _CareSessionSummary(ctx context.Context, sel ast.SelectionSet, obj *model.CareSessionSummary) graphql.Marshaler {
@@ -7639,6 +8122,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getCareSessionHistory":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getCareSessionHistory(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "predictNextFeed":
 			field := field
 
@@ -8312,6 +8817,84 @@ func (ec *executionContext) marshalNCareSession2ᚖgithubᚗcomᚋswatkatzᚋbab
 		return graphql.Null
 	}
 	return ec._CareSession(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCareSessionConnection2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionConnection(ctx context.Context, sel ast.SelectionSet, v model.CareSessionConnection) graphql.Marshaler {
+	return ec._CareSessionConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNCareSessionConnection2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionConnection(ctx context.Context, sel ast.SelectionSet, v *model.CareSessionConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CareSessionConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCareSessionEdge2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CareSessionEdge) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNCareSessionEdge2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNCareSessionEdge2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionEdge(ctx context.Context, sel ast.SelectionSet, v *model.CareSessionEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CareSessionEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCareSessionPageInfo2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.CareSessionPageInfo) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CareSessionPageInfo(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNCareSessionStatus2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSessionStatus(ctx context.Context, v any) (model.CareSessionStatus, error) {

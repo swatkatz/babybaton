@@ -120,6 +120,21 @@ type SleepActivity {
   sleepDetails: SleepDetails
 }
 
+type CareSessionEdge {
+  node: CareSession!
+  cursor: String!
+}
+
+type CareSessionPageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type CareSessionConnection {
+  edges: [CareSessionEdge!]!
+  pageInfo: CareSessionPageInfo!
+}
+
 type BabyStatus {
   lastFeed: FeedActivity
   lastDiaper: DiaperActivity
@@ -199,6 +214,9 @@ type Query {
 
   # Baby Status
   getBabyStatus: BabyStatus!
+
+  # Session History (paginated)
+  getCareSessionHistory(first: Int!, after: String): CareSessionConnection!
 
   # Predictions
   predictNextFeed: NextFeedPrediction!

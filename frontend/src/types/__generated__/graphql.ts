@@ -60,6 +60,24 @@ export type CareSession = {
   summary: CareSessionSummary;
 };
 
+export type CareSessionConnection = {
+  __typename: 'CareSessionConnection';
+  edges: Array<CareSessionEdge>;
+  pageInfo: CareSessionPageInfo;
+};
+
+export type CareSessionEdge = {
+  __typename: 'CareSessionEdge';
+  cursor: Scalars['String']['output'];
+  node: CareSession;
+};
+
+export type CareSessionPageInfo = {
+  __typename: 'CareSessionPageInfo';
+  endCursor: Maybe<Scalars['String']['output']>;
+  hasNextPage: Scalars['Boolean']['output'];
+};
+
 export enum CareSessionStatus {
   Completed = 'COMPLETED',
   InProgress = 'IN_PROGRESS'
@@ -265,6 +283,7 @@ export type Query = {
   checkFamilyNameAvailable: Scalars['Boolean']['output'];
   getBabyStatus: BabyStatus;
   getCareSession: Maybe<CareSession>;
+  getCareSessionHistory: CareSessionConnection;
   getCurrentSession: Maybe<CareSession>;
   getMyCaregiver: Maybe<Caregiver>;
   getMyFamilies: Array<Family>;
@@ -281,6 +300,12 @@ export type QueryCheckFamilyNameAvailableArgs = {
 
 export type QueryGetCareSessionArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryGetCareSessionHistoryArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first: Scalars['Int']['input'];
 };
 
 

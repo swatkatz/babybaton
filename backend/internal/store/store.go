@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
@@ -38,6 +39,7 @@ type Store interface {
 	GetCareSessionByID(ctx context.Context, id uuid.UUID) (*domain.CareSession, error)
 	GetInProgressSessionForFamily(ctx context.Context, familyID uuid.UUID) (*domain.CareSession, error)
 	GetRecentCareSessionsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.CareSession, error)
+	GetCareSessionHistoryForFamily(ctx context.Context, familyID uuid.UUID, limit int, afterTime *time.Time, afterID *uuid.UUID) ([]*domain.CareSession, error)
 	UpdateCareSession(ctx context.Context, session *domain.CareSession) error
 	DeleteCareSession(ctx context.Context, id uuid.UUID) error
 
