@@ -108,6 +108,7 @@ type DiaperDetails struct {
 type SleepDetails struct {
 	ID              uuid.UUID
 	ActivityID      uuid.UUID
+	CareSessionID   uuid.UUID // populated by GetRecentSleepDetailsForFamily
 	StartTime       time.Time
 	EndTime         *time.Time
 	DurationMinutes *int

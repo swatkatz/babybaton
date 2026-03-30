@@ -28,7 +28,7 @@ func (s *PostgresStore) UpsertPredictions(ctx context.Context, familyID uuid.UUI
 	// Insert new predictions
 	for _, p := range predictions {
 		var careSessionID *uuid.UUID
-		if p.CareSessionID != nil {
+		if p.CareSessionID != nil && *p.CareSessionID != uuid.Nil {
 			careSessionID = p.CareSessionID
 		}
 		var confidence *string

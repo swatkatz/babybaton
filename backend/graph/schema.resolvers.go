@@ -1259,6 +1259,7 @@ func (r *queryResolver) Predictions(ctx context.Context) ([]*model.Prediction, e
 			StartTime:       sd.StartTime,
 			EndTime:         sd.EndTime,
 			DurationMinutes: sd.DurationMinutes,
+			CareSessionID:   sd.CareSessionID,
 		})
 	}
 

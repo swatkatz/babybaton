@@ -236,7 +236,7 @@ func (s *PostgresStore) UpdateDiaperDetails(ctx context.Context, details *domain
 // GetRecentSleepDetailsForFamily retrieves recent sleep details across all sessions for a family
 func (s *PostgresStore) GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.SleepDetails, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT sd.id, sd.activity_id, sd.start_time, sd.end_time, sd.duration_minutes, sd.created_at, sd.updated_at
+		SELECT sd.id, sd.activity_id, a.care_session_id, sd.start_time, sd.end_time, sd.duration_minutes, sd.created_at, sd.updated_at
 		FROM sleep_details sd
 		JOIN activities a ON sd.activity_id = a.id
 		JOIN care_sessions cs ON a.care_session_id = cs.id
@@ -254,7 +254,7 @@ func (s *PostgresStore) GetRecentSleepDetailsForFamily(ctx context.Context, fami
 	for rows.Next() {
 		d := &domain.SleepDetails{}
 		err := rows.Scan(
-			&d.ID, &d.ActivityID, &d.StartTime, &d.EndTime,
+			&d.ID, &d.ActivityID, &d.CareSessionID, &d.StartTime, &d.EndTime,
 			&d.DurationMinutes,
 			&d.CreatedAt, &d.UpdatedAt,
 		)
