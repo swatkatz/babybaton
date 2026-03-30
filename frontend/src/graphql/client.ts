@@ -38,7 +38,10 @@ const uploadLink = new UploadHttpLink({
 const authLink = setContext(async (_, { headers }) => {
   try {
     // Get device timezone (e.g., "America/New_York", "Europe/London")
-    const timezone = Localization.getCalendars()[0]?.timeZone ?? 'UTC';
+    // expo-localization can return null/undefined on some web browsers
+    const timezone = Localization.getCalendars()[0]?.timeZone
+      ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+      ?? 'UTC';
 
     // Try Supabase session first (new auth)
     const { data: { session } } = await supabase.auth.getSession();

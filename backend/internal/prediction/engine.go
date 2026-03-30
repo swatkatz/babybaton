@@ -67,14 +67,21 @@ func GeneratePredictions(now time.Time, feeds []FeedRecord, sleeps []SleepRecord
 	sleepPreds := generateSleepPredictions(now, sleeps, loc)
 	predictions = append(predictions, sleepPreds...)
 
-	// --- Bedtime prediction ---
-	bedtimePred := generateBedtimePrediction(now, sleeps, loc)
-	if bedtimePred != nil {
-		predictions = append(predictions, bedtimePred)
+	// --- Check if baby is currently in overnight sleep ---
+	inOvernightSleep := isInOvernightSleep(sleeps)
+
+	// --- Bedtime prediction (skip if baby is already asleep for the night) ---
+	if !inOvernightSleep {
+		bedtimePred := generateBedtimePrediction(now, sleeps, loc)
+		if bedtimePred != nil {
+			predictions = append(predictions, bedtimePred)
+		}
 	}
 
-	// --- Chain forward until bedtime ---
-	predictions = chainPredictions(now, predictions, feeds, sleeps, loc)
+	// --- Chain forward until bedtime (skip if baby is asleep for the night) ---
+	if !inOvernightSleep {
+		predictions = chainPredictions(now, predictions, feeds, sleeps, loc)
+	}
 
 	// Cap at maxPredictions
 	if len(predictions) > maxPredictions {
@@ -587,6 +594,28 @@ func filterWakeWindows(windows []time.Duration) []time.Duration {
 		}
 	}
 	return result
+}
+
+// isInOvernightSleep returns true if the most recent sleep is ongoing and has lasted
+// longer than the nap threshold (napMaxMinutes), indicating overnight sleep.
+func isInOvernightSleep(sleeps []SleepRecord) bool {
+	if len(sleeps) == 0 {
+		return false
+	}
+	// Find most recent sleep
+	mostRecent := sleeps[0]
+	for _, s := range sleeps[1:] {
+		if s.StartTime.After(mostRecent.StartTime) {
+			mostRecent = s
+		}
+	}
+	// Must be ongoing (no end time)
+	if mostRecent.EndTime != nil {
+		return false
+	}
+	// If it's been going for longer than the nap max, treat as overnight
+	elapsed := time.Since(mostRecent.StartTime).Minutes()
+	return elapsed >= napMaxMinutes
 }
 
 func classifySleeps(sleeps []SleepRecord) (naps []SleepRecord, overnights []SleepRecord) {
