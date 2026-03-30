@@ -1228,16 +1228,15 @@ func (r *queryResolver) Predictions(ctx context.Context) ([]*model.Prediction, e
 		return result, nil
 	}
 
-	// Fetch recent activity data (last 14 days)
+	// Fetch recent activity data (last 14 days only — baby patterns change)
 	since14Days := now.Add(-14 * 24 * time.Hour)
-	_ = since14Days // used conceptually below
 
-	feedDetails, err := r.store.GetRecentFeedDetailsForFamily(ctx, familyID, 200)
+	feedDetails, err := r.store.GetRecentFeedDetailsForFamily(ctx, familyID, 200, since14Days)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get feed details: %w", err)
 	}
 
-	sleepDetails, err := r.store.GetRecentSleepDetailsForFamily(ctx, familyID, 200)
+	sleepDetails, err := r.store.GetRecentSleepDetailsForFamily(ctx, familyID, 200, since14Days)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sleep details: %w", err)
 	}

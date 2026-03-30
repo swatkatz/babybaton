@@ -53,7 +53,7 @@ type Store interface {
 	// Activity detail operations (lazy loaded)
 	CreateFeedDetails(ctx context.Context, details *domain.FeedDetails) error
 	GetFeedDetails(ctx context.Context, activityID uuid.UUID) (*domain.FeedDetails, error)
-	GetRecentFeedDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.FeedDetails, error)
+	GetRecentFeedDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int, since time.Time) ([]*domain.FeedDetails, error)
 	UpdateFeedDetails(ctx context.Context, details *domain.FeedDetails) error
 
 	CreateDiaperDetails(ctx context.Context, details *domain.DiaperDetails) error
@@ -62,7 +62,7 @@ type Store interface {
 
 	CreateSleepDetails(ctx context.Context, details *domain.SleepDetails) error
 	GetSleepDetails(ctx context.Context, activityID uuid.UUID) (*domain.SleepDetails, error)
-	GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.SleepDetails, error)
+	GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int, since time.Time) ([]*domain.SleepDetails, error)
 	UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error
 
 	// Prediction operations

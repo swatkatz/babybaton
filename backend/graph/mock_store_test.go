@@ -201,7 +201,7 @@ func (m *mockStore) GetFeedDetails(_ context.Context, _ uuid.UUID) (*domain.Feed
 	}
 	return nil, errNotFound
 }
-func (m *mockStore) GetRecentFeedDetailsForFamily(_ context.Context, _ uuid.UUID, _ int) ([]*domain.FeedDetails, error) {
+func (m *mockStore) GetRecentFeedDetailsForFamily(_ context.Context, _ uuid.UUID, _ int, _ time.Time) ([]*domain.FeedDetails, error) {
 	if m.recentFeedErr != nil {
 		return nil, m.recentFeedErr
 	}
@@ -229,7 +229,7 @@ func (m *mockStore) GetSleepDetails(_ context.Context, _ uuid.UUID) (*domain.Sle
 	}
 	return nil, errNotFound
 }
-func (m *mockStore) GetRecentSleepDetailsForFamily(_ context.Context, _ uuid.UUID, _ int) ([]*domain.SleepDetails, error) {
+func (m *mockStore) GetRecentSleepDetailsForFamily(_ context.Context, _ uuid.UUID, _ int, _ time.Time) ([]*domain.SleepDetails, error) {
 	if m.recentSleepErr != nil {
 		return nil, m.recentSleepErr
 	}

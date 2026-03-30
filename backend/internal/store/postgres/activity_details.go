@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/swatkatz/babybaton/backend/internal/domain"
@@ -148,16 +149,16 @@ func (s *PostgresStore) GetSleepDetails(ctx context.Context, activityID uuid.UUI
 }
 
 // GetRecentFeedDetailsForFamily retrieves recent feed details across all sessions for a family
-func (s *PostgresStore) GetRecentFeedDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.FeedDetails, error) {
+func (s *PostgresStore) GetRecentFeedDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int, since time.Time) ([]*domain.FeedDetails, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT fd.id, fd.activity_id, fd.start_time, fd.end_time, fd.amount_ml, fd.feed_type, fd.food_name, fd.quantity, fd.quantity_unit, fd.created_at, fd.updated_at
 		FROM feed_details fd
 		JOIN activities a ON fd.activity_id = a.id
 		JOIN care_sessions cs ON a.care_session_id = cs.id
-		WHERE cs.family_id = $1
+		WHERE cs.family_id = $1 AND fd.start_time >= $3
 		ORDER BY fd.start_time DESC
 		LIMIT $2
-	`, familyID, limit)
+	`, familyID, limit, since)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recent feed details: %w", err)
@@ -234,16 +235,16 @@ func (s *PostgresStore) UpdateDiaperDetails(ctx context.Context, details *domain
 }
 
 // GetRecentSleepDetailsForFamily retrieves recent sleep details across all sessions for a family
-func (s *PostgresStore) GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.SleepDetails, error) {
+func (s *PostgresStore) GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int, since time.Time) ([]*domain.SleepDetails, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT sd.id, sd.activity_id, a.care_session_id, sd.start_time, sd.end_time, sd.duration_minutes, sd.created_at, sd.updated_at
 		FROM sleep_details sd
 		JOIN activities a ON sd.activity_id = a.id
 		JOIN care_sessions cs ON a.care_session_id = cs.id
-		WHERE cs.family_id = $1
+		WHERE cs.family_id = $1 AND sd.start_time >= $3
 		ORDER BY sd.start_time DESC
 		LIMIT $2
-	`, familyID, limit)
+	`, familyID, limit, since)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recent sleep details: %w", err)

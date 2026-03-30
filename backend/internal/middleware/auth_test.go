@@ -127,7 +127,7 @@ func (m *mockStore) CreateFeedDetails(ctx context.Context, details *domain.FeedD
 func (m *mockStore) GetFeedDetails(ctx context.Context, activityID uuid.UUID) (*domain.FeedDetails, error) {
 	return nil, nil
 }
-func (m *mockStore) GetRecentFeedDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.FeedDetails, error) {
+func (m *mockStore) GetRecentFeedDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int, since time.Time) ([]*domain.FeedDetails, error) {
 	return nil, nil
 }
 func (m *mockStore) UpdateFeedDetails(ctx context.Context, details *domain.FeedDetails) error {
@@ -148,7 +148,7 @@ func (m *mockStore) CreateSleepDetails(ctx context.Context, details *domain.Slee
 func (m *mockStore) GetSleepDetails(ctx context.Context, activityID uuid.UUID) (*domain.SleepDetails, error) {
 	return nil, nil
 }
-func (m *mockStore) GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int) ([]*domain.SleepDetails, error) {
+func (m *mockStore) GetRecentSleepDetailsForFamily(ctx context.Context, familyID uuid.UUID, limit int, since time.Time) ([]*domain.SleepDetails, error) {
 	return nil, nil
 }
 func (m *mockStore) UpdateSleepDetails(ctx context.Context, details *domain.SleepDetails) error {
