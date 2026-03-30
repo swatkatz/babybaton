@@ -14,6 +14,7 @@ jest.mock('../services/predictionReadService', () => ({
   __esModule: true,
   default: {
     markAsRead: jest.fn().mockResolvedValue(undefined),
+    pruneStale: jest.fn().mockResolvedValue(undefined),
   },
 }));
 

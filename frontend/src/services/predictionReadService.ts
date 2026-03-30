@@ -26,6 +26,17 @@ class PredictionReadService {
     }
     return false;
   }
+
+  /** Remove read entries for prediction IDs that no longer exist. */
+  async pruneStale(currentIds: string[]): Promise<void> {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const readKeys = allKeys.filter(k => k.startsWith(KEY_PREFIX));
+    const currentKeySet = new Set(currentIds.map(getKey));
+    const staleKeys = readKeys.filter(k => !currentKeySet.has(k));
+    if (staleKeys.length > 0) {
+      await AsyncStorage.multiRemove(staleKeys);
+    }
+  }
 }
 
 export default new PredictionReadService();

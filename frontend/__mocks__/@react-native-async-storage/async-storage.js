@@ -21,6 +21,9 @@ const AsyncStorage = {
     });
     return Promise.resolve();
   }),
+  getAllKeys: jest.fn(() => {
+    return Promise.resolve(Object.keys(store));
+  }),
   multiRemove: jest.fn((keys) => {
     keys.forEach((key) => {
       delete store[key];
@@ -37,6 +40,7 @@ const AsyncStorage = {
     AsyncStorage.getItem.mockClear();
     AsyncStorage.setItem.mockClear();
     AsyncStorage.removeItem.mockClear();
+    AsyncStorage.getAllKeys.mockClear();
     AsyncStorage.multiGet.mockClear();
     AsyncStorage.multiSet.mockClear();
     AsyncStorage.multiRemove.mockClear();

@@ -50,4 +50,31 @@ describe('PredictionReadService', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('pruneStale', () => {
+    it('removes read entries for prediction IDs no longer in the current set', async () => {
+      await predictionReadService.markAsRead('pred-1');
+      await predictionReadService.markAsRead('pred-2');
+      await predictionReadService.markAsRead('pred-3');
+
+      // Only pred-2 is still current
+      await predictionReadService.pruneStale(['pred-2']);
+
+      // pred-1 and pred-3 should be removed
+      const read1 = await predictionReadService.isRead('pred-1');
+      const read2 = await predictionReadService.isRead('pred-2');
+      const read3 = await predictionReadService.isRead('pred-3');
+      expect(read1).toBe(false);
+      expect(read2).toBe(true);
+      expect(read3).toBe(false);
+    });
+
+    it('does nothing when no stale entries exist', async () => {
+      await predictionReadService.markAsRead('pred-1');
+      await predictionReadService.pruneStale(['pred-1']);
+
+      const read = await predictionReadService.isRead('pred-1');
+      expect(read).toBe(true);
+    });
+  });
 });

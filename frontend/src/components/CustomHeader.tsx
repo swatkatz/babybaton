@@ -30,6 +30,7 @@ export function CustomHeader({ options, route, navigation }: StackHeaderProps) {
   useFocusEffect(
     useCallback(() => {
       if (isDashboard) {
+        predictionReadService.pruneStale(predictionIds);
         predictionReadService.hasAnyUnread(predictionIds).then(setHasUnread);
       }
     }, [isDashboard, predictionIds])

@@ -69,12 +69,14 @@ export function UpcomingScreen({ navigation }: Props) {
 
   const predictions = data?.predictions ?? [];
 
-  // Mark all predictions as read when this screen is focused
+  // Mark all predictions as read and prune stale entries when this screen is focused
   useFocusEffect(
     useCallback(() => {
-      for (const p of predictions) {
-        predictionReadService.markAsRead(p.id);
+      const ids = predictions.map(p => p.id);
+      for (const id of ids) {
+        predictionReadService.markAsRead(id);
       }
+      predictionReadService.pruneStale(ids);
     }, [predictions])
   );
 

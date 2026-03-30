@@ -37,6 +37,7 @@ jest.mock('../services/predictionReadService', () => ({
     isRead: jest.fn().mockResolvedValue(false),
     markAsRead: jest.fn().mockResolvedValue(undefined),
     hasAnyUnread: jest.fn().mockResolvedValue(false),
+    pruneStale: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
