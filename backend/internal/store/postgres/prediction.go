@@ -39,7 +39,8 @@ func (s *PostgresStore) UpsertPredictions(ctx context.Context, familyID uuid.UUI
 
 		_, err = tx.ExecContext(ctx,
 			`INSERT INTO predictions (id, family_id, care_session_id, activity_type, prediction_type, predicted_time, status, confidence, reasoning, predicted_amount_ml, predicted_duration_minutes, computed_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			 ON CONFLICT (id) DO NOTHING`,
 			p.ID, familyID, careSessionID, string(p.ActivityType), string(p.PredictionType),
 			p.PredictedTime, string(p.Status), confidence, p.Reasoning,
 			p.PredictedAmountMl, p.PredictedDurationMinutes, p.ComputedAt,
