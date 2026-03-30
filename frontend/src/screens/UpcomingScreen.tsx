@@ -23,7 +23,7 @@ import { PredictionCard } from '../components/PredictionCard';
 import predictionReadService from '../services/predictionReadService';
 import type { HomeStackParamList } from '../navigation/MainTabNavigator';
 
-const POLL_INTERVAL = 15 * 60 * 1000; // 15 minutes
+const POLL_INTERVAL = 2 * 60 * 1000; // 2 minutes
 
 type Prediction = GetPredictionsQuery['predictions'][number];
 
