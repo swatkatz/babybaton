@@ -52,4 +52,7 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
-      - run: eas build --platform ${{ inputs.platform }} --profile ${{ inputs.profile }} --non-interactive --no-wait
+      - run: eas build --platform ${{ inputs.platform }} --profile ${{ inputs.profile }} --non-interactive ${{ inputs.profile != 'production' && '--no-wait' || '' }}
+      - name: Submit to app stores
+        if: inputs.profile == 'production'
+        run: eas submit --platform ${{ inputs.platform }} --profile production --non-interactive --latest

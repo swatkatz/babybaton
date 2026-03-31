@@ -14,9 +14,8 @@ type Prediction = GetPredictionsQuery['predictions'][number];
 interface PredictionCardProps {
   prediction: Prediction;
   onPress?: () => void;
-  onLogActivity?: () => void;
-  onMarkAwake?: () => void;
-  onDismiss?: () => void;
+  onDone?: () => void;
+  onSkipped?: () => void;
 }
 
 function getPredictionEmoji(predictionType: PredictionType): string {
@@ -104,9 +103,8 @@ function formatPredictedTime(predictedTime: string, isPlanned: boolean): string 
 export function PredictionCard({
   prediction,
   onPress,
-  onLogActivity,
-  onMarkAwake,
-  onDismiss,
+  onDone,
+  onSkipped,
 }: PredictionCardProps) {
   const isOverdue = prediction.status === PredictionStatus.Overdue;
   const isPlanned = prediction.status === PredictionStatus.Planned;
@@ -191,18 +189,14 @@ export function PredictionCard({
       {/* OVERDUE CTAs */}
       {isOverdue && (
         <View style={styles.ctaRow}>
-          {prediction.predictionType === PredictionType.NextWake && onMarkAwake ? (
-            <TouchableOpacity style={styles.ctaPrimary} onPress={onMarkAwake}>
-              <Text style={styles.ctaPrimaryText}>Mark as Awake</Text>
+          {onDone && (
+            <TouchableOpacity style={styles.ctaPrimary} onPress={onDone}>
+              <Text style={styles.ctaPrimaryText}>Done</Text>
             </TouchableOpacity>
-          ) : onLogActivity ? (
-            <TouchableOpacity style={styles.ctaPrimary} onPress={onLogActivity}>
-              <Text style={styles.ctaPrimaryText}>Log Activity</Text>
-            </TouchableOpacity>
-          ) : null}
-          {onDismiss && (
-            <TouchableOpacity style={styles.ctaSecondary} onPress={onDismiss}>
-              <Text style={styles.ctaSecondaryText}>Dismiss</Text>
+          )}
+          {onSkipped && (
+            <TouchableOpacity style={styles.ctaSecondary} onPress={onSkipped}>
+              <Text style={styles.ctaSecondaryText}>Skipped</Text>
             </TouchableOpacity>
           )}
         </View>

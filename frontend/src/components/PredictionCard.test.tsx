@@ -58,40 +58,24 @@ describe('PredictionCard', () => {
       expect(getByText(/AGO/)).toBeTruthy();
     });
 
-    it('renders OVERDUE card with Log Activity CTA for NEXT_FEED', () => {
-      const onLogActivity = jest.fn();
+    it('renders OVERDUE card with Done button', () => {
+      const onDone = jest.fn();
       const { getByText } = render(
-        <PredictionCard prediction={overduePrediction} onLogActivity={onLogActivity} />
+        <PredictionCard prediction={overduePrediction} onDone={onDone} />
       );
-      const button = getByText('Log Activity');
+      const button = getByText('Done');
       fireEvent.press(button);
-      expect(onLogActivity).toHaveBeenCalled();
+      expect(onDone).toHaveBeenCalled();
     });
 
-    it('renders OVERDUE card with Dismiss button', () => {
-      const onDismiss = jest.fn();
+    it('renders OVERDUE card with Skipped button', () => {
+      const onSkipped = jest.fn();
       const { getByText } = render(
-        <PredictionCard prediction={overduePrediction} onDismiss={onDismiss} />
+        <PredictionCard prediction={overduePrediction} onSkipped={onSkipped} />
       );
-      const button = getByText('Dismiss');
+      const button = getByText('Skipped');
       fireEvent.press(button);
-      expect(onDismiss).toHaveBeenCalled();
-    });
-
-    it('renders OVERDUE NEXT_WAKE card with Mark as Awake CTA', () => {
-      const onMarkAwake = jest.fn();
-      const wakePrediction = {
-        ...overduePrediction,
-        predictionType: PredictionType.NextWake,
-        activityType: ActivityType.Sleep,
-        careSessionId: 'session-1',
-      };
-      const { getByText } = render(
-        <PredictionCard prediction={wakePrediction} onMarkAwake={onMarkAwake} />
-      );
-      const button = getByText('Mark as Awake');
-      fireEvent.press(button);
-      expect(onMarkAwake).toHaveBeenCalled();
+      expect(onSkipped).toHaveBeenCalled();
     });
   });
 

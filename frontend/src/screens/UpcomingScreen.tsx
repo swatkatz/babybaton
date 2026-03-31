@@ -16,7 +16,6 @@ import {
   GetPredictionsDocument,
   DismissPredictionDocument,
   PredictionStatus,
-  PredictionType,
   type GetPredictionsQuery,
 } from '../types/__generated__/graphql';
 import { PredictionCard } from '../components/PredictionCard';
@@ -85,18 +84,11 @@ export function UpcomingScreen({ navigation }: Props) {
     [predictions]
   );
 
-  const handleLogActivity = () => {
-    navigation.navigate('LogActivity');
+  const handleDone = (predictionId: string) => {
+    dismissPrediction({ variables: { id: predictionId } });
   };
 
-  const handleMarkAwake = (prediction: Prediction) => {
-    if (prediction.careSessionId) {
-      // Navigate to session detail where caregiver can end the sleep activity
-      navigation.navigate('SessionDetail', { sessionId: prediction.careSessionId });
-    }
-  };
-
-  const handleDismiss = (predictionId: string) => {
+  const handleSkipped = (predictionId: string) => {
     dismissPrediction({ variables: { id: predictionId } });
   };
 
@@ -151,13 +143,8 @@ export function UpcomingScreen({ navigation }: Props) {
                 key={prediction.id}
                 prediction={prediction}
                 onPress={() => handleCardPress(prediction)}
-                onLogActivity={handleLogActivity}
-                onMarkAwake={
-                  prediction.predictionType === PredictionType.NextWake
-                    ? () => handleMarkAwake(prediction)
-                    : undefined
-                }
-                onDismiss={() => handleDismiss(prediction.id)}
+                onDone={() => handleDone(prediction.id)}
+                onSkipped={() => handleSkipped(prediction.id)}
               />
             ))}
           </View>

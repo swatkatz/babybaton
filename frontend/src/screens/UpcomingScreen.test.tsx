@@ -195,39 +195,23 @@ describe('UpcomingScreen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('PredictionDetail', { predictionId: 'pred-1' });
     });
 
-    it('navigates to LogActivity when Log Activity CTA is pressed', () => {
+    it('calls dismissPrediction when Done is pressed on overdue card', () => {
       mockQueryResult.data = {
         predictions: [{ ...basePrediction, status: 'OVERDUE', predictedTime: new Date(Date.now() - 10 * 60000).toISOString() }],
       };
       const { getByText } = renderScreen();
-      fireEvent.press(getByText('Log Activity'));
-      expect(mockNavigate).toHaveBeenCalledWith('LogActivity');
-    });
-
-    it('navigates to SessionDetail for Mark as Awake', () => {
-      mockQueryResult.data = {
-        predictions: [{
-          ...basePrediction,
-          status: 'OVERDUE',
-          predictionType: 'NEXT_WAKE',
-          activityType: 'SLEEP',
-          predictedTime: new Date(Date.now() - 10 * 60000).toISOString(),
-          careSessionId: 'session-123',
-        }],
-      };
-      const { getByText } = renderScreen();
-      fireEvent.press(getByText('Mark as Awake'));
-      expect(mockNavigate).toHaveBeenCalledWith('SessionDetail', { sessionId: 'session-123' });
+      fireEvent.press(getByText('Done'));
+      expect(mockDismissPrediction).toHaveBeenCalledWith({ variables: { id: 'pred-1' } });
     });
   });
 
-  describe('dismiss', () => {
-    it('calls dismissPrediction mutation when Dismiss is pressed', () => {
+  describe('skipped', () => {
+    it('calls dismissPrediction mutation when Skipped is pressed', () => {
       mockQueryResult.data = {
         predictions: [{ ...basePrediction, status: 'OVERDUE', predictedTime: new Date(Date.now() - 10 * 60000).toISOString() }],
       };
       const { getByText } = renderScreen();
-      fireEvent.press(getByText('Dismiss'));
+      fireEvent.press(getByText('Skipped'));
       expect(mockDismissPrediction).toHaveBeenCalledWith({ variables: { id: 'pred-1' } });
     });
   });
