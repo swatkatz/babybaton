@@ -270,6 +270,20 @@ export const GET_CARE_REPORT = gql`
         totalSleepMinutes
         medianSleepMinutesPerDay
         medianLongestStretchMinutes
+        overnightStats {
+          totalMinutes
+          medianMinutesPerNight
+          medianLongestStretchMinutes
+          medianBedtime
+          medianWakeTime
+          count
+        }
+        napStats {
+          totalMinutes
+          medianNapsPerDay
+          medianNapDurationMinutes
+          count
+        }
       }
       buckets {
         bucketStart
@@ -289,6 +303,7 @@ export const GET_CARE_REPORT = gql`
         feedIntervalAdherencePct
         napCountAdherencePct
         bedtimeAdherenceMinutesAvg
+        wakeTimeAdherenceMinutesAvg
       }
     }
   }

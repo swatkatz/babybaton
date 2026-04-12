@@ -357,6 +357,20 @@ func CareReportToGraphQL(r *domain.CareReport) *model.CareReport {
 			TotalSleepMinutes:           int32(r.Totals.TotalSleepMinutes),
 			MedianSleepMinutesPerDay:    r.Totals.MedianSleepMinutesPerDay,
 			MedianLongestStretchMinutes: r.Totals.MedianLongestStretchMinutes,
+			OvernightStats: &model.OvernightSleepStats{
+				TotalMinutes:                int32(r.Totals.OvernightStats.TotalMinutes),
+				MedianMinutesPerNight:       r.Totals.OvernightStats.MedianMinutesPerNight,
+				MedianLongestStretchMinutes: r.Totals.OvernightStats.MedianLongestStretchMinutes,
+				MedianBedtime:               r.Totals.OvernightStats.MedianBedtime,
+				MedianWakeTime:              r.Totals.OvernightStats.MedianWakeTime,
+				Count:                       int32(r.Totals.OvernightStats.Count),
+			},
+			NapStats: &model.NapStats{
+				TotalMinutes:             int32(r.Totals.NapStats.TotalMinutes),
+				MedianNapsPerDay:         r.Totals.NapStats.MedianNapsPerDay,
+				MedianNapDurationMinutes: r.Totals.NapStats.MedianNapDurationMinutes,
+				Count:                    int32(r.Totals.NapStats.Count),
+			},
 		},
 		Buckets:       buckets,
 		HourlyPattern: hourly,
@@ -364,10 +378,11 @@ func CareReportToGraphQL(r *domain.CareReport) *model.CareReport {
 
 	if r.GoalAdherence != nil {
 		result.GoalAdherence = &model.GoalAdherence{
-			WakeWindowAdherencePct:     r.GoalAdherence.WakeWindowAdherencePct,
-			FeedIntervalAdherencePct:   r.GoalAdherence.FeedIntervalAdherencePct,
-			NapCountAdherencePct:       r.GoalAdherence.NapCountAdherencePct,
-			BedtimeAdherenceMinutesAvg: r.GoalAdherence.BedtimeAdherenceMinutesAvg,
+			WakeWindowAdherencePct:      r.GoalAdherence.WakeWindowAdherencePct,
+			FeedIntervalAdherencePct:    r.GoalAdherence.FeedIntervalAdherencePct,
+			NapCountAdherencePct:        r.GoalAdherence.NapCountAdherencePct,
+			BedtimeAdherenceMinutesAvg:  r.GoalAdherence.BedtimeAdherenceMinutesAvg,
+			WakeTimeAdherenceMinutesAvg: r.GoalAdherence.WakeTimeAdherenceMinutesAvg,
 		}
 	}
 

@@ -162,10 +162,11 @@ type ComplexityRoot struct {
 	}
 
 	GoalAdherence struct {
-		BedtimeAdherenceMinutesAvg func(childComplexity int) int
-		FeedIntervalAdherencePct   func(childComplexity int) int
-		NapCountAdherencePct       func(childComplexity int) int
-		WakeWindowAdherencePct     func(childComplexity int) int
+		BedtimeAdherenceMinutesAvg  func(childComplexity int) int
+		FeedIntervalAdherencePct    func(childComplexity int) int
+		NapCountAdherencePct        func(childComplexity int) int
+		WakeTimeAdherenceMinutesAvg func(childComplexity int) int
+		WakeWindowAdherencePct      func(childComplexity int) int
 	}
 
 	HourlyBucket struct {
@@ -190,6 +191,22 @@ type ComplexityRoot struct {
 		UpdateActivity      func(childComplexity int, activityID string, input model.ActivityInput) int
 		UpdateBabyName      func(childComplexity int, babyName string) int
 		UpdateScheduleGoals func(childComplexity int, input model.ScheduleGoalsInput) int
+	}
+
+	NapStats struct {
+		Count                    func(childComplexity int) int
+		MedianNapDurationMinutes func(childComplexity int) int
+		MedianNapsPerDay         func(childComplexity int) int
+		TotalMinutes             func(childComplexity int) int
+	}
+
+	OvernightSleepStats struct {
+		Count                       func(childComplexity int) int
+		MedianBedtime               func(childComplexity int) int
+		MedianLongestStretchMinutes func(childComplexity int) int
+		MedianMinutesPerNight       func(childComplexity int) int
+		MedianWakeTime              func(childComplexity int) int
+		TotalMinutes                func(childComplexity int) int
 	}
 
 	ParsedActivity struct {
@@ -249,6 +266,8 @@ type ComplexityRoot struct {
 		MedianLongestStretchMinutes func(childComplexity int) int
 		MedianMlPerDay              func(childComplexity int) int
 		MedianSleepMinutesPerDay    func(childComplexity int) int
+		NapStats                    func(childComplexity int) int
+		OvernightStats              func(childComplexity int) int
 		TotalDiaperChanges          func(childComplexity int) int
 		TotalFeeds                  func(childComplexity int) int
 		TotalMl                     func(childComplexity int) int
@@ -778,6 +797,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.GoalAdherence.NapCountAdherencePct(childComplexity), true
+	case "GoalAdherence.wakeTimeAdherenceMinutesAvg":
+		if e.complexity.GoalAdherence.WakeTimeAdherenceMinutesAvg == nil {
+			break
+		}
+
+		return e.complexity.GoalAdherence.WakeTimeAdherenceMinutesAvg(childComplexity), true
 	case "GoalAdherence.wakeWindowAdherencePct":
 		if e.complexity.GoalAdherence.WakeWindowAdherencePct == nil {
 			break
@@ -954,6 +979,68 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.UpdateScheduleGoals(childComplexity, args["input"].(model.ScheduleGoalsInput)), true
+
+	case "NapStats.count":
+		if e.complexity.NapStats.Count == nil {
+			break
+		}
+
+		return e.complexity.NapStats.Count(childComplexity), true
+	case "NapStats.medianNapDurationMinutes":
+		if e.complexity.NapStats.MedianNapDurationMinutes == nil {
+			break
+		}
+
+		return e.complexity.NapStats.MedianNapDurationMinutes(childComplexity), true
+	case "NapStats.medianNapsPerDay":
+		if e.complexity.NapStats.MedianNapsPerDay == nil {
+			break
+		}
+
+		return e.complexity.NapStats.MedianNapsPerDay(childComplexity), true
+	case "NapStats.totalMinutes":
+		if e.complexity.NapStats.TotalMinutes == nil {
+			break
+		}
+
+		return e.complexity.NapStats.TotalMinutes(childComplexity), true
+
+	case "OvernightSleepStats.count":
+		if e.complexity.OvernightSleepStats.Count == nil {
+			break
+		}
+
+		return e.complexity.OvernightSleepStats.Count(childComplexity), true
+	case "OvernightSleepStats.medianBedtime":
+		if e.complexity.OvernightSleepStats.MedianBedtime == nil {
+			break
+		}
+
+		return e.complexity.OvernightSleepStats.MedianBedtime(childComplexity), true
+	case "OvernightSleepStats.medianLongestStretchMinutes":
+		if e.complexity.OvernightSleepStats.MedianLongestStretchMinutes == nil {
+			break
+		}
+
+		return e.complexity.OvernightSleepStats.MedianLongestStretchMinutes(childComplexity), true
+	case "OvernightSleepStats.medianMinutesPerNight":
+		if e.complexity.OvernightSleepStats.MedianMinutesPerNight == nil {
+			break
+		}
+
+		return e.complexity.OvernightSleepStats.MedianMinutesPerNight(childComplexity), true
+	case "OvernightSleepStats.medianWakeTime":
+		if e.complexity.OvernightSleepStats.MedianWakeTime == nil {
+			break
+		}
+
+		return e.complexity.OvernightSleepStats.MedianWakeTime(childComplexity), true
+	case "OvernightSleepStats.totalMinutes":
+		if e.complexity.OvernightSleepStats.TotalMinutes == nil {
+			break
+		}
+
+		return e.complexity.OvernightSleepStats.TotalMinutes(childComplexity), true
 
 	case "ParsedActivity.activityType":
 		if e.complexity.ParsedActivity.ActivityType == nil {
@@ -1231,6 +1318,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ReportTotals.MedianSleepMinutesPerDay(childComplexity), true
+	case "ReportTotals.napStats":
+		if e.complexity.ReportTotals.NapStats == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.NapStats(childComplexity), true
+	case "ReportTotals.overnightStats":
+		if e.complexity.ReportTotals.OvernightStats == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.OvernightStats(childComplexity), true
 	case "ReportTotals.totalDiaperChanges":
 		if e.complexity.ReportTotals.TotalDiaperChanges == nil {
 			break
@@ -1732,6 +1831,24 @@ type ReportTotals {
   totalSleepMinutes: Int!
   medianSleepMinutesPerDay: Float!
   medianLongestStretchMinutes: Float!
+  overnightStats: OvernightSleepStats!
+  napStats: NapStats!
+}
+
+type OvernightSleepStats {
+  totalMinutes: Int!
+  medianMinutesPerNight: Float!
+  medianLongestStretchMinutes: Float!
+  medianBedtime: String
+  medianWakeTime: String
+  count: Int!
+}
+
+type NapStats {
+  totalMinutes: Int!
+  medianNapsPerDay: Float!
+  medianNapDurationMinutes: Float!
+  count: Int!
 }
 
 type ReportBucket {
@@ -1754,6 +1871,7 @@ type GoalAdherence {
   feedIntervalAdherencePct: Float
   napCountAdherencePct: Float
   bedtimeAdherenceMinutesAvg: Float
+  wakeTimeAdherenceMinutesAvg: Float
 }
 
 type FeedTypeCount {
@@ -2561,6 +2679,10 @@ func (ec *executionContext) fieldContext_CareReport_totals(_ context.Context, fi
 				return ec.fieldContext_ReportTotals_medianSleepMinutesPerDay(ctx, field)
 			case "medianLongestStretchMinutes":
 				return ec.fieldContext_ReportTotals_medianLongestStretchMinutes(ctx, field)
+			case "overnightStats":
+				return ec.fieldContext_ReportTotals_overnightStats(ctx, field)
+			case "napStats":
+				return ec.fieldContext_ReportTotals_napStats(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ReportTotals", field.Name)
 		},
@@ -2680,6 +2802,8 @@ func (ec *executionContext) fieldContext_CareReport_goalAdherence(_ context.Cont
 				return ec.fieldContext_GoalAdherence_napCountAdherencePct(ctx, field)
 			case "bedtimeAdherenceMinutesAvg":
 				return ec.fieldContext_GoalAdherence_bedtimeAdherenceMinutesAvg(ctx, field)
+			case "wakeTimeAdherenceMinutesAvg":
+				return ec.fieldContext_GoalAdherence_wakeTimeAdherenceMinutesAvg(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type GoalAdherence", field.Name)
 		},
@@ -4500,6 +4624,35 @@ func (ec *executionContext) fieldContext_GoalAdherence_bedtimeAdherenceMinutesAv
 	return fc, nil
 }
 
+func (ec *executionContext) _GoalAdherence_wakeTimeAdherenceMinutesAvg(ctx context.Context, field graphql.CollectedField, obj *model.GoalAdherence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GoalAdherence_wakeTimeAdherenceMinutesAvg,
+		func(ctx context.Context) (any, error) {
+			return obj.WakeTimeAdherenceMinutesAvg, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_GoalAdherence_wakeTimeAdherenceMinutesAvg(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GoalAdherence",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _HourlyBucket_hour(ctx context.Context, field graphql.CollectedField, obj *model.HourlyBucket) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5294,6 +5447,296 @@ func (ec *executionContext) fieldContext_Mutation_updateScheduleGoals(ctx contex
 	if fc.Args, err = ec.field_Mutation_updateScheduleGoals_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NapStats_totalMinutes(ctx context.Context, field graphql.CollectedField, obj *model.NapStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NapStats_totalMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalMinutes, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NapStats_totalMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NapStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NapStats_medianNapsPerDay(ctx context.Context, field graphql.CollectedField, obj *model.NapStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NapStats_medianNapsPerDay,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianNapsPerDay, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NapStats_medianNapsPerDay(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NapStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NapStats_medianNapDurationMinutes(ctx context.Context, field graphql.CollectedField, obj *model.NapStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NapStats_medianNapDurationMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianNapDurationMinutes, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NapStats_medianNapDurationMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NapStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NapStats_count(ctx context.Context, field graphql.CollectedField, obj *model.NapStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_NapStats_count,
+		func(ctx context.Context) (any, error) {
+			return obj.Count, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_NapStats_count(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NapStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OvernightSleepStats_totalMinutes(ctx context.Context, field graphql.CollectedField, obj *model.OvernightSleepStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OvernightSleepStats_totalMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalMinutes, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OvernightSleepStats_totalMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OvernightSleepStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OvernightSleepStats_medianMinutesPerNight(ctx context.Context, field graphql.CollectedField, obj *model.OvernightSleepStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OvernightSleepStats_medianMinutesPerNight,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianMinutesPerNight, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OvernightSleepStats_medianMinutesPerNight(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OvernightSleepStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OvernightSleepStats_medianLongestStretchMinutes(ctx context.Context, field graphql.CollectedField, obj *model.OvernightSleepStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OvernightSleepStats_medianLongestStretchMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianLongestStretchMinutes, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OvernightSleepStats_medianLongestStretchMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OvernightSleepStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OvernightSleepStats_medianBedtime(ctx context.Context, field graphql.CollectedField, obj *model.OvernightSleepStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OvernightSleepStats_medianBedtime,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianBedtime, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_OvernightSleepStats_medianBedtime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OvernightSleepStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OvernightSleepStats_medianWakeTime(ctx context.Context, field graphql.CollectedField, obj *model.OvernightSleepStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OvernightSleepStats_medianWakeTime,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianWakeTime, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_OvernightSleepStats_medianWakeTime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OvernightSleepStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OvernightSleepStats_count(ctx context.Context, field graphql.CollectedField, obj *model.OvernightSleepStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OvernightSleepStats_count,
+		func(ctx context.Context) (any, error) {
+			return obj.Count, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OvernightSleepStats_count(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OvernightSleepStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
 	}
 	return fc, nil
 }
@@ -7044,6 +7487,88 @@ func (ec *executionContext) fieldContext_ReportTotals_medianLongestStretchMinute
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_overnightStats(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_overnightStats,
+		func(ctx context.Context) (any, error) {
+			return obj.OvernightStats, nil
+		},
+		nil,
+		ec.marshalNOvernightSleepStats2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐOvernightSleepStats,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_overnightStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "totalMinutes":
+				return ec.fieldContext_OvernightSleepStats_totalMinutes(ctx, field)
+			case "medianMinutesPerNight":
+				return ec.fieldContext_OvernightSleepStats_medianMinutesPerNight(ctx, field)
+			case "medianLongestStretchMinutes":
+				return ec.fieldContext_OvernightSleepStats_medianLongestStretchMinutes(ctx, field)
+			case "medianBedtime":
+				return ec.fieldContext_OvernightSleepStats_medianBedtime(ctx, field)
+			case "medianWakeTime":
+				return ec.fieldContext_OvernightSleepStats_medianWakeTime(ctx, field)
+			case "count":
+				return ec.fieldContext_OvernightSleepStats_count(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type OvernightSleepStats", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_napStats(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_napStats,
+		func(ctx context.Context) (any, error) {
+			return obj.NapStats, nil
+		},
+		nil,
+		ec.marshalNNapStats2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐNapStats,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_napStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "totalMinutes":
+				return ec.fieldContext_NapStats_totalMinutes(ctx, field)
+			case "medianNapsPerDay":
+				return ec.fieldContext_NapStats_medianNapsPerDay(ctx, field)
+			case "medianNapDurationMinutes":
+				return ec.fieldContext_NapStats_medianNapDurationMinutes(ctx, field)
+			case "count":
+				return ec.fieldContext_NapStats_count(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type NapStats", field.Name)
 		},
 	}
 	return fc, nil
@@ -10011,6 +10536,8 @@ func (ec *executionContext) _GoalAdherence(ctx context.Context, sel ast.Selectio
 			out.Values[i] = ec._GoalAdherence_napCountAdherencePct(ctx, field, obj)
 		case "bedtimeAdherenceMinutesAvg":
 			out.Values[i] = ec._GoalAdherence_bedtimeAdherenceMinutesAvg(ctx, field, obj)
+		case "wakeTimeAdherenceMinutesAvg":
+			out.Values[i] = ec._GoalAdherence_wakeTimeAdherenceMinutesAvg(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -10202,6 +10729,118 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateScheduleGoals(ctx, field)
 			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var napStatsImplementors = []string{"NapStats"}
+
+func (ec *executionContext) _NapStats(ctx context.Context, sel ast.SelectionSet, obj *model.NapStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, napStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NapStats")
+		case "totalMinutes":
+			out.Values[i] = ec._NapStats_totalMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianNapsPerDay":
+			out.Values[i] = ec._NapStats_medianNapsPerDay(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianNapDurationMinutes":
+			out.Values[i] = ec._NapStats_medianNapDurationMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "count":
+			out.Values[i] = ec._NapStats_count(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var overnightSleepStatsImplementors = []string{"OvernightSleepStats"}
+
+func (ec *executionContext) _OvernightSleepStats(ctx context.Context, sel ast.SelectionSet, obj *model.OvernightSleepStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, overnightSleepStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("OvernightSleepStats")
+		case "totalMinutes":
+			out.Values[i] = ec._OvernightSleepStats_totalMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianMinutesPerNight":
+			out.Values[i] = ec._OvernightSleepStats_medianMinutesPerNight(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianLongestStretchMinutes":
+			out.Values[i] = ec._OvernightSleepStats_medianLongestStretchMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianBedtime":
+			out.Values[i] = ec._OvernightSleepStats_medianBedtime(ctx, field, obj)
+		case "medianWakeTime":
+			out.Values[i] = ec._OvernightSleepStats_medianWakeTime(ctx, field, obj)
+		case "count":
+			out.Values[i] = ec._OvernightSleepStats_count(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -10819,6 +11458,16 @@ func (ec *executionContext) _ReportTotals(ctx context.Context, sel ast.Selection
 			}
 		case "medianLongestStretchMinutes":
 			out.Values[i] = ec._ReportTotals_medianLongestStretchMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "overnightStats":
+			out.Values[i] = ec._ReportTotals_overnightStats(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "napStats":
+			out.Values[i] = ec._ReportTotals_napStats(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11921,6 +12570,26 @@ func (ec *executionContext) marshalNInt2int32(ctx context.Context, sel ast.Selec
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNNapStats2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐNapStats(ctx context.Context, sel ast.SelectionSet, v *model.NapStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._NapStats(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNOvernightSleepStats2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐOvernightSleepStats(ctx context.Context, sel ast.SelectionSet, v *model.OvernightSleepStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._OvernightSleepStats(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNParsedActivity2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐParsedActivityᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ParsedActivity) graphql.Marshaler {
