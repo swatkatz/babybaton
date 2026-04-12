@@ -532,6 +532,7 @@ JOIN sleep_details sd ON sd.activity_id = a.id
 WHERE cs.family_id = $1
   AND sd.start_time >= $2 AND sd.start_time < $3
   AND a.activity_type = 'sleep'
+  AND extract(hour FROM sd.start_time) < 18
 GROUP BY day`
 
 	rows, err := s.db.QueryContext(ctx, query, familyID, from, to)
@@ -540,7 +541,8 @@ GROUP BY day`
 	}
 	defer rows.Close()
 
-	var matchCount, totalDays int
+	var totalPct float64
+	var totalDays int
 	for rows.Next() {
 		var day time.Time
 		var naps int
@@ -548,9 +550,11 @@ GROUP BY day`
 			return nil, fmt.Errorf("failed to scan nap count row: %w", err)
 		}
 		totalDays++
-		if naps == targetCount {
-			matchCount++
+		dailyPct := float64(naps) / float64(targetCount) * 100
+		if dailyPct > 100 {
+			dailyPct = 100
 		}
+		totalPct += dailyPct
 	}
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating nap counts: %w", err)
@@ -559,7 +563,8 @@ GROUP BY day`
 	if totalDays == 0 {
 		return nil, nil
 	}
-	pct := float64(matchCount) / float64(totalDays) * 100
+
+	pct := totalPct / float64(totalDays)
 	return &pct, nil
 }
 
