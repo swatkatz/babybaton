@@ -76,12 +76,26 @@ jest.mock('../components/CustomHeader', () => ({
   CustomHeader: () => null,
 }));
 
+jest.mock('../screens/ReportsScreen', () => ({
+  ReportsScreen: () => {
+    const { Text } = require('react-native');
+    return <Text>Reports Screen</Text>;
+  },
+}));
+jest.mock('../screens/ReportDetailScreen', () => ({
+  ReportDetailScreen: () => {
+    const { Text } = require('react-native');
+    return <Text>Report Detail Screen</Text>;
+  },
+}));
+
 // Mock lucide icons
 jest.mock('lucide-react-native', () => {
   const { View } = require('react-native');
   return {
     Home: (props: Record<string, unknown>) => <View testID="icon-home" {...props} />,
     Clock: (props: Record<string, unknown>) => <View testID="icon-clock" {...props} />,
+    BarChart3: (props: Record<string, unknown>) => <View testID="icon-barchart3" {...props} />,
     Target: (props: Record<string, unknown>) => <View testID="icon-target" {...props} />,
     User: (props: Record<string, unknown>) => <View testID="icon-user" {...props} />,
   };
@@ -113,17 +127,31 @@ describe('MainTabNavigator', () => {
     expect(getByText('Settings Screen')).toBeTruthy();
   });
 
+  it('renders Reports tab content when Reports tab pressed', () => {
+    const { getByText, getByLabelText } = renderTabs();
+    fireEvent.press(getByLabelText('Reports'));
+    expect(getByText('Reports Screen')).toBeTruthy();
+  });
+
   it('renders Schedule tab content when Schedule tab pressed', () => {
     const { getByText, getByLabelText } = renderTabs();
     fireEvent.press(getByLabelText('Schedule'));
     expect(getByText('Schedule Goals Screen')).toBeTruthy();
   });
 
-  it('renders four tab icons', () => {
+  it('renders five tab icons', () => {
     const { getAllByTestId } = renderTabs();
     expect(getAllByTestId('icon-home').length).toBeGreaterThan(0);
     expect(getAllByTestId('icon-clock').length).toBeGreaterThan(0);
+    expect(getAllByTestId('icon-barchart3').length).toBeGreaterThan(0);
     expect(getAllByTestId('icon-target').length).toBeGreaterThan(0);
     expect(getAllByTestId('icon-user').length).toBeGreaterThan(0);
+  });
+
+  it('renders tabs in correct order: Home, History, Reports, Schedule, Profile', () => {
+    const { getAllByRole } = renderTabs();
+    const tabs = getAllByRole('button');
+    const tabLabels = tabs.map((tab) => tab.props.accessibilityLabel);
+    expect(tabLabels).toEqual(['Home', 'History', 'Reports', 'Schedule', 'Profile']);
   });
 });
