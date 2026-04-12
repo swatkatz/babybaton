@@ -272,7 +272,7 @@ func TestCareReport(t *testing.T) {
 	t.Run("goal adherence with goals", func(t *testing.T) {
 		// Set up schedule goals
 		targetInterval := 180 // 3 hours
-		targetNaps := 2
+		targetNaps := 1
 		targetBedtime := "20:00"
 		goals := &domain.ScheduleGoals{
 			TargetFeedIntervalMinutes: &targetInterval,
@@ -302,7 +302,7 @@ func TestCareReport(t *testing.T) {
 			t.Errorf("FeedIntervalAdherencePct = %.1f, want >= 50", *report.GoalAdherence.FeedIntervalAdherencePct)
 		}
 
-		// Nap count: 2 sleeps per day, target is 2 => 100%
+		// Nap count: 1 daytime nap per day (hour 10), overnight (hour 20) excluded, target is 1 => 100%
 		if report.GoalAdherence.NapCountAdherencePct == nil {
 			t.Error("NapCountAdherencePct should not be nil")
 		} else if *report.GoalAdherence.NapCountAdherencePct != 100 {
@@ -317,6 +317,188 @@ func TestCareReport(t *testing.T) {
 		}
 
 		t.Logf("✓ Goal adherence computed correctly")
+	})
+}
+
+func TestNapCountAdherence(t *testing.T) {
+	store, err := NewPostgresStore("postgres://postgres:postgres@localhost:5432/baby_baton_test?sslmode=disable")
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+
+	setupFamily := func(t *testing.T) (*domain.Family, *domain.CareSession) {
+		t.Helper()
+		family, caregiver, err := CreateTestFamily(ctx, store)
+		if err != nil {
+			t.Fatalf("Failed to create test family: %v", err)
+		}
+		t.Cleanup(func() { store.DeleteFamily(ctx, family.ID) })
+
+		session := &domain.CareSession{
+			ID:          uuid.New(),
+			CaregiverID: caregiver.ID,
+			FamilyID:    family.ID,
+			Status:      domain.StatusInProgress,
+			StartedAt:   time.Now(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		if err := store.CreateCareSession(ctx, session); err != nil {
+			t.Fatalf("Failed to create session: %v", err)
+		}
+		return family, session
+	}
+
+	t.Run("exact target", func(t *testing.T) {
+		family, session := setupFamily(t)
+		dayStart := time.Now().UTC().Truncate(24 * time.Hour).Add(8 * time.Hour)
+
+		for _, hour := range []int{9, 11, 14} {
+			createSleepActivity(t, ctx, store, session.ID, dayStart.Add(time.Duration(hour-8)*time.Hour), 30)
+		}
+
+		from := dayStart.Add(-1 * time.Hour)
+		to := dayStart.Add(24 * time.Hour)
+		pct, err := store.computeNapCountAdherence(ctx, family.ID, from, to, 3)
+		if err != nil {
+			t.Fatalf("computeNapCountAdherence failed: %v", err)
+		}
+		if pct == nil {
+			t.Fatal("expected non-nil result")
+		}
+		if *pct != 100 {
+			t.Errorf("got %.1f%%, want 100%%", *pct)
+		}
+	})
+
+	t.Run("under target", func(t *testing.T) {
+		family, session := setupFamily(t)
+		dayStart := time.Now().UTC().Truncate(24 * time.Hour).Add(8 * time.Hour)
+
+		for _, hour := range []int{10, 13} {
+			createSleepActivity(t, ctx, store, session.ID, dayStart.Add(time.Duration(hour-8)*time.Hour), 30)
+		}
+
+		from := dayStart.Add(-1 * time.Hour)
+		to := dayStart.Add(24 * time.Hour)
+		pct, err := store.computeNapCountAdherence(ctx, family.ID, from, to, 3)
+		if err != nil {
+			t.Fatalf("computeNapCountAdherence failed: %v", err)
+		}
+		if pct == nil {
+			t.Fatal("expected non-nil result")
+		}
+		expected := 66.7
+		if math.Abs(*pct-expected) > 0.1 {
+			t.Errorf("got %.1f%%, want ~%.1f%%", *pct, expected)
+		}
+	})
+
+	t.Run("over target capped at 100", func(t *testing.T) {
+		family, session := setupFamily(t)
+		dayStart := time.Now().UTC().Truncate(24 * time.Hour).Add(8 * time.Hour)
+
+		for _, hour := range []int{9, 11, 13, 15} {
+			createSleepActivity(t, ctx, store, session.ID, dayStart.Add(time.Duration(hour-8)*time.Hour), 30)
+		}
+
+		from := dayStart.Add(-1 * time.Hour)
+		to := dayStart.Add(24 * time.Hour)
+		pct, err := store.computeNapCountAdherence(ctx, family.ID, from, to, 3)
+		if err != nil {
+			t.Fatalf("computeNapCountAdherence failed: %v", err)
+		}
+		if pct == nil {
+			t.Fatal("expected non-nil result")
+		}
+		if *pct != 100 {
+			t.Errorf("got %.1f%%, want 100%%", *pct)
+		}
+	})
+
+	t.Run("overnight sleep excluded", func(t *testing.T) {
+		family, session := setupFamily(t)
+		dayStart := time.Now().UTC().Truncate(24 * time.Hour).Add(8 * time.Hour)
+
+		for _, hour := range []int{9, 11, 14} {
+			createSleepActivity(t, ctx, store, session.ID, dayStart.Add(time.Duration(hour-8)*time.Hour), 30)
+		}
+		createSleepActivity(t, ctx, store, session.ID, dayStart.Add(12*time.Hour), 60) // 8pm, excluded
+
+		from := dayStart.Add(-1 * time.Hour)
+		to := dayStart.Add(24 * time.Hour)
+		pct, err := store.computeNapCountAdherence(ctx, family.ID, from, to, 3)
+		if err != nil {
+			t.Fatalf("computeNapCountAdherence failed: %v", err)
+		}
+		if pct == nil {
+			t.Fatal("expected non-nil result")
+		}
+		if *pct != 100 {
+			t.Errorf("got %.1f%%, want 100%% (overnight should be excluded)", *pct)
+		}
+	})
+
+	t.Run("multi-day average", func(t *testing.T) {
+		family, session := setupFamily(t)
+		day1Start := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, -1).Add(8 * time.Hour)
+		day2Start := day1Start.Add(24 * time.Hour)
+
+		// Day 1: 3 naps (100%)
+		for _, hour := range []int{9, 11, 14} {
+			createSleepActivity(t, ctx, store, session.ID, day1Start.Add(time.Duration(hour-8)*time.Hour), 30)
+		}
+		// Day 2: 2 naps (66.7%)
+		for _, hour := range []int{10, 13} {
+			createSleepActivity(t, ctx, store, session.ID, day2Start.Add(time.Duration(hour-8)*time.Hour), 30)
+		}
+
+		from := day1Start.Add(-1 * time.Hour)
+		to := day2Start.Add(24 * time.Hour)
+		pct, err := store.computeNapCountAdherence(ctx, family.ID, from, to, 3)
+		if err != nil {
+			t.Fatalf("computeNapCountAdherence failed: %v", err)
+		}
+		if pct == nil {
+			t.Fatal("expected non-nil result")
+		}
+		expected := 83.3
+		if math.Abs(*pct-expected) > 0.5 {
+			t.Errorf("got %.1f%%, want ~%.1f%%", *pct, expected)
+		}
+	})
+
+	t.Run("no sleep data returns nil", func(t *testing.T) {
+		family, _ := setupFamily(t)
+		farFuture := time.Now().AddDate(1, 0, 0)
+
+		pct, err := store.computeNapCountAdherence(ctx, family.ID, farFuture, farFuture.Add(24*time.Hour), 3)
+		if err != nil {
+			t.Fatalf("computeNapCountAdherence failed: %v", err)
+		}
+		if pct != nil {
+			t.Errorf("expected nil for no data, got %.1f", *pct)
+		}
+	})
+
+	t.Run("only evening sleep returns nil", func(t *testing.T) {
+		family, session := setupFamily(t)
+		dayStart := time.Now().UTC().Truncate(24 * time.Hour).Add(8 * time.Hour)
+
+		createSleepActivity(t, ctx, store, session.ID, dayStart.Add(12*time.Hour), 60) // 8pm
+
+		from := dayStart.Add(-1 * time.Hour)
+		to := dayStart.Add(24 * time.Hour)
+		pct, err := store.computeNapCountAdherence(ctx, family.ID, from, to, 3)
+		if err != nil {
+			t.Fatalf("computeNapCountAdherence failed: %v", err)
+		}
+		if pct != nil {
+			t.Errorf("expected nil when only overnight sleep exists, got %.1f", *pct)
+		}
 	})
 }
 
