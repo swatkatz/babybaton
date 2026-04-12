@@ -244,6 +244,56 @@ export const GET_SCHEDULE_GOALS = gql`
   }
 `;
 
+export const GET_CARE_REPORT = gql`
+  query GetCareReport(
+    $from: DateTime!
+    $to: DateTime!
+    $granularity: ReportGranularity!
+  ) {
+    careReport(from: $from, to: $to, granularity: $granularity) {
+      from
+      to
+      granularity
+      totals {
+        totalFeeds
+        totalMl
+        medianFeedsPerDay
+        medianMlPerDay
+        feedTypeBreakdown {
+          feedType
+          count
+        }
+        totalDiaperChanges
+        totalPoops
+        totalPees
+        medianDiapersPerDay
+        totalSleepMinutes
+        medianSleepMinutesPerDay
+        medianLongestStretchMinutes
+      }
+      buckets {
+        bucketStart
+        feeds
+        ml
+        diapers
+        sleepMinutes
+      }
+      hourlyPattern {
+        hour
+        feeds
+        sleepMinutes
+        diapers
+      }
+      goalAdherence {
+        wakeWindowAdherencePct
+        feedIntervalAdherencePct
+        napCountAdherencePct
+        bedtimeAdherenceMinutesAvg
+      }
+    }
+  }
+`;
+
 export const GET_FAMILY_SETTINGS = gql`
   query GetFamilySettings {
     getMyFamily {

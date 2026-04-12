@@ -47,6 +47,17 @@ export type BabyStatus = {
   lastSleep: Maybe<SleepActivity>;
 };
 
+export type CareReport = {
+  __typename: 'CareReport';
+  buckets: Array<ReportBucket>;
+  from: Scalars['DateTime']['output'];
+  goalAdherence: Maybe<GoalAdherence>;
+  granularity: ReportGranularity;
+  hourlyPattern: Array<HourlyBucket>;
+  to: Scalars['DateTime']['output'];
+  totals: ReportTotals;
+};
+
 export type CareSession = {
   __typename: 'CareSession';
   activities: Array<Activity>;
@@ -170,6 +181,28 @@ export enum FeedType {
   Formula = 'FORMULA',
   Solids = 'SOLIDS'
 }
+
+export type FeedTypeCount = {
+  __typename: 'FeedTypeCount';
+  count: Scalars['Int']['output'];
+  feedType: FeedType;
+};
+
+export type GoalAdherence = {
+  __typename: 'GoalAdherence';
+  bedtimeAdherenceMinutesAvg: Maybe<Scalars['Float']['output']>;
+  feedIntervalAdherencePct: Maybe<Scalars['Float']['output']>;
+  napCountAdherencePct: Maybe<Scalars['Float']['output']>;
+  wakeWindowAdherencePct: Maybe<Scalars['Float']['output']>;
+};
+
+export type HourlyBucket = {
+  __typename: 'HourlyBucket';
+  diapers: Scalars['Int']['output'];
+  feeds: Scalars['Int']['output'];
+  hour: Scalars['Int']['output'];
+  sleepMinutes: Scalars['Int']['output'];
+};
 
 export type Mutation = {
   __typename: 'Mutation';
@@ -311,6 +344,7 @@ export enum PredictionType {
 
 export type Query = {
   __typename: 'Query';
+  careReport: CareReport;
   checkFamilyNameAvailable: Scalars['Boolean']['output'];
   getBabyStatus: BabyStatus;
   getCareSession: Maybe<CareSession>;
@@ -322,6 +356,13 @@ export type Query = {
   getRecentCareSessions: Array<CareSession>;
   predictions: Array<Prediction>;
   scheduleGoals: Maybe<ScheduleGoals>;
+};
+
+
+export type QueryCareReportArgs = {
+  from: Scalars['DateTime']['input'];
+  granularity: ReportGranularity;
+  to: Scalars['DateTime']['input'];
 };
 
 
@@ -343,6 +384,37 @@ export type QueryGetCareSessionHistoryArgs = {
 
 export type QueryGetRecentCareSessionsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type ReportBucket = {
+  __typename: 'ReportBucket';
+  bucketStart: Scalars['DateTime']['output'];
+  diapers: Scalars['Int']['output'];
+  feeds: Scalars['Int']['output'];
+  ml: Scalars['Int']['output'];
+  sleepMinutes: Scalars['Int']['output'];
+};
+
+export enum ReportGranularity {
+  Day = 'DAY',
+  Month = 'MONTH',
+  Week = 'WEEK'
+}
+
+export type ReportTotals = {
+  __typename: 'ReportTotals';
+  feedTypeBreakdown: Array<FeedTypeCount>;
+  medianDiapersPerDay: Scalars['Float']['output'];
+  medianFeedsPerDay: Scalars['Float']['output'];
+  medianLongestStretchMinutes: Scalars['Float']['output'];
+  medianMlPerDay: Scalars['Float']['output'];
+  medianSleepMinutesPerDay: Scalars['Float']['output'];
+  totalDiaperChanges: Scalars['Int']['output'];
+  totalFeeds: Scalars['Int']['output'];
+  totalMl: Scalars['Int']['output'];
+  totalPees: Scalars['Int']['output'];
+  totalPoops: Scalars['Int']['output'];
+  totalSleepMinutes: Scalars['Int']['output'];
 };
 
 export type ScheduleGoals = {
@@ -556,6 +628,15 @@ export type GetScheduleGoalsQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type GetScheduleGoalsQuery = { scheduleGoals: { __typename: 'ScheduleGoals', targetWakeWindowMinutes: number | null, targetFeedIntervalMinutes: number | null, targetNapCount: number | null, maxDaytimeNapMinutes: number | null, targetBedtime: string | null, targetWakeTime: string | null } | null };
 
+export type GetCareReportQueryVariables = Exact<{
+  from: Scalars['DateTime']['input'];
+  to: Scalars['DateTime']['input'];
+  granularity: ReportGranularity;
+}>;
+
+
+export type GetCareReportQuery = { careReport: { __typename: 'CareReport', from: string, to: string, granularity: ReportGranularity, totals: { __typename: 'ReportTotals', totalFeeds: number, totalMl: number, medianFeedsPerDay: number, medianMlPerDay: number, totalDiaperChanges: number, totalPoops: number, totalPees: number, medianDiapersPerDay: number, totalSleepMinutes: number, medianSleepMinutesPerDay: number, medianLongestStretchMinutes: number, feedTypeBreakdown: Array<{ __typename: 'FeedTypeCount', feedType: FeedType, count: number }> }, buckets: Array<{ __typename: 'ReportBucket', bucketStart: string, feeds: number, ml: number, diapers: number, sleepMinutes: number }>, hourlyPattern: Array<{ __typename: 'HourlyBucket', hour: number, feeds: number, sleepMinutes: number, diapers: number }>, goalAdherence: { __typename: 'GoalAdherence', wakeWindowAdherencePct: number | null, feedIntervalAdherencePct: number | null, napCountAdherencePct: number | null, bedtimeAdherenceMinutesAvg: number | null } | null } };
+
 export type GetFamilySettingsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -582,4 +663,5 @@ export const GetMyCaregiverDocument = {"kind":"Document","definitions":[{"kind":
 export const GetBabyStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetBabyStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getBabyStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"lastFeed"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"activityType"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"feedDetails"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"amountMl"}},{"kind":"Field","name":{"kind":"Name","value":"feedType"}},{"kind":"Field","name":{"kind":"Name","value":"foodName"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"lastDiaper"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"activityType"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"diaperDetails"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"hadPoop"}},{"kind":"Field","name":{"kind":"Name","value":"hadPee"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"lastSleep"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"activityType"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"sleepDetails"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"durationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetBabyStatusQuery, GetBabyStatusQueryVariables>;
 export const GetCareSessionHistoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetCareSessionHistory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"first"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"after"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getCareSessionHistory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"Variable","name":{"kind":"Name","value":"first"}}},{"kind":"Argument","name":{"kind":"Name","value":"after"},"value":{"kind":"Variable","name":{"kind":"Name","value":"after"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"edges"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cursor"}},{"kind":"Field","name":{"kind":"Name","value":"node"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"FragmentSpread","name":{"kind":"Name","value":"CareSessionDetail"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}},{"kind":"Field","name":{"kind":"Name","value":"endCursor"}}]}}]}}]}},{"kind":"FragmentDefinition","name":{"kind":"Name","value":"CareSessionDetail"},"typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CareSession"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"completedAt"}},{"kind":"Field","name":{"kind":"Name","value":"caregiver"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"activities"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"FeedActivity"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"activityType"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"feedDetails"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"amountMl"}},{"kind":"Field","name":{"kind":"Name","value":"feedType"}},{"kind":"Field","name":{"kind":"Name","value":"durationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"foodName"}},{"kind":"Field","name":{"kind":"Name","value":"quantity"}},{"kind":"Field","name":{"kind":"Name","value":"quantityUnit"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"DiaperActivity"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"activityType"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"diaperDetails"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"changedAt"}},{"kind":"Field","name":{"kind":"Name","value":"hadPoop"}},{"kind":"Field","name":{"kind":"Name","value":"hadPee"}}]}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"SleepActivity"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"activityType"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"sleepDetails"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startTime"}},{"kind":"Field","name":{"kind":"Name","value":"endTime"}},{"kind":"Field","name":{"kind":"Name","value":"durationMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"summary"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalFeeds"}},{"kind":"Field","name":{"kind":"Name","value":"totalMl"}},{"kind":"Field","name":{"kind":"Name","value":"totalDiaperChanges"}},{"kind":"Field","name":{"kind":"Name","value":"totalSleepMinutes"}}]}},{"kind":"Field","name":{"kind":"Name","value":"notes"}}]}}]} as unknown as DocumentNode<GetCareSessionHistoryQuery, GetCareSessionHistoryQueryVariables>;
 export const GetScheduleGoalsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetScheduleGoals"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"scheduleGoals"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"targetWakeWindowMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"targetFeedIntervalMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"targetNapCount"}},{"kind":"Field","name":{"kind":"Name","value":"maxDaytimeNapMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"targetBedtime"}},{"kind":"Field","name":{"kind":"Name","value":"targetWakeTime"}}]}}]}}]} as unknown as DocumentNode<GetScheduleGoalsQuery, GetScheduleGoalsQueryVariables>;
+export const GetCareReportDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetCareReport"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"from"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DateTime"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"to"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DateTime"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"granularity"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ReportGranularity"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"careReport"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"from"},"value":{"kind":"Variable","name":{"kind":"Name","value":"from"}}},{"kind":"Argument","name":{"kind":"Name","value":"to"},"value":{"kind":"Variable","name":{"kind":"Name","value":"to"}}},{"kind":"Argument","name":{"kind":"Name","value":"granularity"},"value":{"kind":"Variable","name":{"kind":"Name","value":"granularity"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"from"}},{"kind":"Field","name":{"kind":"Name","value":"to"}},{"kind":"Field","name":{"kind":"Name","value":"granularity"}},{"kind":"Field","name":{"kind":"Name","value":"totals"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalFeeds"}},{"kind":"Field","name":{"kind":"Name","value":"totalMl"}},{"kind":"Field","name":{"kind":"Name","value":"medianFeedsPerDay"}},{"kind":"Field","name":{"kind":"Name","value":"medianMlPerDay"}},{"kind":"Field","name":{"kind":"Name","value":"feedTypeBreakdown"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"feedType"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalDiaperChanges"}},{"kind":"Field","name":{"kind":"Name","value":"totalPoops"}},{"kind":"Field","name":{"kind":"Name","value":"totalPees"}},{"kind":"Field","name":{"kind":"Name","value":"medianDiapersPerDay"}},{"kind":"Field","name":{"kind":"Name","value":"totalSleepMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"medianSleepMinutesPerDay"}},{"kind":"Field","name":{"kind":"Name","value":"medianLongestStretchMinutes"}}]}},{"kind":"Field","name":{"kind":"Name","value":"buckets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"bucketStart"}},{"kind":"Field","name":{"kind":"Name","value":"feeds"}},{"kind":"Field","name":{"kind":"Name","value":"ml"}},{"kind":"Field","name":{"kind":"Name","value":"diapers"}},{"kind":"Field","name":{"kind":"Name","value":"sleepMinutes"}}]}},{"kind":"Field","name":{"kind":"Name","value":"hourlyPattern"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hour"}},{"kind":"Field","name":{"kind":"Name","value":"feeds"}},{"kind":"Field","name":{"kind":"Name","value":"sleepMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"diapers"}}]}},{"kind":"Field","name":{"kind":"Name","value":"goalAdherence"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wakeWindowAdherencePct"}},{"kind":"Field","name":{"kind":"Name","value":"feedIntervalAdherencePct"}},{"kind":"Field","name":{"kind":"Name","value":"napCountAdherencePct"}},{"kind":"Field","name":{"kind":"Name","value":"bedtimeAdherenceMinutesAvg"}}]}}]}}]}}]} as unknown as DocumentNode<GetCareReportQuery, GetCareReportQueryVariables>;
 export const GetFamilySettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetFamilySettings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getMyFamily"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"babyName"}},{"kind":"Field","name":{"kind":"Name","value":"password"}},{"kind":"Field","name":{"kind":"Name","value":"caregivers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"deviceId"}},{"kind":"Field","name":{"kind":"Name","value":"deviceName"}}]}}]}}]}}]} as unknown as DocumentNode<GetFamilySettingsQuery, GetFamilySettingsQueryVariables>;
