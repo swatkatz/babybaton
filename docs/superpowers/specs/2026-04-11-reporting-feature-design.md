@@ -300,6 +300,129 @@ GROUP BY fd.feed_type;
 
 This powers the `TypeBreakdownBar`. The frontend hides any segment representing <1% of total feeds — this prevents misleading slivers for families that primarily use one feed type.
 
+### Parallel Query Execution
+
+Report queries are independent per activity type and must run concurrently. A thin helper using `errgroup` provides this:
+
+```go
+// internal/parallel/parallel.go
+package parallel
+
+import (
+    "context"
+    "golang.org/x/sync/errgroup"
+)
+
+// Run executes functions concurrently, returning on first error.
+// Remaining functions are cancelled via context on failure.
+func Run(ctx context.Context, fns ...func(ctx context.Context) error) error {
+    g, ctx := errgroup.WithContext(ctx)
+    for _, fn := range fns {
+        g.Go(func() error { return fn(ctx) })
+    }
+    return g.Wait()
+}
+```
+
+The report store method uses this to run all four work streams in parallel:
+
+```go
+func (s *PostgresStore) CareReport(ctx context.Context, familyID string, from, to time.Time, granularity string) (*domain.CareReport, error) {
+    var feedResult feedData
+    var diaperResult diaperData
+    var sleepResult sleepData
+    var goals *domain.ScheduleGoals
+
+    err := parallel.Run(ctx,
+        func(ctx context.Context) error {
+            var err error
+            feedResult, err = s.feedReport(ctx, familyID, from, to, granularity)
+            return err
+        },
+        func(ctx context.Context) error {
+            var err error
+            diaperResult, err = s.diaperReport(ctx, familyID, from, to, granularity)
+            return err
+        },
+        func(ctx context.Context) error {
+            var err error
+            sleepResult, err = s.sleepReport(ctx, familyID, from, to, granularity)
+            return err
+        },
+        func(ctx context.Context) error {
+            var err error
+            goals, err = s.GetScheduleGoals(ctx, familyID)
+            return err
+        },
+    )
+    if err != nil {
+        return nil, err
+    }
+    // Merge results + compute goal adherence...
+}
+```
+
+Each per-type method (`feedReport`, `diaperReport`, `sleepReport`) internally runs its CTE query (buckets + medians + hourly combined) as a single SQL round-trip. Wall-clock time equals the slowest single activity-type query rather than the sum.
+
+**Follow-up (after reporting ships):** The same `parallel.Run` helper should be retrofitted onto existing sequential resolvers:
+- **Predictions resolver** (`schema.resolvers.go:1231-1270`): `GetRecentFeedDetailsForFamily` + `GetRecentSleepDetailsForFamily` + `GetScheduleGoals` — all independent
+- **GetBabyStatus resolver** (`schema.resolvers.go:1088-1140`): 3x `GetLatestActivityByType` in first tier, 3x `GetDetails` in second tier — both tiers parallelizable
+- **AddActivities / CompleteCareSession**: loop of `GetSleepDetails` + `UpdateSleepDetails` — per-iteration parallelizable
+
+### CTE Consolidation
+
+Each per-type method combines its bucket, hourly, and median queries into a single SQL round-trip using a CTE. Example for feeds:
+
+```sql
+WITH daily AS (
+  SELECT date_trunc('day', fd.start_time) AS day,
+         count(*) AS feeds,
+         coalesce(sum(fd.amount_ml), 0) AS ml
+  FROM activities a
+  JOIN care_sessions cs ON a.care_session_id = cs.id
+  JOIN feed_details fd ON fd.activity_id = a.id
+  WHERE cs.family_id = $1
+    AND fd.start_time BETWEEN $2 AND $3
+    AND a.activity_type = 'feed'
+  GROUP BY day
+),
+buckets AS (
+  SELECT date_trunc($4, day) AS bucket,
+         sum(feeds)::int AS feeds,
+         sum(ml)::int AS ml
+  FROM daily GROUP BY bucket
+),
+medians AS (
+  SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY feeds) AS median_feeds,
+         percentile_cont(0.5) WITHIN GROUP (ORDER BY ml) AS median_ml
+  FROM daily
+),
+hourly AS (
+  SELECT extract(hour FROM fd.start_time)::int AS hour,
+         count(*) AS feeds
+  FROM activities a
+  JOIN care_sessions cs ON a.care_session_id = cs.id
+  JOIN feed_details fd ON fd.activity_id = a.id
+  WHERE cs.family_id = $1
+    AND fd.start_time BETWEEN $2 AND $3
+    AND a.activity_type = 'feed'
+  GROUP BY hour
+)
+SELECT 'buckets' AS result_type, bucket::text AS key, feeds::text AS val1, ml::text AS val2
+FROM buckets
+UNION ALL
+SELECT 'medians', '', median_feeds::text, median_ml::text
+FROM medians
+UNION ALL
+SELECT 'hourly', hour::text, feeds::text, ''
+FROM hourly
+ORDER BY result_type, key;
+```
+
+Go code parses the tagged rows into the appropriate structs. This reduces each activity type from 3 round-trips to 1.
+
+**Total query count per report:** 4 concurrent round-trips (feed CTE + diaper CTE + sleep CTE + schedule goals), plus 1 sequential feed type breakdown query. Wall time ≈ slowest single CTE (~5-10ms even at year scale).
+
 ### Domain Models
 
 New structs in `domain/models.go`: `CareReport`, `ReportTotals`, `ReportBucket`, `HourlyBucket`, `GoalAdherence`.
