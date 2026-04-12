@@ -171,3 +171,57 @@ type Prediction struct {
 	ComputedAt               time.Time
 	CreatedAt                time.Time
 }
+
+// Reporting models
+
+type CareReport struct {
+	From          time.Time
+	To            time.Time
+	Granularity   string // "DAY", "WEEK", "MONTH"
+	Totals        ReportTotals
+	Buckets       []ReportBucket
+	HourlyPattern []HourlyBucket
+	GoalAdherence *GoalAdherence // nil when no goals set
+}
+
+type ReportTotals struct {
+	TotalFeeds                  int
+	TotalMl                     int
+	MedianFeedsPerDay           float64
+	MedianMlPerDay              float64
+	FeedTypeBreakdown           []FeedTypeCount
+	TotalDiaperChanges          int
+	TotalPoops                  int
+	TotalPees                   int
+	MedianDiapersPerDay         float64
+	TotalSleepMinutes           int
+	MedianSleepMinutesPerDay    float64
+	MedianLongestStretchMinutes float64
+}
+
+type ReportBucket struct {
+	BucketStart  time.Time
+	Feeds        int
+	Ml           int
+	Diapers      int
+	SleepMinutes int
+}
+
+type HourlyBucket struct {
+	Hour         int // 0-23
+	Feeds        int
+	SleepMinutes int
+	Diapers      int
+}
+
+type GoalAdherence struct {
+	WakeWindowAdherencePct     *float64
+	FeedIntervalAdherencePct   *float64
+	NapCountAdherencePct       *float64
+	BedtimeAdherenceMinutesAvg *float64
+}
+
+type FeedTypeCount struct {
+	FeedType string // "breast_milk", "formula", "solids"
+	Count    int
+}
