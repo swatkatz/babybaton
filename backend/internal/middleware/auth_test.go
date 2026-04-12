@@ -173,6 +173,9 @@ func (m *mockStore) GetScheduleGoals(ctx context.Context, familyID uuid.UUID) (*
 func (m *mockStore) UpsertScheduleGoals(ctx context.Context, familyID uuid.UUID, goals *domain.ScheduleGoals) (*domain.ScheduleGoals, error) {
 	return goals, nil
 }
+func (m *mockStore) CareReport(ctx context.Context, familyID uuid.UUID, from time.Time, to time.Time, granularity string) (*domain.CareReport, error) {
+	return nil, nil
+}
 func (m *mockStore) Close() error { return nil }
 
 // ==================== Legacy AuthMiddleware Tests ====================

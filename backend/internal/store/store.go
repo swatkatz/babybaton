@@ -76,6 +76,9 @@ type Store interface {
 	GetScheduleGoals(ctx context.Context, familyID uuid.UUID) (*domain.ScheduleGoals, error)
 	UpsertScheduleGoals(ctx context.Context, familyID uuid.UUID, goals *domain.ScheduleGoals) (*domain.ScheduleGoals, error)
 
+	// Reporting operations
+	CareReport(ctx context.Context, familyID uuid.UUID, from, to time.Time, granularity string) (*domain.CareReport, error)
+
 	// Lifecycle
 	Close() error
 }
