@@ -9,7 +9,7 @@ Add a first-class Reports tab to BabyBaton that gives caregivers aggregate insig
 
 **In scope:**
 - New bottom tab "Reports" (5th tab)
-- Totals & averages, trends over time, patterns by time of day, goal adherence
+- Totals & medians, trends over time, patterns by time of day, goal adherence
 - Time range selection: Day / Week / Month / Year (default: rolling 7 days)
 - Tappable summary cards with drill-down to per-activity detail screens
 - In-app only — no export/sharing in MVP
@@ -52,16 +52,16 @@ type CareReport {
 type ReportTotals {
   totalFeeds: Int!
   totalMl: Int!
-  avgFeedsPerDay: Float!
-  avgMlPerDay: Float!
+  medianFeedsPerDay: Float!
+  medianMlPerDay: Float!
   feedTypeBreakdown: [FeedTypeCount!]!
   totalDiaperChanges: Int!
   totalPoops: Int!
   totalPees: Int!
-  avgDiapersPerDay: Float!
+  medianDiapersPerDay: Float!
   totalSleepMinutes: Int!
-  avgSleepMinutesPerDay: Float!
-  avgLongestStretchMinutes: Float!
+  medianSleepMinutesPerDay: Float!
+  medianLongestStretchMinutes: Float!
 }
 
 type ReportBucket {
@@ -217,7 +217,7 @@ Tab icon: `BarChart3` from `lucide-react-native` (consistent with existing icon 
 
 **Layout (scrollable single page):**
 1. **Time range chips** — Day / Week / Month / Year, sticky at top. Default: Week (rolling 7 days).
-2. **Summary cards** — Three tappable cards in a row (Feed, Diaper, Sleep). Each shows total count, primary metric, and daily average. Blue border + chevron to indicate tappability. Tapping navigates to `ReportDetail`.
+2. **Summary cards** — Three tappable cards in a row (Feed, Diaper, Sleep). Each shows total count, primary metric, and daily median. Blue border + chevron to indicate tappability. Tapping navigates to `ReportDetail`.
 3. **Trends section** — Bar chart showing combined daily/weekly/monthly buckets. Uses the `buckets` from the API. Color-coded by activity type.
 4. **Daily pattern section** — 24-bar histogram from `hourlyPattern`. Color-coded bars (blue=feed, purple=sleep, peach=diaper).
 5. **Goal adherence section** — Progress bars with percentages. Only shown when `goalAdherence` is non-null.
@@ -241,8 +241,8 @@ Pushed onto the `ReportsStack` with a back button. Header shows activity icon + 
 **Layout (scrollable):**
 1. **Time range chips** — same as overview, stays in sync
 2. **Detailed stats** — 3 stat cards specific to the type:
-   - Feed: total feeds, avg/day, avg ml/day
-   - Sleep: total hours, avg/day, avg longest stretch
+   - Feed: total feeds, median/day, median ml/day
+   - Sleep: total hours, median/day, median longest stretch
    - Diaper: total changes, poops, pees
 3. **Type breakdown bar** (feed only) — horizontal stacked bar showing breast milk / formula / solids proportions. Segments <1% are hidden.
 4. **Trend chart** — type-specific bar chart (feeds/day, sleep minutes/day, diapers/day)
@@ -277,15 +277,15 @@ query GetCareReport($from: DateTime!, $to: DateTime!, $granularity: ReportGranul
     totals {
       totalFeeds
       totalMl
-      avgFeedsPerDay
-      avgMlPerDay
+      medianFeedsPerDay
+      medianMlPerDay
       totalDiaperChanges
       totalPoops
       totalPees
-      avgDiapersPerDay
+      medianDiapersPerDay
       totalSleepMinutes
-      avgSleepMinutesPerDay
-      avgLongestStretchMinutes
+      medianSleepMinutesPerDay
+      medianLongestStretchMinutes
     }
     buckets {
       bucketStart
@@ -342,7 +342,7 @@ The backend populates this from the feed type grouping query. The frontend filte
 **Store integration tests** (`store/postgres/report_test.go`):
 - Seed activities with known times across feed_details, diaper_details, sleep_details
 - Test DAY, WEEK, MONTH granularities
-- Assert bucket counts, totals, averages, hourly histogram values
+- Assert bucket counts, totals, medians, hourly histogram values
 - Edge cases: empty date ranges, single activity, activities at midnight boundaries
 - Feed type breakdown: verify counts, test that all types are returned (frontend handles <1% filtering)
 
