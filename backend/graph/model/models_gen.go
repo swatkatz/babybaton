@@ -156,10 +156,11 @@ type FeedTypeCount struct {
 }
 
 type GoalAdherence struct {
-	WakeWindowAdherencePct     *float64 `json:"wakeWindowAdherencePct,omitempty"`
-	FeedIntervalAdherencePct   *float64 `json:"feedIntervalAdherencePct,omitempty"`
-	NapCountAdherencePct       *float64 `json:"napCountAdherencePct,omitempty"`
-	BedtimeAdherenceMinutesAvg *float64 `json:"bedtimeAdherenceMinutesAvg,omitempty"`
+	WakeWindowAdherencePct      *float64 `json:"wakeWindowAdherencePct,omitempty"`
+	FeedIntervalAdherencePct    *float64 `json:"feedIntervalAdherencePct,omitempty"`
+	NapCountAdherencePct        *float64 `json:"napCountAdherencePct,omitempty"`
+	BedtimeAdherenceMinutesAvg  *float64 `json:"bedtimeAdherenceMinutesAvg,omitempty"`
+	WakeTimeAdherenceMinutesAvg *float64 `json:"wakeTimeAdherenceMinutesAvg,omitempty"`
 }
 
 type HourlyBucket struct {
@@ -170,6 +171,22 @@ type HourlyBucket struct {
 }
 
 type Mutation struct {
+}
+
+type NapStats struct {
+	TotalMinutes             int32   `json:"totalMinutes"`
+	MedianNapsPerDay         float64 `json:"medianNapsPerDay"`
+	MedianNapDurationMinutes float64 `json:"medianNapDurationMinutes"`
+	Count                    int32   `json:"count"`
+}
+
+type OvernightSleepStats struct {
+	TotalMinutes                int32   `json:"totalMinutes"`
+	MedianMinutesPerNight       float64 `json:"medianMinutesPerNight"`
+	MedianLongestStretchMinutes float64 `json:"medianLongestStretchMinutes"`
+	MedianBedtime               *string `json:"medianBedtime,omitempty"`
+	MedianWakeTime              *string `json:"medianWakeTime,omitempty"`
+	Count                       int32   `json:"count"`
 }
 
 type ParsedActivity struct {
@@ -211,18 +228,20 @@ type ReportBucket struct {
 }
 
 type ReportTotals struct {
-	TotalFeeds                  int32            `json:"totalFeeds"`
-	TotalMl                     int32            `json:"totalMl"`
-	MedianFeedsPerDay           float64          `json:"medianFeedsPerDay"`
-	MedianMlPerDay              float64          `json:"medianMlPerDay"`
-	FeedTypeBreakdown           []*FeedTypeCount `json:"feedTypeBreakdown"`
-	TotalDiaperChanges          int32            `json:"totalDiaperChanges"`
-	TotalPoops                  int32            `json:"totalPoops"`
-	TotalPees                   int32            `json:"totalPees"`
-	MedianDiapersPerDay         float64          `json:"medianDiapersPerDay"`
-	TotalSleepMinutes           int32            `json:"totalSleepMinutes"`
-	MedianSleepMinutesPerDay    float64          `json:"medianSleepMinutesPerDay"`
-	MedianLongestStretchMinutes float64          `json:"medianLongestStretchMinutes"`
+	TotalFeeds                  int32                `json:"totalFeeds"`
+	TotalMl                     int32                `json:"totalMl"`
+	MedianFeedsPerDay           float64              `json:"medianFeedsPerDay"`
+	MedianMlPerDay              float64              `json:"medianMlPerDay"`
+	FeedTypeBreakdown           []*FeedTypeCount     `json:"feedTypeBreakdown"`
+	TotalDiaperChanges          int32                `json:"totalDiaperChanges"`
+	TotalPoops                  int32                `json:"totalPoops"`
+	TotalPees                   int32                `json:"totalPees"`
+	MedianDiapersPerDay         float64              `json:"medianDiapersPerDay"`
+	TotalSleepMinutes           int32                `json:"totalSleepMinutes"`
+	MedianSleepMinutesPerDay    float64              `json:"medianSleepMinutesPerDay"`
+	MedianLongestStretchMinutes float64              `json:"medianLongestStretchMinutes"`
+	OvernightStats              *OvernightSleepStats `json:"overnightStats"`
+	NapStats                    *NapStats            `json:"napStats"`
 }
 
 type ScheduleGoals struct {

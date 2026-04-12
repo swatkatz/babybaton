@@ -46,6 +46,8 @@ func (s *PostgresStore) CareReport(ctx context.Context, familyID uuid.UUID, from
 	var diaperResult diaperData
 	var sleepResult sleepData
 	var goals *domain.ScheduleGoals
+	var overnightStats domain.OvernightSleepStats
+	var napStats domain.NapStats
 
 	err := parallel.Run(ctx,
 		func(ctx context.Context) error {
@@ -66,6 +68,16 @@ func (s *PostgresStore) CareReport(ctx context.Context, familyID uuid.UUID, from
 		func(ctx context.Context) error {
 			var err error
 			goals, err = s.GetScheduleGoals(ctx, familyID)
+			return err
+		},
+		func(ctx context.Context) error {
+			var err error
+			overnightStats, err = s.overnightSleepStats(ctx, familyID, from, to)
+			return err
+		},
+		func(ctx context.Context) error {
+			var err error
+			napStats, err = s.napSleepStats(ctx, familyID, from, to)
 			return err
 		},
 	)
@@ -111,6 +123,8 @@ func (s *PostgresStore) CareReport(ctx context.Context, familyID uuid.UUID, from
 			TotalSleepMinutes:           sleepResult.totalMinutes,
 			MedianSleepMinutesPerDay:    sleepResult.medianMinutesPerDay,
 			MedianLongestStretchMinutes: sleepResult.medianLongestStretch,
+			OvernightStats:              overnightStats,
+			NapStats:                    napStats,
 		},
 		Buckets:       buckets,
 		HourlyPattern: hourly,
@@ -470,6 +484,18 @@ func (s *PostgresStore) computeGoalAdherence(ctx context.Context, familyID uuid.
 		}
 	}
 
+	// Wake time adherence
+	if goals.TargetWakeTime != nil {
+		avg, err := s.computeWakeTimeAdherence(ctx, familyID, from, to, *goals.TargetWakeTime)
+		if err != nil {
+			return nil, err
+		}
+		if avg != nil {
+			ga.WakeTimeAdherenceMinutesAvg = avg
+			hasAny = true
+		}
+	}
+
 	if !hasAny {
 		return nil, nil
 	}
@@ -615,6 +641,171 @@ ORDER BY sd.start_time`
 	}
 	avg := totalDiff / float64(count)
 	return &avg, nil
+}
+
+func (s *PostgresStore) overnightSleepStats(ctx context.Context, familyID uuid.UUID, from, to time.Time) (domain.OvernightSleepStats, error) {
+	query := `
+WITH overnight AS (
+  SELECT sd.start_time, sd.end_time, sd.duration_minutes
+  FROM activities a
+  JOIN care_sessions cs ON a.care_session_id = cs.id
+  JOIN sleep_details sd ON sd.activity_id = a.id
+  WHERE cs.family_id = $1
+    AND sd.start_time >= $2 AND sd.start_time < $3
+    AND a.activity_type = 'sleep'
+    AND (extract(hour FROM sd.start_time) >= 18 OR extract(hour FROM sd.start_time) < 5)
+),
+nightly AS (
+  SELECT date_trunc('day', start_time) AS night,
+         sum(duration_minutes) AS minutes,
+         max(duration_minutes) AS longest_stretch
+  FROM overnight
+  GROUP BY night
+)
+SELECT
+  coalesce((SELECT sum(duration_minutes) FROM overnight), 0) AS total_minutes,
+  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY minutes) FROM nightly) AS median_per_night,
+  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY longest_stretch) FROM nightly) AS median_longest,
+  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM start_time)::bigint % 86400) FROM overnight) AS median_bedtime_sec,
+  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM end_time)::bigint % 86400) FROM overnight WHERE end_time IS NOT NULL) AS median_waketime_sec,
+  coalesce((SELECT count(*) FROM overnight), 0) AS count`
+
+	var result domain.OvernightSleepStats
+	var totalMin int64
+	var medianPerNight, medianLongest, medianBedtimeSec, medianWaketimeSec sql.NullFloat64
+	var cnt int64
+
+	err := s.db.QueryRowContext(ctx, query, familyID, from, to).Scan(
+		&totalMin, &medianPerNight, &medianLongest, &medianBedtimeSec, &medianWaketimeSec, &cnt,
+	)
+	if err != nil {
+		return result, fmt.Errorf("failed to query overnight sleep stats: %w", err)
+	}
+
+	result.TotalMinutes = int(totalMin)
+	result.Count = int(cnt)
+	if medianPerNight.Valid {
+		result.MedianMinutesPerNight = medianPerNight.Float64
+	}
+	if medianLongest.Valid {
+		result.MedianLongestStretchMinutes = medianLongest.Float64
+	}
+	if medianBedtimeSec.Valid {
+		result.MedianBedtime = secondsToHHMM(medianBedtimeSec.Float64)
+	}
+	if medianWaketimeSec.Valid {
+		result.MedianWakeTime = secondsToHHMM(medianWaketimeSec.Float64)
+	}
+
+	return result, nil
+}
+
+func (s *PostgresStore) napSleepStats(ctx context.Context, familyID uuid.UUID, from, to time.Time) (domain.NapStats, error) {
+	query := `
+WITH naps AS (
+  SELECT sd.start_time, sd.duration_minutes
+  FROM activities a
+  JOIN care_sessions cs ON a.care_session_id = cs.id
+  JOIN sleep_details sd ON sd.activity_id = a.id
+  WHERE cs.family_id = $1
+    AND sd.start_time >= $2 AND sd.start_time < $3
+    AND a.activity_type = 'sleep'
+    AND extract(hour FROM sd.start_time) >= 5
+    AND extract(hour FROM sd.start_time) < 18
+),
+daily AS (
+  SELECT date_trunc('day', start_time) AS day,
+         count(*) AS nap_count
+  FROM naps
+  GROUP BY day
+)
+SELECT
+  coalesce((SELECT sum(duration_minutes) FROM naps), 0) AS total_minutes,
+  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY nap_count) FROM daily) AS median_naps_per_day,
+  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_minutes) FROM naps) AS median_duration,
+  coalesce((SELECT count(*) FROM naps), 0) AS count`
+
+	var result domain.NapStats
+	var totalMin int64
+	var medianNapsPerDay, medianDuration sql.NullFloat64
+	var cnt int64
+
+	err := s.db.QueryRowContext(ctx, query, familyID, from, to).Scan(
+		&totalMin, &medianNapsPerDay, &medianDuration, &cnt,
+	)
+	if err != nil {
+		return result, fmt.Errorf("failed to query nap stats: %w", err)
+	}
+
+	result.TotalMinutes = int(totalMin)
+	result.Count = int(cnt)
+	if medianNapsPerDay.Valid {
+		result.MedianNapsPerDay = medianNapsPerDay.Float64
+	}
+	if medianDuration.Valid {
+		result.MedianNapDurationMinutes = medianDuration.Float64
+	}
+
+	return result, nil
+}
+
+func (s *PostgresStore) computeWakeTimeAdherence(ctx context.Context, familyID uuid.UUID, from, to time.Time, targetWakeTime string) (*float64, error) {
+	targetTime, err := time.Parse("15:04", targetWakeTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse target wake time %q: %w", targetWakeTime, err)
+	}
+	targetMinutesOfDay := targetTime.Hour()*60 + targetTime.Minute()
+
+	query := `
+SELECT sd.end_time
+FROM activities a
+JOIN care_sessions cs ON a.care_session_id = cs.id
+JOIN sleep_details sd ON sd.activity_id = a.id
+WHERE cs.family_id = $1
+  AND sd.start_time >= $2 AND sd.start_time < $3
+  AND a.activity_type = 'sleep'
+  AND (extract(hour FROM sd.start_time) >= 18 OR extract(hour FROM sd.start_time) < 5)
+  AND sd.end_time IS NOT NULL
+ORDER BY sd.end_time`
+
+	rows, err := s.db.QueryContext(ctx, query, familyID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query wake times: %w", err)
+	}
+	defer rows.Close()
+
+	var totalDiff float64
+	var count int
+	for rows.Next() {
+		var endTime time.Time
+		if err := rows.Scan(&endTime); err != nil {
+			return nil, fmt.Errorf("failed to scan wake time row: %w", err)
+		}
+		actualMinutes := endTime.Hour()*60 + endTime.Minute()
+		diff := math.Abs(float64(actualMinutes - targetMinutesOfDay))
+		totalDiff += diff
+		count++
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating wake times: %w", err)
+	}
+
+	if count == 0 {
+		return nil, nil
+	}
+	avg := totalDiff / float64(count)
+	return &avg, nil
+}
+
+func secondsToHHMM(secs float64) *string {
+	totalMinutes := int(math.Round(secs / 60))
+	h := totalMinutes / 60
+	m := totalMinutes % 60
+	if h < 0 {
+		h += 24
+	}
+	s := fmt.Sprintf("%02d:%02d", h%24, m)
+	return &s
 }
 
 // Helper functions

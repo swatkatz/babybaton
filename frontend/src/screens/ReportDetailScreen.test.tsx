@@ -59,6 +59,22 @@ const mockReport = {
     totalSleepMinutes: 5880,
     medianSleepMinutesPerDay: 840,
     medianLongestStretchMinutes: 360,
+    overnightStats: {
+      __typename: 'OvernightSleepStats' as const,
+      totalMinutes: 4200,
+      medianMinutesPerNight: 600,
+      medianLongestStretchMinutes: 540,
+      medianBedtime: '20:00',
+      medianWakeTime: '07:00',
+      count: 7,
+    },
+    napStats: {
+      __typename: 'NapStats' as const,
+      totalMinutes: 1680,
+      medianNapsPerDay: 2,
+      medianNapDurationMinutes: 45,
+      count: 14,
+    },
   },
   buckets: [
     { __typename: 'ReportBucket' as const, bucketStart: '2026-04-05T07:00:00.000Z', feeds: 6, ml: 720, diapers: 5, sleepMinutes: 840 },
@@ -76,6 +92,7 @@ const mockReport = {
     feedIntervalAdherencePct: 72,
     napCountAdherencePct: 60,
     bedtimeAdherenceMinutesAvg: 15,
+    wakeTimeAdherenceMinutesAvg: 10,
   },
 };
 
@@ -155,19 +172,55 @@ describe('ReportDetailScreen', () => {
 
     it('renders total sleep hours, median/day, median stretch', async () => {
       const link = createMockLink(() => ({ data: { careReport: mockReport } }));
-      const { findByText } = renderScreen('SLEEP', link);
+      const { findByText, findAllByText } = renderScreen('SLEEP', link);
       expect(await findByText('98h')).toBeTruthy();
       expect(await findByText('total sleep')).toBeTruthy();
       expect(await findByText('14h')).toBeTruthy();
-      expect(await findByText('median/day')).toBeTruthy();
+      expect((await findAllByText('median/day')).length).toBeGreaterThanOrEqual(1);
       expect(await findByText('6h')).toBeTruthy();
       expect(await findByText('median stretch')).toBeTruthy();
     });
 
-    it('shows nap count goal adherence', async () => {
+    it('renders Overnight section with overnight stats', async () => {
       const link = createMockLink(() => ({ data: { careReport: mockReport } }));
-      const { findByText } = renderScreen('SLEEP', link);
+      const { findByTestId, findByText } = renderScreen('SLEEP', link);
+      expect(await findByTestId('overnight-section')).toBeTruthy();
+      expect(await findByText('Overnight')).toBeTruthy();
+      expect(await findByText('70h')).toBeTruthy(); // 4200 min = 70h
+      expect(await findByText('total overnight')).toBeTruthy();
+      expect(await findByText('10h')).toBeTruthy(); // 600 min = 10h
+      expect(await findByText('median/night')).toBeTruthy();
+      expect(await findByText('20:00')).toBeTruthy();
+      expect(await findByText('median bedtime')).toBeTruthy();
+      expect(await findByText('07:00')).toBeTruthy();
+      expect(await findByText('median wake')).toBeTruthy();
+    });
+
+    it('renders Naps section with nap stats', async () => {
+      const link = createMockLink(() => ({ data: { careReport: mockReport } }));
+      const { findByTestId, findByText } = renderScreen('SLEEP', link);
+      expect(await findByTestId('naps-section')).toBeTruthy();
+      expect(await findByText('Naps')).toBeTruthy();
+      expect(await findByText('14')).toBeTruthy(); // count
+      expect(await findByText('total naps')).toBeTruthy();
+      expect(await findByText('2.0')).toBeTruthy(); // medianNapsPerDay
+      expect(await findByText('45m')).toBeTruthy(); // 45 min duration
+      expect(await findByText('median duration')).toBeTruthy();
+    });
+
+    it('shows nap count goal adherence in naps section', async () => {
+      const link = createMockLink(() => ({ data: { careReport: mockReport } }));
+      const { findByText, findByTestId } = renderScreen('SLEEP', link);
+      expect(await findByTestId('nap-goals')).toBeTruthy();
       expect(await findByText('Nap Count')).toBeTruthy();
+    });
+
+    it('shows bedtime and wake time goals in overnight section', async () => {
+      const link = createMockLink(() => ({ data: { careReport: mockReport } }));
+      const { findByText, findByTestId } = renderScreen('SLEEP', link);
+      expect(await findByTestId('overnight-goals')).toBeTruthy();
+      expect(await findByText('Bedtime')).toBeTruthy();
+      expect(await findByText('Wake Time')).toBeTruthy();
     });
 
     it('does not show TypeBreakdownBar', async () => {
@@ -175,6 +228,13 @@ describe('ReportDetailScreen', () => {
       const { findByText, queryByTestId } = renderScreen('SLEEP', link);
       await findByText('98h');
       expect(queryByTestId('type-breakdown-bar')).toBeNull();
+    });
+
+    it('does not show generic goal adherence section', async () => {
+      const link = createMockLink(() => ({ data: { careReport: mockReport } }));
+      const { findByText, queryByTestId } = renderScreen('SLEEP', link);
+      await findByText('98h');
+      expect(queryByTestId('goal-adherence-section')).toBeNull();
     });
   });
 

@@ -197,6 +197,8 @@ type ReportTotals struct {
 	TotalSleepMinutes           int
 	MedianSleepMinutesPerDay    float64
 	MedianLongestStretchMinutes float64
+	OvernightStats              OvernightSleepStats
+	NapStats                    NapStats
 }
 
 type ReportBucket struct {
@@ -214,11 +216,28 @@ type HourlyBucket struct {
 	Diapers      int
 }
 
+type OvernightSleepStats struct {
+	TotalMinutes                int
+	MedianMinutesPerNight       float64
+	MedianLongestStretchMinutes float64
+	MedianBedtime               *string // "HH:MM", nil if no data
+	MedianWakeTime              *string // "HH:MM", nil if no data
+	Count                       int
+}
+
+type NapStats struct {
+	TotalMinutes             int
+	MedianNapsPerDay         float64
+	MedianNapDurationMinutes float64
+	Count                    int
+}
+
 type GoalAdherence struct {
-	WakeWindowAdherencePct     *float64
-	FeedIntervalAdherencePct   *float64
-	NapCountAdherencePct       *float64
-	BedtimeAdherenceMinutesAvg *float64
+	WakeWindowAdherencePct      *float64
+	FeedIntervalAdherencePct    *float64
+	NapCountAdherencePct        *float64
+	BedtimeAdherenceMinutesAvg  *float64
+	WakeTimeAdherenceMinutesAvg *float64
 }
 
 type FeedTypeCount struct {

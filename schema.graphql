@@ -265,6 +265,24 @@ type ReportTotals {
   totalSleepMinutes: Int!
   medianSleepMinutesPerDay: Float!
   medianLongestStretchMinutes: Float!
+  overnightStats: OvernightSleepStats!
+  napStats: NapStats!
+}
+
+type OvernightSleepStats {
+  totalMinutes: Int!
+  medianMinutesPerNight: Float!
+  medianLongestStretchMinutes: Float!
+  medianBedtime: String
+  medianWakeTime: String
+  count: Int!
+}
+
+type NapStats {
+  totalMinutes: Int!
+  medianNapsPerDay: Float!
+  medianNapDurationMinutes: Float!
+  count: Int!
 }
 
 type ReportBucket {
@@ -287,6 +305,7 @@ type GoalAdherence {
   feedIntervalAdherencePct: Float
   napCountAdherencePct: Float
   bedtimeAdherenceMinutesAvg: Float
+  wakeTimeAdherenceMinutesAvg: Float
 }
 
 type FeedTypeCount {

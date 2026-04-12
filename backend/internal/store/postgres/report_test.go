@@ -142,6 +142,22 @@ func TestCareReport(t *testing.T) {
 			t.Errorf("MedianLongestStretchMinutes = %v, want 60", report.Totals.MedianLongestStretchMinutes)
 		}
 
+		// Overnight stats: 3 bedtime sleeps at hour 20, 60 min each
+		if report.Totals.OvernightStats.Count != 3 {
+			t.Errorf("OvernightStats.Count = %d, want 3", report.Totals.OvernightStats.Count)
+		}
+		if report.Totals.OvernightStats.TotalMinutes != 180 {
+			t.Errorf("OvernightStats.TotalMinutes = %d, want 180", report.Totals.OvernightStats.TotalMinutes)
+		}
+
+		// Nap stats: 3 naps at hour 10, 30 min each
+		if report.Totals.NapStats.Count != 3 {
+			t.Errorf("NapStats.Count = %d, want 3", report.Totals.NapStats.Count)
+		}
+		if report.Totals.NapStats.TotalMinutes != 90 {
+			t.Errorf("NapStats.TotalMinutes = %d, want 90", report.Totals.NapStats.TotalMinutes)
+		}
+
 		t.Logf("✓ DAY granularity report correct")
 	})
 
@@ -498,6 +514,263 @@ func TestNapCountAdherence(t *testing.T) {
 		}
 		if pct != nil {
 			t.Errorf("expected nil when only overnight sleep exists, got %.1f", *pct)
+		}
+	})
+}
+
+func TestOvernightAndNapStats(t *testing.T) {
+	store, err := NewPostgresStore("postgres://postgres:postgres@localhost:5432/baby_baton_test?sslmode=disable")
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+
+	setupFamily := func(t *testing.T) (*domain.Family, *domain.CareSession) {
+		t.Helper()
+		family, caregiver, err := CreateTestFamily(ctx, store)
+		if err != nil {
+			t.Fatalf("Failed to create test family: %v", err)
+		}
+		t.Cleanup(func() { store.DeleteFamily(ctx, family.ID) })
+
+		session := &domain.CareSession{
+			ID:          uuid.New(),
+			CaregiverID: caregiver.ID,
+			FamilyID:    family.ID,
+			Status:      domain.StatusInProgress,
+			StartedAt:   time.Now(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		if err := store.CreateCareSession(ctx, session); err != nil {
+			t.Fatalf("Failed to create session: %v", err)
+		}
+		return family, session
+	}
+
+	t.Run("overnight and nap split correctly", func(t *testing.T) {
+		family, session := setupFamily(t)
+		// Use a fixed base to avoid timezone issues
+		dayStart := time.Now().UTC().Truncate(24 * time.Hour).Add(5 * time.Hour)
+
+		// Nap at 14:00 (30 min) — should be in nap stats
+		createSleepActivity(t, ctx, store, session.ID, dayStart.Add(9*time.Hour), 30)
+		// Overnight at 20:00 (480 min / 8 hours, ends 04:00) — should be in overnight stats
+		createSleepActivity(t, ctx, store, session.ID, dayStart.Add(15*time.Hour), 480)
+
+		from := dayStart.Add(-1 * time.Hour)
+		to := dayStart.Add(24 * time.Hour)
+
+		report, err := store.CareReport(ctx, family.ID, from, to, "DAY")
+		if err != nil {
+			t.Fatalf("CareReport failed: %v", err)
+		}
+
+		// Overnight stats
+		if report.Totals.OvernightStats.Count != 1 {
+			t.Errorf("overnight count = %d, want 1", report.Totals.OvernightStats.Count)
+		}
+		if report.Totals.OvernightStats.TotalMinutes != 480 {
+			t.Errorf("overnight total minutes = %d, want 480", report.Totals.OvernightStats.TotalMinutes)
+		}
+		if report.Totals.OvernightStats.MedianBedtime == nil {
+			t.Error("overnight median bedtime should not be nil")
+		} else if *report.Totals.OvernightStats.MedianBedtime != "20:00" {
+			t.Errorf("overnight median bedtime = %s, want 20:00", *report.Totals.OvernightStats.MedianBedtime)
+		}
+		if report.Totals.OvernightStats.MedianWakeTime == nil {
+			t.Error("overnight median wake time should not be nil")
+		} else if *report.Totals.OvernightStats.MedianWakeTime != "04:00" {
+			t.Errorf("overnight median wake time = %s, want 04:00", *report.Totals.OvernightStats.MedianWakeTime)
+		}
+
+		// Nap stats
+		if report.Totals.NapStats.Count != 1 {
+			t.Errorf("nap count = %d, want 1", report.Totals.NapStats.Count)
+		}
+		if report.Totals.NapStats.TotalMinutes != 30 {
+			t.Errorf("nap total minutes = %d, want 30", report.Totals.NapStats.TotalMinutes)
+		}
+		if report.Totals.NapStats.MedianNapDurationMinutes != 30 {
+			t.Errorf("median nap duration = %.1f, want 30", report.Totals.NapStats.MedianNapDurationMinutes)
+		}
+	})
+
+	t.Run("multi-night medians", func(t *testing.T) {
+		family, session := setupFamily(t)
+		day1 := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, -2).Add(5 * time.Hour)
+		day2 := day1.Add(24 * time.Hour)
+
+		// Night 1: bedtime 19:30, 540 min (9 hours), wakes 04:30
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(14*time.Hour+30*time.Minute), 540)
+		// Night 2: bedtime 20:30, 420 min (7 hours), wakes 03:30
+		createSleepActivity(t, ctx, store, session.ID, day2.Add(15*time.Hour+30*time.Minute), 420)
+
+		from := day1.Add(-1 * time.Hour)
+		to := day2.Add(24 * time.Hour)
+
+		stats, err := store.overnightSleepStats(ctx, family.ID, from, to)
+		if err != nil {
+			t.Fatalf("overnightSleepStats failed: %v", err)
+		}
+
+		if stats.Count != 2 {
+			t.Errorf("count = %d, want 2", stats.Count)
+		}
+		if stats.TotalMinutes != 960 {
+			t.Errorf("total minutes = %d, want 960", stats.TotalMinutes)
+		}
+		// Median bedtime: between 19:30 and 20:30 = 20:00
+		if stats.MedianBedtime == nil {
+			t.Error("median bedtime should not be nil")
+		} else if *stats.MedianBedtime != "20:00" {
+			t.Errorf("median bedtime = %s, want 20:00", *stats.MedianBedtime)
+		}
+		// Median wake time: between 04:30 and 03:30 = 04:00
+		if stats.MedianWakeTime == nil {
+			t.Error("median wake time should not be nil")
+		} else if *stats.MedianWakeTime != "04:00" {
+			t.Errorf("median wake time = %s, want 04:00", *stats.MedianWakeTime)
+		}
+	})
+
+	t.Run("empty data returns zeros", func(t *testing.T) {
+		family, _ := setupFamily(t)
+		farFuture := time.Now().AddDate(1, 0, 0)
+
+		overnight, err := store.overnightSleepStats(ctx, family.ID, farFuture, farFuture.Add(24*time.Hour))
+		if err != nil {
+			t.Fatalf("overnightSleepStats failed: %v", err)
+		}
+		if overnight.Count != 0 {
+			t.Errorf("overnight count = %d, want 0", overnight.Count)
+		}
+		if overnight.TotalMinutes != 0 {
+			t.Errorf("overnight total = %d, want 0", overnight.TotalMinutes)
+		}
+		if overnight.MedianBedtime != nil {
+			t.Error("median bedtime should be nil for no data")
+		}
+
+		naps, err := store.napSleepStats(ctx, family.ID, farFuture, farFuture.Add(24*time.Hour))
+		if err != nil {
+			t.Fatalf("napSleepStats failed: %v", err)
+		}
+		if naps.Count != 0 {
+			t.Errorf("nap count = %d, want 0", naps.Count)
+		}
+		if naps.TotalMinutes != 0 {
+			t.Errorf("nap total = %d, want 0", naps.TotalMinutes)
+		}
+	})
+}
+
+func TestWakeTimeAdherence(t *testing.T) {
+	store, err := NewPostgresStore("postgres://postgres:postgres@localhost:5432/baby_baton_test?sslmode=disable")
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+
+	setupFamily := func(t *testing.T) (*domain.Family, *domain.CareSession) {
+		t.Helper()
+		family, caregiver, err := CreateTestFamily(ctx, store)
+		if err != nil {
+			t.Fatalf("Failed to create test family: %v", err)
+		}
+		t.Cleanup(func() { store.DeleteFamily(ctx, family.ID) })
+
+		session := &domain.CareSession{
+			ID:          uuid.New(),
+			CaregiverID: caregiver.ID,
+			FamilyID:    family.ID,
+			Status:      domain.StatusInProgress,
+			StartedAt:   time.Now(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		if err := store.CreateCareSession(ctx, session); err != nil {
+			t.Fatalf("Failed to create session: %v", err)
+		}
+		return family, session
+	}
+
+	t.Run("wake time 5 min off target", func(t *testing.T) {
+		family, session := setupFamily(t)
+		dayStart := time.Now().UTC().Truncate(24 * time.Hour).Add(5 * time.Hour)
+
+		// Overnight sleep starting at 20:00, ending at 07:05 (665 min)
+		createSleepActivity(t, ctx, store, session.ID, dayStart.Add(15*time.Hour), 665)
+
+		from := dayStart.Add(-1 * time.Hour)
+		to := dayStart.Add(24 * time.Hour)
+
+		avg, err := store.computeWakeTimeAdherence(ctx, family.ID, from, to, "07:00")
+		if err != nil {
+			t.Fatalf("computeWakeTimeAdherence failed: %v", err)
+		}
+		if avg == nil {
+			t.Fatal("expected non-nil result")
+		}
+		if math.Abs(*avg-5) > 1 {
+			t.Errorf("got %.1f min, want ~5 min", *avg)
+		}
+	})
+
+	t.Run("no overnight sleep returns nil", func(t *testing.T) {
+		family, session := setupFamily(t)
+		dayStart := time.Now().UTC().Truncate(24 * time.Hour).Add(8 * time.Hour)
+
+		// Only a nap at 14:00
+		createSleepActivity(t, ctx, store, session.ID, dayStart.Add(6*time.Hour), 30)
+
+		from := dayStart.Add(-1 * time.Hour)
+		to := dayStart.Add(24 * time.Hour)
+		avg, err := store.computeWakeTimeAdherence(ctx, family.ID, from, to, "07:00")
+		if err != nil {
+			t.Fatalf("computeWakeTimeAdherence failed: %v", err)
+		}
+		if avg != nil {
+			t.Errorf("expected nil for daytime-only sleep, got %.1f", *avg)
+		}
+	})
+
+	t.Run("goal adherence includes wake time", func(t *testing.T) {
+		family, session := setupFamily(t)
+		dayStart := time.Now().UTC().Truncate(24 * time.Hour).Add(5 * time.Hour)
+
+		// Overnight sleep 20:00 -> 07:00 (660 min)
+		createSleepActivity(t, ctx, store, session.ID, dayStart.Add(15*time.Hour), 660)
+
+		targetWake := "07:00"
+		targetBedtime := "20:00"
+		goals := &domain.ScheduleGoals{
+			TargetBedtime:  &targetBedtime,
+			TargetWakeTime: &targetWake,
+		}
+		_, err := store.UpsertScheduleGoals(ctx, family.ID, goals)
+		if err != nil {
+			t.Fatalf("Failed to upsert schedule goals: %v", err)
+		}
+
+		from := dayStart.Add(-1 * time.Hour)
+		to := dayStart.Add(24 * time.Hour)
+		report, err := store.CareReport(ctx, family.ID, from, to, "DAY")
+		if err != nil {
+			t.Fatalf("CareReport failed: %v", err)
+		}
+
+		if report.GoalAdherence == nil {
+			t.Fatal("GoalAdherence should not be nil")
+		}
+		if report.GoalAdherence.WakeTimeAdherenceMinutesAvg == nil {
+			t.Error("WakeTimeAdherenceMinutesAvg should not be nil")
+		} else if math.Abs(*report.GoalAdherence.WakeTimeAdherenceMinutesAvg) > 1 {
+			t.Errorf("WakeTimeAdherenceMinutesAvg = %.1f, want ~0", *report.GoalAdherence.WakeTimeAdherenceMinutesAvg)
 		}
 	})
 }

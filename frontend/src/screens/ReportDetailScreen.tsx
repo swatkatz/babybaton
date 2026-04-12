@@ -12,6 +12,7 @@ import {
   GetCareReportDocument,
   ReportGranularity,
   ReportTotals,
+  GoalAdherence,
 } from '../types/__generated__/graphql';
 import { ReportsStackParamList } from '../navigation/MainTabNavigator';
 import { colors } from '../theme/colors';
@@ -33,9 +34,8 @@ const metricMap: Record<ActivityType, { metric: 'feeds' | 'diapers' | 'sleepMinu
   SLEEP: { metric: 'sleepMinutes', color: colors.sleep },
 };
 
-const goalMap: Record<string, { label: string; field: 'feedIntervalAdherencePct' | 'napCountAdherencePct' }> = {
+const goalMap: Record<string, { label: string; field: keyof GoalAdherence }> = {
   FEED: { label: 'Feed Interval', field: 'feedIntervalAdherencePct' },
-  SLEEP: { label: 'Nap Count', field: 'napCountAdherencePct' },
 };
 
 function getDateRange(range: TimeRange): { from: Date; to: Date; granularity: ReportGranularity } {
@@ -60,6 +60,31 @@ function formatSleepHours(minutes: number): string {
   if (hours === 0) return `${remaining}m`;
   if (remaining === 0) return `${hours}h`;
   return `${hours}h ${remaining}m`;
+}
+
+function formatAdherenceMinutes(minutes: number | null | undefined): number | null {
+  if (minutes == null) return null;
+  const maxMinutes = 120;
+  return Math.max(0, Math.round((1 - minutes / maxMinutes) * 100));
+}
+
+function getOvernightStats(totals: ReportTotals): Array<{ value: string; label: string }> {
+  const os = totals.overnightStats;
+  return [
+    { value: formatSleepHours(os.totalMinutes), label: 'total overnight' },
+    { value: formatSleepHours(os.medianMinutesPerNight), label: 'median/night' },
+    { value: os.medianBedtime ?? '--', label: 'median bedtime' },
+    { value: os.medianWakeTime ?? '--', label: 'median wake' },
+  ];
+}
+
+function getNapSectionStats(totals: ReportTotals): Array<{ value: string; label: string }> {
+  const ns = totals.napStats;
+  return [
+    { value: String(ns.count), label: 'total naps' },
+    { value: ns.medianNapsPerDay.toFixed(1), label: 'median/day' },
+    { value: formatSleepHours(ns.medianNapDurationMinutes), label: 'median duration' },
+  ];
 }
 
 function getDetailStats(activityType: ActivityType, totals: ReportTotals): Array<{ value: string; label: string }> {
@@ -169,12 +194,64 @@ export function ReportDetailScreen({ route, navigation }: Props) {
           <HourlyPatternChart hourlyPattern={report.hourlyPattern} activityType={activityType} />
         </View>
 
+        {activityType === 'SLEEP' && (
+          <>
+            <View style={styles.section} testID="overnight-section">
+              <Text style={styles.sectionTitle}>Overnight</Text>
+              <View style={styles.cardsRow}>
+                {getOvernightStats(totals).map((stat) => (
+                  <View key={stat.label} style={styles.statCard}>
+                    <Text style={styles.statValue}>{stat.value}</Text>
+                    <Text style={styles.statLabel}>{stat.label}</Text>
+                  </View>
+                ))}
+              </View>
+              {report.goalAdherence && (report.goalAdherence.bedtimeAdherenceMinutesAvg != null || report.goalAdherence.wakeTimeAdherenceMinutesAvg != null) && (
+                <View style={styles.goalGroup} testID="overnight-goals">
+                  {report.goalAdherence.bedtimeAdherenceMinutesAvg != null && (
+                    <GoalAdherenceBar
+                      label="Bedtime"
+                      percentage={formatAdherenceMinutes(report.goalAdherence.bedtimeAdherenceMinutesAvg)}
+                    />
+                  )}
+                  {report.goalAdherence.wakeTimeAdherenceMinutesAvg != null && (
+                    <GoalAdherenceBar
+                      label="Wake Time"
+                      percentage={formatAdherenceMinutes(report.goalAdherence.wakeTimeAdherenceMinutesAvg)}
+                    />
+                  )}
+                </View>
+              )}
+            </View>
+
+            <View style={styles.section} testID="naps-section">
+              <Text style={styles.sectionTitle}>Naps</Text>
+              <View style={styles.cardsRow}>
+                {getNapSectionStats(totals).map((stat) => (
+                  <View key={stat.label} style={styles.statCard}>
+                    <Text style={styles.statValue}>{stat.value}</Text>
+                    <Text style={styles.statLabel}>{stat.label}</Text>
+                  </View>
+                ))}
+              </View>
+              {report.goalAdherence && report.goalAdherence.napCountAdherencePct != null && (
+                <View style={styles.goalGroup} testID="nap-goals">
+                  <GoalAdherenceBar
+                    label="Nap Count"
+                    percentage={report.goalAdherence.napCountAdherencePct}
+                  />
+                </View>
+              )}
+            </View>
+          </>
+        )}
+
         {goal && report.goalAdherence && (
           <View style={styles.section} testID="goal-adherence-section">
             <Text style={styles.sectionTitle}>Goal Adherence</Text>
             <GoalAdherenceBar
               label={goal.label}
-              percentage={report.goalAdherence[goal.field]}
+              percentage={report.goalAdherence[goal.field] as number | null}
             />
           </View>
         )}
@@ -235,5 +312,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
+  },
+  goalGroup: {
+    marginTop: spacing.xs,
   },
 });
