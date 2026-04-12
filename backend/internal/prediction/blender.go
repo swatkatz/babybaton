@@ -381,7 +381,7 @@ func GenerateGoalOnlyPredictions(now time.Time, goals *domain.ScheduleGoals, tim
 		pred := &domain.Prediction{
 			ActivityType:   domain.ActivityTypeFeed,
 			PredictionType: domain.PredictionTypeNextFeed,
-			PredictedTime:  predictedTime,
+			PredictedTime:  predictedTime.UTC(),
 			Status:         assignStatus(predictedTime, now, false),
 			Confidence:     &confidence,
 			Reasoning:      &reasoning,
@@ -416,7 +416,7 @@ func GenerateGoalOnlyPredictions(now time.Time, goals *domain.ScheduleGoals, tim
 		pred := &domain.Prediction{
 			ActivityType:   domain.ActivityTypeSleep,
 			PredictionType: domain.PredictionTypeNextNap,
-			PredictedTime:  predictedTime,
+			PredictedTime:  predictedTime.UTC(),
 			Status:         assignStatus(predictedTime, now, false),
 			Confidence:     &confidence,
 			Reasoning:      &reasoning,
@@ -440,7 +440,7 @@ func GenerateGoalOnlyPredictions(now time.Time, goals *domain.ScheduleGoals, tim
 		pred := &domain.Prediction{
 			ActivityType:   domain.ActivityTypeSleep,
 			PredictionType: domain.PredictionTypeBedtime,
-			PredictedTime:  predictedTime,
+			PredictedTime:  predictedTime.UTC(),
 			Status:         assignStatus(predictedTime, now, false),
 			Confidence:     &confidence,
 			Reasoning:      &reasoning,

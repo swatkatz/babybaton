@@ -324,6 +324,36 @@ func TestGeneratePredictions_TypicalDay(t *testing.T) {
 	}
 }
 
+func TestGeneratePredictions_PredictedTimesAreUTC(t *testing.T) {
+	// Regression: predicted times created via time.Date(..., loc) carried a
+	// non-UTC Location.  When written to a TIMESTAMP (without timezone) column
+	// via lib/pq, the local representation is stored but read back as UTC,
+	// shifting the time by the user's UTC offset.  All predicted times must be
+	// in UTC so that TIMESTAMP round-trips are lossless.
+	var feeds []FeedRecord
+	for i := 0; i < 12; i++ {
+		hoursAgo := float64(i) * 3.0
+		feeds = append(feeds, makeFeed(hoursAgo, domain.FeedTypeBreastMilk, 120))
+	}
+	sleeps := []SleepRecord{
+		makeNap(1.5, 90),
+		makeNap(5, 90),
+		makeNap(8.5, 90),
+		makeOvernight(24, 600),
+		makeOvernight(48, 600),
+	}
+
+	result := GeneratePredictions(baseTime, feeds, sleeps, "America/New_York")
+	for _, p := range result {
+		if p.PredictedTime.Location() != time.UTC {
+			t.Errorf("prediction %s has Location %v, want UTC", p.PredictionType, p.PredictedTime.Location())
+		}
+		if p.ComputedAt.Location() != time.UTC {
+			t.Errorf("prediction %s ComputedAt has Location %v, want UTC", p.PredictionType, p.ComputedAt.Location())
+		}
+	}
+}
+
 func TestGeneratePredictions_OverdueFeed(t *testing.T) {
 	// Last feed was 5 hours ago, median interval is ~3 hours
 	var feeds []FeedRecord

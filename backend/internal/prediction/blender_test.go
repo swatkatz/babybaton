@@ -442,6 +442,23 @@ func TestGenerateGoalOnlyPredictions_AllGoals(t *testing.T) {
 	}
 }
 
+func TestGenerateGoalOnlyPredictions_TimesAreUTC(t *testing.T) {
+	goals := &domain.ScheduleGoals{
+		TargetFeedIntervalMinutes: ptrInt(180),
+		TargetWakeWindowMinutes:   ptrInt(120),
+		TargetBedtime:             ptrStr("20:00"),
+		TargetWakeTime:            ptrStr("07:00"),
+		MaxDaytimeNapMinutes:      ptrInt(90),
+	}
+	result := GenerateGoalOnlyPredictions(baseTime, goals, "America/New_York")
+	for _, p := range result {
+		if p.PredictedTime.Location() != time.UTC {
+			t.Errorf("goal-only prediction %s has Location %v, want UTC",
+				p.PredictionType, p.PredictedTime.Location())
+		}
+	}
+}
+
 // --- agreementConfidence tests ---
 
 func TestAgreementConfidence_Within10Percent(t *testing.T) {

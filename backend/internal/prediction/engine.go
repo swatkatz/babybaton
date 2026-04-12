@@ -91,10 +91,16 @@ func GeneratePredictions(now time.Time, feeds []FeedRecord, sleeps []SleepRecord
 		predictions = predictions[:maxPredictions]
 	}
 
-	// Set computed_at and created_at, generate stable IDs
+	// Normalize all predicted times to UTC so that lib/pq encodes them
+	// correctly for TIMESTAMP (without timezone) columns. Without this,
+	// times created via time.Date(..., loc) carry a non-UTC Location;
+	// lib/pq formats the local representation, Postgres strips the offset,
+	// and on read-back the value is misinterpreted as UTC — shifting the
+	// time by the user's UTC offset.
 	for _, p := range predictions {
-		p.ComputedAt = now
-		p.CreatedAt = now
+		p.PredictedTime = p.PredictedTime.UTC()
+		p.ComputedAt = now.UTC()
+		p.CreatedAt = now.UTC()
 		p.ID = stableID(p.PredictionType, p.PredictedTime)
 	}
 
