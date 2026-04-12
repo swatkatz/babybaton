@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Home, Clock, Target, User } from 'lucide-react-native';
+import { Home, Clock, BarChart3, Target, User } from 'lucide-react-native';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { CurrentSessionDetailScreen } from '../screens/CurrentSessionDetailScreen';
 import { SessionDetailScreen } from '../screens/SessionDetailScreen';
@@ -11,6 +11,8 @@ import { PredictionDetailScreen } from '../screens/PredictionDetailScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { ScheduleGoalsScreen } from '../screens/ScheduleGoalsScreen';
+import { ReportsScreen } from '../screens/ReportsScreen';
+import { ReportDetailScreen } from '../screens/ReportDetailScreen';
 import { CustomHeader } from '../components/CustomHeader';
 import { colors } from '../theme/colors';
 
@@ -28,9 +30,15 @@ export type HistoryStackParamList = {
   SessionDetail: { sessionId: string };
 };
 
+export type ReportsStackParamList = {
+  ReportsOverview: undefined;
+  ReportDetail: { activityType: 'FEED' | 'DIAPER' | 'SLEEP' };
+};
+
 export type MainTabParamList = {
   HomeTab: undefined;
   HistoryTab: undefined;
+  ReportsTab: undefined;
   ScheduleTab: undefined;
   ProfileTab: undefined;
 };
@@ -38,6 +46,7 @@ export type MainTabParamList = {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createStackNavigator<HomeStackParamList>();
 const HistoryStack = createStackNavigator<HistoryStackParamList>();
+const ReportsStack = createStackNavigator<ReportsStackParamList>();
 
 function HomeStackNavigator() {
   return (
@@ -116,6 +125,29 @@ function HistoryStackNavigator() {
   );
 }
 
+function ReportsStackNavigator() {
+  return (
+    <ReportsStack.Navigator>
+      <ReportsStack.Screen
+        name="ReportsOverview"
+        component={ReportsScreen}
+        options={{
+          title: 'Reports',
+          header: (props) => <CustomHeader {...props} />,
+        }}
+      />
+      <ReportsStack.Screen
+        name="ReportDetail"
+        component={ReportDetailScreen}
+        options={{
+          title: 'Report Detail',
+          header: (props) => <CustomHeader {...props} />,
+        }}
+      />
+    </ReportsStack.Navigator>
+  );
+}
+
 const TAB_ICON_SIZE = 24;
 
 export function MainTabNavigator() {
@@ -149,6 +181,16 @@ export function MainTabNavigator() {
             <Clock size={TAB_ICON_SIZE} color={color} />
           ),
           tabBarAccessibilityLabel: 'History',
+        }}
+      />
+      <Tab.Screen
+        name="ReportsTab"
+        component={ReportsStackNavigator}
+        options={{
+          tabBarIcon: ({ color }) => (
+            <BarChart3 size={TAB_ICON_SIZE} color={color} />
+          ),
+          tabBarAccessibilityLabel: 'Reports',
         }}
       />
       <Tab.Screen
