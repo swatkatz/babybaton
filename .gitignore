@@ -9,3 +9,6 @@ backend/backend
 *.apk
 *.aab
 *.ipa
+
+# Superpowers visual companion
+.superpowers/

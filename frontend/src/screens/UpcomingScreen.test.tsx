@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 import { UpcomingScreen } from './UpcomingScreen';
 
 // Mock navigation
@@ -41,15 +41,19 @@ let mockQueryResult: {
 };
 
 const mockDismissPrediction = jest.fn();
+let lastUseMutationOptions: { update?: (...args: unknown[]) => void } | undefined;
 
 jest.mock('@apollo/client/react', () => ({
   useQuery: () => mockQueryResult,
-  useMutation: () => [mockDismissPrediction],
+  useMutation: (_doc: unknown, options?: { update?: (...args: unknown[]) => void }) => {
+    lastUseMutationOptions = options;
+    return [mockDismissPrediction];
+  },
 }));
 
-const basePrediction: PredictionMock = {
+const baseFeedPrediction: PredictionMock = {
   __typename: 'Prediction',
-  id: 'pred-1',
+  id: 'pred-feed',
   activityType: 'FEED',
   predictionType: 'NEXT_FEED',
   predictedTime: new Date(Date.now() + 45 * 60000).toISOString(),
@@ -59,6 +63,15 @@ const basePrediction: PredictionMock = {
   predictedAmountMl: null,
   predictedDurationMinutes: null,
   careSessionId: null,
+};
+
+const baseNapPrediction: PredictionMock = {
+  ...baseFeedPrediction,
+  id: 'pred-nap',
+  activityType: 'SLEEP',
+  predictionType: 'NEXT_NAP',
+  predictedTime: new Date(Date.now() + 30 * 60000).toISOString(),
+  reasoning: 'Wake window has been ~2 hours',
 };
 
 function renderScreen() {
@@ -73,8 +86,9 @@ function renderScreen() {
 describe('UpcomingScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    lastUseMutationOptions = undefined;
     mockQueryResult = {
-      data: { predictions: [{ ...basePrediction }] },
+      data: { predictions: [{ ...baseFeedPrediction }] },
       loading: false,
       error: undefined,
       refetch: jest.fn(),
@@ -127,64 +141,45 @@ describe('UpcomingScreen', () => {
     expect(mockQueryResult.refetch).toHaveBeenCalled();
   });
 
-  describe('section rendering', () => {
-    it('renders OVERDUE section header when overdue predictions exist', () => {
-      mockQueryResult.data = {
-        predictions: [{ ...basePrediction, status: 'OVERDUE', predictedTime: new Date(Date.now() - 10 * 60000).toISOString() }],
-      };
-      const { getByTestId, getByText } = renderScreen();
-      expect(getByTestId('overdue-section')).toBeTruthy();
-      expect(getByText('OVERDUE')).toBeTruthy();
-    });
-
-    it('does not render OVERDUE section when no overdue predictions', () => {
-      const { queryByTestId } = renderScreen();
-      expect(queryByTestId('overdue-section')).toBeNull();
-    });
-
-    it('renders UPCOMING section header', () => {
-      const { getByTestId, getByText } = renderScreen();
-      expect(getByTestId('upcoming-section')).toBeTruthy();
-      expect(getByText('COMING UP')).toBeTruthy();
-    });
-
-    it('renders PLANNED section with disclaimer note', () => {
-      mockQueryResult.data = {
-        predictions: [{ ...basePrediction, status: 'PLANNED' }],
-      };
-      const { getByTestId, getByText } = renderScreen();
-      expect(getByTestId('planned-section')).toBeTruthy();
-      expect(getByText('REST OF DAY')).toBeTruthy();
-      expect(getByText('Updates as activities are logged')).toBeTruthy();
-    });
-
-    it('groups predictions by status correctly', () => {
+  describe('highlights selection', () => {
+    it('shows the next feed and the next sleep prediction (max 2 cards)', () => {
       mockQueryResult.data = {
         predictions: [
-          { ...basePrediction, id: 'pred-overdue', status: 'OVERDUE', predictedTime: new Date(Date.now() - 10 * 60000).toISOString() },
-          { ...basePrediction, id: 'pred-upcoming-1', status: 'UPCOMING' },
-          { ...basePrediction, id: 'pred-upcoming-2', status: 'UPCOMING', predictionType: 'NEXT_NAP', activityType: 'SLEEP' },
-          { ...basePrediction, id: 'pred-planned', status: 'PLANNED' },
-        ],
-      };
-      const { getByTestId } = renderScreen();
-      expect(getByTestId('overdue-section')).toBeTruthy();
-      expect(getByTestId('upcoming-section')).toBeTruthy();
-      expect(getByTestId('planned-section')).toBeTruthy();
-    });
-
-    it('sorts predictions by predictedTime within each section', () => {
-      const later = new Date(Date.now() + 120 * 60000).toISOString();
-      const sooner = new Date(Date.now() + 30 * 60000).toISOString();
-      mockQueryResult.data = {
-        predictions: [
-          { ...basePrediction, id: 'pred-later', status: 'UPCOMING', predictedTime: later, predictionType: 'NEXT_NAP', activityType: 'SLEEP' },
-          { ...basePrediction, id: 'pred-sooner', status: 'UPCOMING', predictedTime: sooner },
+          { ...baseFeedPrediction, id: 'feed-1' },
+          { ...baseNapPrediction, id: 'nap-1' },
+          // Bedtime later than nap — should be ignored in favor of nap
+          { ...baseNapPrediction, id: 'bedtime-1', predictionType: 'BEDTIME', predictedTime: new Date(Date.now() + 6 * 60 * 60000).toISOString() },
         ],
       };
       const { getAllByTestId } = renderScreen();
-      const cards = getAllByTestId('prediction-card');
-      expect(cards.length).toBe(2);
+      expect(getAllByTestId('prediction-card')).toHaveLength(2);
+    });
+
+    it('shows just one card when only a feed prediction exists', () => {
+      mockQueryResult.data = { predictions: [{ ...baseFeedPrediction }] };
+      const { getAllByTestId } = renderScreen();
+      expect(getAllByTestId('prediction-card')).toHaveLength(1);
+    });
+
+    it('does not show any chained PLANNED predictions', () => {
+      mockQueryResult.data = {
+        predictions: [
+          { ...baseFeedPrediction, id: 'feed-now' },
+          { ...baseFeedPrediction, id: 'feed-planned', status: 'PLANNED', predictedTime: new Date(Date.now() + 4 * 60 * 60000).toISOString() },
+        ],
+      };
+      const { getAllByTestId } = renderScreen();
+      // Both are NEXT_FEED, so we only keep the soonest one regardless of status.
+      expect(getAllByTestId('prediction-card')).toHaveLength(1);
+    });
+
+    it('picks the soonest sleep-type prediction when multiple exist', () => {
+      const soonNap = { ...baseNapPrediction, id: 'nap-soon', predictedTime: new Date(Date.now() + 20 * 60000).toISOString() };
+      const laterBedtime = { ...baseNapPrediction, id: 'bedtime', predictionType: 'BEDTIME', predictedTime: new Date(Date.now() + 6 * 60 * 60000).toISOString() };
+      mockQueryResult.data = { predictions: [laterBedtime, soonNap] };
+      const { getByText, queryByText } = renderScreen();
+      expect(getByText('Next nap')).toBeTruthy();
+      expect(queryByText('Bedtime')).toBeNull();
     });
   });
 
@@ -192,36 +187,63 @@ describe('UpcomingScreen', () => {
     it('navigates to PredictionDetail when card is pressed', () => {
       const { getByTestId } = renderScreen();
       fireEvent.press(getByTestId('prediction-card'));
-      expect(mockNavigate).toHaveBeenCalledWith('PredictionDetail', { predictionId: 'pred-1' });
+      expect(mockNavigate).toHaveBeenCalledWith('PredictionDetail', { predictionId: 'pred-feed' });
     });
 
     it('calls dismissPrediction when Done is pressed on overdue card', () => {
       mockQueryResult.data = {
-        predictions: [{ ...basePrediction, status: 'OVERDUE', predictedTime: new Date(Date.now() - 10 * 60000).toISOString() }],
+        predictions: [{ ...baseFeedPrediction, status: 'OVERDUE', predictedTime: new Date(Date.now() - 10 * 60000).toISOString() }],
       };
       const { getByText } = renderScreen();
       fireEvent.press(getByText('Done'));
-      expect(mockDismissPrediction).toHaveBeenCalledWith({ variables: { id: 'pred-1' } });
+      expect(mockDismissPrediction).toHaveBeenCalledWith({ variables: { id: 'pred-feed' } });
     });
-  });
 
-  describe('skipped', () => {
     it('calls dismissPrediction mutation when Skipped is pressed', () => {
       mockQueryResult.data = {
-        predictions: [{ ...basePrediction, status: 'OVERDUE', predictedTime: new Date(Date.now() - 10 * 60000).toISOString() }],
+        predictions: [{ ...baseFeedPrediction, status: 'OVERDUE', predictedTime: new Date(Date.now() - 10 * 60000).toISOString() }],
       };
       const { getByText } = renderScreen();
       fireEvent.press(getByText('Skipped'));
-      expect(mockDismissPrediction).toHaveBeenCalledWith({ variables: { id: 'pred-1' } });
+      expect(mockDismissPrediction).toHaveBeenCalledWith({ variables: { id: 'pred-feed' } });
+    });
+  });
+
+  describe('cache update on dismiss', () => {
+    it('removes the dismissed prediction from the predictions cache field', () => {
+      renderScreen();
+      // Pull the update fn passed to useMutation and exercise it directly.
+      const update = lastUseMutationOptions?.update;
+      expect(typeof update).toBe('function');
+
+      const filterFnByField: Record<string, (refs: { __ref: string }[], helpers: { readField: (field: string, ref: { __ref: string }) => string }) => unknown> = {};
+      const cache = {
+        modify: ({ fields }: { fields: Record<string, (refs: { __ref: string }[], helpers: { readField: (field: string, ref: { __ref: string }) => string }) => unknown> }) => {
+          Object.assign(filterFnByField, fields);
+        },
+      };
+
+      update?.(cache, undefined, { variables: { id: 'pred-feed' } });
+      const predictionsField = filterFnByField.predictions;
+      expect(predictionsField).toBeDefined();
+
+      const refs = [
+        { __ref: 'Prediction:pred-feed' },
+        { __ref: 'Prediction:pred-other' },
+      ];
+      const readField = (_field: string, ref: { __ref: string }): string =>
+        ref.__ref.split(':')[1] ?? '';
+      const result = predictionsField(refs, { readField }) as { __ref: string }[];
+      expect(result).toEqual([{ __ref: 'Prediction:pred-other' }]);
     });
   });
 
   describe('multiple prediction types', () => {
-    it('renders different labels for different prediction types', () => {
+    it('renders the right labels for different prediction types', () => {
       mockQueryResult.data = {
         predictions: [
-          { ...basePrediction, id: 'pred-1', predictionType: 'NEXT_FEED' },
-          { ...basePrediction, id: 'pred-2', predictionType: 'NEXT_NAP', activityType: 'SLEEP' },
+          { ...baseFeedPrediction, id: 'pred-1', predictionType: 'NEXT_FEED' },
+          { ...baseNapPrediction, id: 'pred-2', predictionType: 'NEXT_NAP' },
         ],
       };
       const { getByText } = renderScreen();

@@ -379,8 +379,10 @@ func TestGeneratePredictions_CurrentlyAsleep(t *testing.T) {
 	}
 }
 
-func TestGeneratePredictions_ChainForward(t *testing.T) {
-	// Set up data so chaining happens
+func TestGeneratePredictions_NoChainedPlanned(t *testing.T) {
+	// With ample data, the engine should still only emit immediate next
+	// predictions — no PLANNED chained cards. Predictions are intentionally
+	// limited to "what's next" so the UI stays focused.
 	var feeds []FeedRecord
 	for i := 0; i < 10; i++ {
 		hoursAgo := float64(i) * 3.0
@@ -389,14 +391,21 @@ func TestGeneratePredictions_ChainForward(t *testing.T) {
 
 	result := GeneratePredictions(baseTime, feeds, nil, "America/Los_Angeles")
 
-	plannedCount := 0
 	for _, p := range result {
 		if p.Status == domain.PredictionStatusPlanned {
-			plannedCount++
+			t.Errorf("expected no PLANNED predictions, got one of type %s", p.PredictionType)
 		}
 	}
-	if plannedCount == 0 {
-		t.Error("expected at least one PLANNED (chained) prediction")
+
+	// Should still have at most one feed prediction (the immediate next).
+	feedCount := 0
+	for _, p := range result {
+		if p.PredictionType == domain.PredictionTypeNextFeed {
+			feedCount++
+		}
+	}
+	if feedCount > 1 {
+		t.Errorf("expected at most 1 NEXT_FEED prediction, got %d", feedCount)
 	}
 }
 
@@ -504,6 +513,126 @@ func TestGeneratePredictions_SingleFeed(t *testing.T) {
 		if p.PredictionType == domain.PredictionTypeNextFeed {
 			t.Error("should not predict feed with only 1 data point (can't compute interval)")
 		}
+	}
+}
+
+func TestSuppressFulfilledPredictions_FeedWithinWindow(t *testing.T) {
+	pt := baseTime.Add(15 * time.Minute) // upcoming feed prediction
+	pred := &domain.Prediction{
+		PredictionType: domain.PredictionTypeNextFeed,
+		PredictedTime:  pt,
+	}
+	// A feed logged 10 minutes after the predicted time → within window → suppress
+	feeds := []FeedRecord{
+		makeFeedAt(pt.Add(10*time.Minute), domain.FeedTypeBreastMilk, 100),
+	}
+	result := suppressFulfilledPredictions([]*domain.Prediction{pred}, feeds, nil)
+	if len(result) != 0 {
+		t.Errorf("expected feed prediction to be suppressed, got %d predictions", len(result))
+	}
+}
+
+func TestSuppressFulfilledPredictions_FeedJustBeforeWindow(t *testing.T) {
+	pt := baseTime.Add(15 * time.Minute)
+	pred := &domain.Prediction{
+		PredictionType: domain.PredictionTypeNextFeed,
+		PredictedTime:  pt,
+	}
+	// A feed logged 25 minutes BEFORE the predicted time → still within window
+	feeds := []FeedRecord{
+		makeFeedAt(pt.Add(-25*time.Minute), domain.FeedTypeBreastMilk, 100),
+	}
+	result := suppressFulfilledPredictions([]*domain.Prediction{pred}, feeds, nil)
+	if len(result) != 0 {
+		t.Errorf("expected feed prediction to be suppressed (25 min before), got %d", len(result))
+	}
+}
+
+func TestSuppressFulfilledPredictions_FeedOutsideWindow(t *testing.T) {
+	pt := baseTime.Add(2 * time.Hour)
+	pred := &domain.Prediction{
+		PredictionType: domain.PredictionTypeNextFeed,
+		PredictedTime:  pt,
+	}
+	// A feed 45 minutes before the predicted time → outside window → keep
+	feeds := []FeedRecord{
+		makeFeedAt(pt.Add(-45*time.Minute), domain.FeedTypeBreastMilk, 100),
+	}
+	result := suppressFulfilledPredictions([]*domain.Prediction{pred}, feeds, nil)
+	if len(result) != 1 {
+		t.Errorf("expected feed prediction to be kept, got %d", len(result))
+	}
+}
+
+func TestSuppressFulfilledPredictions_SolidsDoNotFulfillFeed(t *testing.T) {
+	pt := baseTime
+	pred := &domain.Prediction{
+		PredictionType: domain.PredictionTypeNextFeed,
+		PredictedTime:  pt,
+	}
+	feeds := []FeedRecord{
+		makeFeedAt(pt, domain.FeedTypeSolids, 0),
+	}
+	result := suppressFulfilledPredictions([]*domain.Prediction{pred}, feeds, nil)
+	if len(result) != 1 {
+		t.Errorf("solids should not fulfill milk feed prediction; got %d", len(result))
+	}
+}
+
+func TestSuppressFulfilledPredictions_OverdueFeedAutoDismissed(t *testing.T) {
+	// Simulate the user-reported case: a NEXT_FEED prediction is overdue,
+	// then a feed gets logged within the +/- 30 min window. The end-to-end
+	// generator should not return that overdue prediction anymore.
+	overdueAt := baseTime.Add(-15 * time.Minute) // 15 min in the past
+	feeds := []FeedRecord{
+		// 8 historical feeds spaced ~3h apart, anchored so the last one
+		// produces an overdue prediction near baseTime
+		{StartTime: overdueAt.Add(-3 * time.Hour), FeedType: ptr(domain.FeedTypeBreastMilk), AmountMl: ptr(100)},
+		{StartTime: overdueAt.Add(-6 * time.Hour), FeedType: ptr(domain.FeedTypeBreastMilk), AmountMl: ptr(100)},
+		{StartTime: overdueAt.Add(-9 * time.Hour), FeedType: ptr(domain.FeedTypeBreastMilk), AmountMl: ptr(100)},
+		{StartTime: overdueAt.Add(-12 * time.Hour), FeedType: ptr(domain.FeedTypeBreastMilk), AmountMl: ptr(100)},
+		{StartTime: overdueAt.Add(-15 * time.Hour), FeedType: ptr(domain.FeedTypeBreastMilk), AmountMl: ptr(100)},
+		// And a fresh feed logged 10 minutes after the original predicted
+		// time — should now anchor (or fully suppress) the overdue card.
+		{StartTime: overdueAt.Add(10 * time.Minute), FeedType: ptr(domain.FeedTypeBreastMilk), AmountMl: ptr(100)},
+	}
+
+	result := GeneratePredictions(baseTime, feeds, nil, "America/Los_Angeles")
+	for _, p := range result {
+		if p.PredictionType == domain.PredictionTypeNextFeed && p.Status == domain.PredictionStatusOverdue {
+			t.Error("overdue feed prediction should be auto-dismissed once a matching feed is logged")
+		}
+	}
+}
+
+func TestSuppressFulfilledPredictions_NapWithinWindow(t *testing.T) {
+	pt := baseTime.Add(20 * time.Minute)
+	pred := &domain.Prediction{
+		PredictionType: domain.PredictionTypeNextNap,
+		PredictedTime:  pt,
+	}
+	sleeps := []SleepRecord{
+		{StartTime: pt.Add(-10 * time.Minute), DurationMinutes: ptr(90), CareSessionID: uuid.New()},
+	}
+	result := suppressFulfilledPredictions([]*domain.Prediction{pred}, nil, sleeps)
+	if len(result) != 0 {
+		t.Errorf("expected nap prediction to be suppressed, got %d", len(result))
+	}
+}
+
+func TestSuppressFulfilledPredictions_WakeWithinWindow(t *testing.T) {
+	pt := baseTime.Add(5 * time.Minute)
+	pred := &domain.Prediction{
+		PredictionType: domain.PredictionTypeNextWake,
+		PredictedTime:  pt,
+	}
+	end := pt.Add(15 * time.Minute)
+	sleeps := []SleepRecord{
+		{StartTime: pt.Add(-2 * time.Hour), EndTime: &end, DurationMinutes: ptr(135), CareSessionID: uuid.New()},
+	}
+	result := suppressFulfilledPredictions([]*domain.Prediction{pred}, nil, sleeps)
+	if len(result) != 0 {
+		t.Errorf("expected wake prediction to be suppressed, got %d", len(result))
 	}
 }
 

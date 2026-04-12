@@ -30,14 +30,17 @@ type SleepRecord struct {
 }
 
 const (
-	napMaxMinutes       = 200
-	daytimeStartHour    = 6
-	daytimeEndHour      = 22
-	minFeedInterval     = 1 * time.Hour
-	maxFeedInterval     = 8 * time.Hour
-	minWakeWindow       = 1 * time.Hour
-	maxWakeWindow       = 6 * time.Hour
-	maxPredictions = 20
+	napMaxMinutes    = 200
+	daytimeStartHour = 6
+	daytimeEndHour   = 22
+	minFeedInterval  = 1 * time.Hour
+	maxFeedInterval  = 8 * time.Hour
+	minWakeWindow    = 1 * time.Hour
+	maxWakeWindow    = 6 * time.Hour
+	maxPredictions   = 20
+	// fulfilledWindow is the +/- window in which a logged activity is
+	// considered to "fulfill" (and thus auto-dismiss) a matching prediction.
+	fulfilledWindow = 30 * time.Minute
 )
 
 // GeneratePredictions produces a timeline of predictions given recent feed and sleep data.
@@ -78,10 +81,10 @@ func GeneratePredictions(now time.Time, feeds []FeedRecord, sleeps []SleepRecord
 		}
 	}
 
-	// --- Chain forward until bedtime (skip if baby is asleep for the night) ---
-	if !inOvernightSleep {
-		predictions = chainPredictions(now, predictions, feeds, sleeps, loc)
-	}
+	// Auto-dismiss any prediction whose target time is within +/- fulfilledWindow
+	// of an actual logged activity of matching type. This prevents stale overdue
+	// cards from sticking around when an activity has clearly already happened.
+	predictions = suppressFulfilledPredictions(predictions, feeds, sleeps)
 
 	// Cap at maxPredictions
 	if len(predictions) > maxPredictions {
@@ -390,129 +393,76 @@ func generateBedtimePrediction(now time.Time, sleeps []SleepRecord, loc *time.Lo
 	}
 }
 
-// chainPredictions fills in PLANNED predictions (alternating feeds/naps) until bedtime.
-func chainPredictions(now time.Time, existing []*domain.Prediction, feeds []FeedRecord, sleeps []SleepRecord, loc *time.Location) []*domain.Prediction {
-	result := make([]*domain.Prediction, len(existing))
-	copy(result, existing)
-
-	// Get median intervals needed for chaining
-	daytimeFeeds := filterDaytimeFeeds(feeds, loc)
-	intervals := filterFeedIntervals(computeFeedIntervals(daytimeFeeds))
-	if len(intervals) == 0 {
-		return result
+// suppressFulfilledPredictions removes predictions whose target time falls
+// within +/- fulfilledWindow of an actual logged activity of the matching
+// type. This auto-dismisses overdue cards once the activity has actually
+// happened, even if the predictions were generated before the activity was
+// recorded.
+func suppressFulfilledPredictions(predictions []*domain.Prediction, feeds []FeedRecord, sleeps []SleepRecord) []*domain.Prediction {
+	if len(predictions) == 0 {
+		return predictions
 	}
-	medianFeedInterval := medianDuration(intervals)
 
-	naps, _ := classifySleeps(sleeps)
-	wakeWindows := filterWakeWindows(computeWakeWindows(naps))
-
-	// Find bedtime cutoff
-	var bedtimeCutoff time.Time
-	for _, p := range result {
-		if p.PredictionType == domain.PredictionTypeBedtime {
-			bedtimeCutoff = p.PredictedTime
-			break
+	result := make([]*domain.Prediction, 0, len(predictions))
+	for _, p := range predictions {
+		if predictionFulfilled(p, feeds, sleeps) {
+			continue
 		}
+		result = append(result, p)
 	}
-	if bedtimeCutoff.IsZero() {
-		// Default to 10pm today
-		nowLocal := now.In(loc)
-		bedtimeCutoff = time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), daytimeEndHour, 0, 0, 0, loc)
-		if bedtimeCutoff.Before(now) {
-			return result // Past bedtime, no chaining needed
-		}
-	}
-
-	// Find the latest existing prediction time to chain from
-	var lastFeedTime time.Time
-	for _, p := range result {
-		if p.PredictionType == domain.PredictionTypeNextFeed && p.PredictedTime.After(lastFeedTime) {
-			lastFeedTime = p.PredictedTime
-		}
-	}
-
-	if lastFeedTime.IsZero() {
-		return result
-	}
-
-	// Chain additional feed predictions
-	chainTime := lastFeedTime.Add(medianFeedInterval)
-	for chainTime.Before(bedtimeCutoff) && len(result) < maxPredictions {
-		confidence := computeConfidence(len(intervals), stddevDuration(intervals), medianFeedInterval)
-		reasoning := fmt.Sprintf("Chained: based on %.1fhr median feed interval", medianFeedInterval.Hours())
-		pred := &domain.Prediction{
-			FamilyID:       uuid.Nil,
-			ActivityType:   domain.ActivityTypeFeed,
-			PredictionType: domain.PredictionTypeNextFeed,
-			PredictedTime:  chainTime,
-			Status:         domain.PredictionStatusPlanned,
-			Confidence:     confidence,
-			Reasoning:      &reasoning,
-		}
-		result = append(result, pred)
-		chainTime = chainTime.Add(medianFeedInterval)
-	}
-
-	// Chain nap predictions if we have wake window data
-	if len(wakeWindows) > 0 {
-		medianWakeWindow := medianDuration(wakeWindows)
-		var napDurations []time.Duration
-		for _, n := range naps {
-			if n.EndTime != nil {
-				napDurations = append(napDurations, n.EndTime.Sub(n.StartTime))
-			}
-		}
-
-		if len(napDurations) > 0 {
-			medianNapDur := medianDuration(napDurations)
-
-			// Find the last wake time or nap end prediction
-			var lastWake time.Time
-			for _, p := range existing {
-				if p.PredictionType == domain.PredictionTypeNextWake && p.PredictedTime.After(lastWake) {
-					lastWake = p.PredictedTime
-				}
-				if p.PredictionType == domain.PredictionTypeNextNap && p.PredictedTime.After(lastWake) {
-					// A nap prediction means baby will wake after nap duration
-					lastWake = p.PredictedTime.Add(medianNapDur)
-				}
-			}
-
-			if !lastWake.IsZero() {
-				napTime := lastWake.Add(medianWakeWindow)
-				for napTime.Before(bedtimeCutoff) && len(result) < maxPredictions {
-					confidence := computeConfidence(len(wakeWindows), stddevDuration(wakeWindows), medianWakeWindow)
-					reasoning := fmt.Sprintf("Chained: based on %.1fhr median wake window", medianWakeWindow.Hours())
-					durationMin := int(medianNapDur.Minutes())
-					pred := &domain.Prediction{
-						FamilyID:                 uuid.Nil,
-						ActivityType:             domain.ActivityTypeSleep,
-						PredictionType:           domain.PredictionTypeNextNap,
-						PredictedTime:            napTime,
-						Status:                   domain.PredictionStatusPlanned,
-						Confidence:               confidence,
-						Reasoning:                &reasoning,
-						PredictedDurationMinutes: &durationMin,
-					}
-					result = append(result, pred)
-
-					// Next nap starts after this nap ends + wake window
-					napTime = napTime.Add(medianNapDur).Add(medianWakeWindow)
-				}
-			}
-		}
-	}
-
-	// Sort by predicted time
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].PredictedTime.Before(result[j].PredictedTime)
-	})
-
-	if len(result) > maxPredictions {
-		result = result[:maxPredictions]
-	}
-
 	return result
+}
+
+// predictionFulfilled returns true if there is a logged activity of the
+// matching type within +/- fulfilledWindow of the prediction's target time.
+func predictionFulfilled(p *domain.Prediction, feeds []FeedRecord, sleeps []SleepRecord) bool {
+	switch p.PredictionType {
+	case domain.PredictionTypeNextFeed:
+		for _, f := range feeds {
+			if f.FeedType != nil && *f.FeedType == domain.FeedTypeSolids {
+				continue
+			}
+			if withinWindow(f.StartTime, p.PredictedTime, fulfilledWindow) {
+				return true
+			}
+		}
+	case domain.PredictionTypeNextNap:
+		for _, s := range sleeps {
+			if classifySingleSleep(s) != "nap" {
+				continue
+			}
+			if withinWindow(s.StartTime, p.PredictedTime, fulfilledWindow) {
+				return true
+			}
+		}
+	case domain.PredictionTypeNextWake:
+		for _, s := range sleeps {
+			if s.EndTime == nil {
+				continue
+			}
+			if withinWindow(*s.EndTime, p.PredictedTime, fulfilledWindow) {
+				return true
+			}
+		}
+	case domain.PredictionTypeBedtime:
+		for _, s := range sleeps {
+			if classifySingleSleep(s) != "overnight" {
+				continue
+			}
+			if withinWindow(s.StartTime, p.PredictedTime, fulfilledWindow) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func withinWindow(a, b time.Time, window time.Duration) bool {
+	d := a.Sub(b)
+	if d < 0 {
+		d = -d
+	}
+	return d <= window
 }
 
 // --- Helper functions ---
