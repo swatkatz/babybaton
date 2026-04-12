@@ -301,6 +301,79 @@ func ScheduleGoalsToGraphQL(sg *domain.ScheduleGoals) *model.ScheduleGoals {
 	return result
 }
 
+// CareReportToGraphQL converts a domain CareReport to a GraphQL model
+func CareReportToGraphQL(r *domain.CareReport) *model.CareReport {
+	if r == nil {
+		return nil
+	}
+
+	buckets := make([]*model.ReportBucket, len(r.Buckets))
+	for i, b := range r.Buckets {
+		buckets[i] = &model.ReportBucket{
+			BucketStart:  b.BucketStart,
+			Feeds:        int32(b.Feeds),
+			Ml:           int32(b.Ml),
+			Diapers:      int32(b.Diapers),
+			SleepMinutes: int32(b.SleepMinutes),
+		}
+	}
+
+	hourly := make([]*model.HourlyBucket, len(r.HourlyPattern))
+	for i, h := range r.HourlyPattern {
+		hourly[i] = &model.HourlyBucket{
+			Hour:         int32(h.Hour),
+			Feeds:        int32(h.Feeds),
+			SleepMinutes: int32(h.SleepMinutes),
+			Diapers:      int32(h.Diapers),
+		}
+	}
+
+	breakdown := make([]*model.FeedTypeCount, len(r.Totals.FeedTypeBreakdown))
+	for i, ftc := range r.Totals.FeedTypeBreakdown {
+		ft, err := domainFeedTypeToGraphQL(domain.FeedType(ftc.FeedType))
+		if err != nil {
+			continue
+		}
+		breakdown[i] = &model.FeedTypeCount{
+			FeedType: ft,
+			Count:    int32(ftc.Count),
+		}
+	}
+
+	result := &model.CareReport{
+		From:        r.From,
+		To:          r.To,
+		Granularity: model.ReportGranularity(r.Granularity),
+		Totals: &model.ReportTotals{
+			TotalFeeds:                  int32(r.Totals.TotalFeeds),
+			TotalMl:                     int32(r.Totals.TotalMl),
+			MedianFeedsPerDay:           r.Totals.MedianFeedsPerDay,
+			MedianMlPerDay:              r.Totals.MedianMlPerDay,
+			FeedTypeBreakdown:           breakdown,
+			TotalDiaperChanges:          int32(r.Totals.TotalDiaperChanges),
+			TotalPoops:                  int32(r.Totals.TotalPoops),
+			TotalPees:                   int32(r.Totals.TotalPees),
+			MedianDiapersPerDay:         r.Totals.MedianDiapersPerDay,
+			TotalSleepMinutes:           int32(r.Totals.TotalSleepMinutes),
+			MedianSleepMinutesPerDay:    r.Totals.MedianSleepMinutesPerDay,
+			MedianLongestStretchMinutes: r.Totals.MedianLongestStretchMinutes,
+		},
+		Buckets:       buckets,
+		HourlyPattern: hourly,
+	}
+
+	if r.GoalAdherence != nil {
+		result.GoalAdherence = &model.GoalAdherence{
+			WakeWindowAdherencePct:     r.GoalAdherence.WakeWindowAdherencePct,
+			FeedIntervalAdherencePct:   r.GoalAdherence.FeedIntervalAdherencePct,
+			NapCountAdherencePct:       r.GoalAdherence.NapCountAdherencePct,
+			BedtimeAdherenceMinutesAvg: r.GoalAdherence.BedtimeAdherenceMinutesAvg,
+		}
+	}
+
+	return result
+}
+
 // ScheduleGoalsInputToDomain converts a GraphQL ScheduleGoalsInput to a domain ScheduleGoals
 func ScheduleGoalsInputToDomain(input model.ScheduleGoalsInput, familyID uuid.UUID) (*domain.ScheduleGoals, error) {
 	sg := &domain.ScheduleGoals{

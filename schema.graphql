@@ -45,6 +45,12 @@ enum PredictionStatus {
   PLANNED
 }
 
+enum ReportGranularity {
+  DAY
+  WEEK
+  MONTH
+}
+
 # Types
 type Family {
   id: ID!
@@ -236,6 +242,58 @@ input SleepDetailsInput {
   endTime: DateTime
 }
 
+type CareReport {
+  from: DateTime!
+  to: DateTime!
+  granularity: ReportGranularity!
+  totals: ReportTotals!
+  buckets: [ReportBucket!]!
+  hourlyPattern: [HourlyBucket!]!
+  goalAdherence: GoalAdherence
+}
+
+type ReportTotals {
+  totalFeeds: Int!
+  totalMl: Int!
+  medianFeedsPerDay: Float!
+  medianMlPerDay: Float!
+  feedTypeBreakdown: [FeedTypeCount!]!
+  totalDiaperChanges: Int!
+  totalPoops: Int!
+  totalPees: Int!
+  medianDiapersPerDay: Float!
+  totalSleepMinutes: Int!
+  medianSleepMinutesPerDay: Float!
+  medianLongestStretchMinutes: Float!
+}
+
+type ReportBucket {
+  bucketStart: DateTime!
+  feeds: Int!
+  ml: Int!
+  diapers: Int!
+  sleepMinutes: Int!
+}
+
+type HourlyBucket {
+  hour: Int!
+  feeds: Int!
+  sleepMinutes: Int!
+  diapers: Int!
+}
+
+type GoalAdherence {
+  wakeWindowAdherencePct: Float
+  feedIntervalAdherencePct: Float
+  napCountAdherencePct: Float
+  bedtimeAdherenceMinutesAvg: Float
+}
+
+type FeedTypeCount {
+  feedType: FeedType!
+  count: Int!
+}
+
 # Queries
 type Query {
   # Family & Auth
@@ -260,6 +318,9 @@ type Query {
 
   # Schedule Goals
   scheduleGoals: ScheduleGoals
+
+  # Reporting
+  careReport(from: DateTime!, to: DateTime!, granularity: ReportGranularity!): CareReport!
 }
 
 # Mutations

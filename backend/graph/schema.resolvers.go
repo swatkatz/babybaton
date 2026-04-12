@@ -1318,6 +1318,21 @@ func (r *queryResolver) ScheduleGoals(ctx context.Context) (*model.ScheduleGoals
 	return mapper.ScheduleGoalsToGraphQL(goals), nil
 }
 
+// CareReport is the resolver for the careReport field.
+func (r *queryResolver) CareReport(ctx context.Context, from time.Time, to time.Time, granularity model.ReportGranularity) (*model.CareReport, error) {
+	_, familyID, err := middleware.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("authentication required: %w", err)
+	}
+
+	report, err := r.store.CareReport(ctx, familyID, from, to, string(granularity))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate care report: %w", err)
+	}
+
+	return mapper.CareReportToGraphQL(report), nil
+}
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 

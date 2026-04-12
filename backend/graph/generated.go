@@ -60,6 +60,16 @@ type ComplexityRoot struct {
 		LastSleep  func(childComplexity int) int
 	}
 
+	CareReport struct {
+		Buckets       func(childComplexity int) int
+		From          func(childComplexity int) int
+		GoalAdherence func(childComplexity int) int
+		Granularity   func(childComplexity int) int
+		HourlyPattern func(childComplexity int) int
+		To            func(childComplexity int) int
+		Totals        func(childComplexity int) int
+	}
+
 	CareSession struct {
 		Activities  func(childComplexity int) int
 		Caregiver   func(childComplexity int) int
@@ -146,6 +156,25 @@ type ComplexityRoot struct {
 		StartTime       func(childComplexity int) int
 	}
 
+	FeedTypeCount struct {
+		Count    func(childComplexity int) int
+		FeedType func(childComplexity int) int
+	}
+
+	GoalAdherence struct {
+		BedtimeAdherenceMinutesAvg func(childComplexity int) int
+		FeedIntervalAdherencePct   func(childComplexity int) int
+		NapCountAdherencePct       func(childComplexity int) int
+		WakeWindowAdherencePct     func(childComplexity int) int
+	}
+
+	HourlyBucket struct {
+		Diapers      func(childComplexity int) int
+		Feeds        func(childComplexity int) int
+		Hour         func(childComplexity int) int
+		SleepMinutes func(childComplexity int) int
+	}
+
 	Mutation struct {
 		AddActivities       func(childComplexity int, activities []*model.ActivityInput) int
 		CompleteCareSession func(childComplexity int, notes *string) int
@@ -191,6 +220,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		CareReport               func(childComplexity int, from time.Time, to time.Time, granularity model.ReportGranularity) int
 		CheckFamilyNameAvailable func(childComplexity int, name string) int
 		GetBabyStatus            func(childComplexity int) int
 		GetCareSession           func(childComplexity int, id string) int
@@ -202,6 +232,29 @@ type ComplexityRoot struct {
 		GetRecentCareSessions    func(childComplexity int, limit *int32) int
 		Predictions              func(childComplexity int) int
 		ScheduleGoals            func(childComplexity int) int
+	}
+
+	ReportBucket struct {
+		BucketStart  func(childComplexity int) int
+		Diapers      func(childComplexity int) int
+		Feeds        func(childComplexity int) int
+		Ml           func(childComplexity int) int
+		SleepMinutes func(childComplexity int) int
+	}
+
+	ReportTotals struct {
+		FeedTypeBreakdown           func(childComplexity int) int
+		MedianDiapersPerDay         func(childComplexity int) int
+		MedianFeedsPerDay           func(childComplexity int) int
+		MedianLongestStretchMinutes func(childComplexity int) int
+		MedianMlPerDay              func(childComplexity int) int
+		MedianSleepMinutesPerDay    func(childComplexity int) int
+		TotalDiaperChanges          func(childComplexity int) int
+		TotalFeeds                  func(childComplexity int) int
+		TotalMl                     func(childComplexity int) int
+		TotalPees                   func(childComplexity int) int
+		TotalPoops                  func(childComplexity int) int
+		TotalSleepMinutes           func(childComplexity int) int
 	}
 
 	ScheduleGoals struct {
@@ -256,6 +309,7 @@ type QueryResolver interface {
 	GetCareSessionHistory(ctx context.Context, first int32, after *string) (*model.CareSessionConnection, error)
 	Predictions(ctx context.Context) ([]*model.Prediction, error)
 	ScheduleGoals(ctx context.Context) (*model.ScheduleGoals, error)
+	CareReport(ctx context.Context, from time.Time, to time.Time, granularity model.ReportGranularity) (*model.CareReport, error)
 }
 
 type executableSchema struct {
@@ -320,6 +374,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.BabyStatus.LastSleep(childComplexity), true
+
+	case "CareReport.buckets":
+		if e.complexity.CareReport.Buckets == nil {
+			break
+		}
+
+		return e.complexity.CareReport.Buckets(childComplexity), true
+	case "CareReport.from":
+		if e.complexity.CareReport.From == nil {
+			break
+		}
+
+		return e.complexity.CareReport.From(childComplexity), true
+	case "CareReport.goalAdherence":
+		if e.complexity.CareReport.GoalAdherence == nil {
+			break
+		}
+
+		return e.complexity.CareReport.GoalAdherence(childComplexity), true
+	case "CareReport.granularity":
+		if e.complexity.CareReport.Granularity == nil {
+			break
+		}
+
+		return e.complexity.CareReport.Granularity(childComplexity), true
+	case "CareReport.hourlyPattern":
+		if e.complexity.CareReport.HourlyPattern == nil {
+			break
+		}
+
+		return e.complexity.CareReport.HourlyPattern(childComplexity), true
+	case "CareReport.to":
+		if e.complexity.CareReport.To == nil {
+			break
+		}
+
+		return e.complexity.CareReport.To(childComplexity), true
+	case "CareReport.totals":
+		if e.complexity.CareReport.Totals == nil {
+			break
+		}
+
+		return e.complexity.CareReport.Totals(childComplexity), true
 
 	case "CareSession.activities":
 		if e.complexity.CareSession.Activities == nil {
@@ -650,6 +747,69 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.FeedDetails.StartTime(childComplexity), true
 
+	case "FeedTypeCount.count":
+		if e.complexity.FeedTypeCount.Count == nil {
+			break
+		}
+
+		return e.complexity.FeedTypeCount.Count(childComplexity), true
+	case "FeedTypeCount.feedType":
+		if e.complexity.FeedTypeCount.FeedType == nil {
+			break
+		}
+
+		return e.complexity.FeedTypeCount.FeedType(childComplexity), true
+
+	case "GoalAdherence.bedtimeAdherenceMinutesAvg":
+		if e.complexity.GoalAdherence.BedtimeAdherenceMinutesAvg == nil {
+			break
+		}
+
+		return e.complexity.GoalAdherence.BedtimeAdherenceMinutesAvg(childComplexity), true
+	case "GoalAdherence.feedIntervalAdherencePct":
+		if e.complexity.GoalAdherence.FeedIntervalAdherencePct == nil {
+			break
+		}
+
+		return e.complexity.GoalAdherence.FeedIntervalAdherencePct(childComplexity), true
+	case "GoalAdherence.napCountAdherencePct":
+		if e.complexity.GoalAdherence.NapCountAdherencePct == nil {
+			break
+		}
+
+		return e.complexity.GoalAdherence.NapCountAdherencePct(childComplexity), true
+	case "GoalAdherence.wakeWindowAdherencePct":
+		if e.complexity.GoalAdherence.WakeWindowAdherencePct == nil {
+			break
+		}
+
+		return e.complexity.GoalAdherence.WakeWindowAdherencePct(childComplexity), true
+
+	case "HourlyBucket.diapers":
+		if e.complexity.HourlyBucket.Diapers == nil {
+			break
+		}
+
+		return e.complexity.HourlyBucket.Diapers(childComplexity), true
+	case "HourlyBucket.feeds":
+		if e.complexity.HourlyBucket.Feeds == nil {
+			break
+		}
+
+		return e.complexity.HourlyBucket.Feeds(childComplexity), true
+	case "HourlyBucket.hour":
+		if e.complexity.HourlyBucket.Hour == nil {
+			break
+		}
+
+		return e.complexity.HourlyBucket.Hour(childComplexity), true
+	case "HourlyBucket.sleepMinutes":
+		if e.complexity.HourlyBucket.SleepMinutes == nil {
+			break
+		}
+
+		return e.complexity.HourlyBucket.SleepMinutes(childComplexity), true
+
 	case "Mutation.addActivities":
 		if e.complexity.Mutation.AddActivities == nil {
 			break
@@ -906,6 +1066,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Prediction.Status(childComplexity), true
 
+	case "Query.careReport":
+		if e.complexity.Query.CareReport == nil {
+			break
+		}
+
+		args, err := ec.field_Query_careReport_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.CareReport(childComplexity, args["from"].(time.Time), args["to"].(time.Time), args["granularity"].(model.ReportGranularity)), true
 	case "Query.checkFamilyNameAvailable":
 		if e.complexity.Query.CheckFamilyNameAvailable == nil {
 			break
@@ -992,6 +1163,110 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.ScheduleGoals(childComplexity), true
+
+	case "ReportBucket.bucketStart":
+		if e.complexity.ReportBucket.BucketStart == nil {
+			break
+		}
+
+		return e.complexity.ReportBucket.BucketStart(childComplexity), true
+	case "ReportBucket.diapers":
+		if e.complexity.ReportBucket.Diapers == nil {
+			break
+		}
+
+		return e.complexity.ReportBucket.Diapers(childComplexity), true
+	case "ReportBucket.feeds":
+		if e.complexity.ReportBucket.Feeds == nil {
+			break
+		}
+
+		return e.complexity.ReportBucket.Feeds(childComplexity), true
+	case "ReportBucket.ml":
+		if e.complexity.ReportBucket.Ml == nil {
+			break
+		}
+
+		return e.complexity.ReportBucket.Ml(childComplexity), true
+	case "ReportBucket.sleepMinutes":
+		if e.complexity.ReportBucket.SleepMinutes == nil {
+			break
+		}
+
+		return e.complexity.ReportBucket.SleepMinutes(childComplexity), true
+
+	case "ReportTotals.feedTypeBreakdown":
+		if e.complexity.ReportTotals.FeedTypeBreakdown == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.FeedTypeBreakdown(childComplexity), true
+	case "ReportTotals.medianDiapersPerDay":
+		if e.complexity.ReportTotals.MedianDiapersPerDay == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.MedianDiapersPerDay(childComplexity), true
+	case "ReportTotals.medianFeedsPerDay":
+		if e.complexity.ReportTotals.MedianFeedsPerDay == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.MedianFeedsPerDay(childComplexity), true
+	case "ReportTotals.medianLongestStretchMinutes":
+		if e.complexity.ReportTotals.MedianLongestStretchMinutes == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.MedianLongestStretchMinutes(childComplexity), true
+	case "ReportTotals.medianMlPerDay":
+		if e.complexity.ReportTotals.MedianMlPerDay == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.MedianMlPerDay(childComplexity), true
+	case "ReportTotals.medianSleepMinutesPerDay":
+		if e.complexity.ReportTotals.MedianSleepMinutesPerDay == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.MedianSleepMinutesPerDay(childComplexity), true
+	case "ReportTotals.totalDiaperChanges":
+		if e.complexity.ReportTotals.TotalDiaperChanges == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.TotalDiaperChanges(childComplexity), true
+	case "ReportTotals.totalFeeds":
+		if e.complexity.ReportTotals.TotalFeeds == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.TotalFeeds(childComplexity), true
+	case "ReportTotals.totalMl":
+		if e.complexity.ReportTotals.TotalMl == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.TotalMl(childComplexity), true
+	case "ReportTotals.totalPees":
+		if e.complexity.ReportTotals.TotalPees == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.TotalPees(childComplexity), true
+	case "ReportTotals.totalPoops":
+		if e.complexity.ReportTotals.TotalPoops == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.TotalPoops(childComplexity), true
+	case "ReportTotals.totalSleepMinutes":
+		if e.complexity.ReportTotals.TotalSleepMinutes == nil {
+			break
+		}
+
+		return e.complexity.ReportTotals.TotalSleepMinutes(childComplexity), true
 
 	case "ScheduleGoals.maxDaytimeNapMinutes":
 		if e.complexity.ScheduleGoals.MaxDaytimeNapMinutes == nil {
@@ -1237,6 +1512,12 @@ enum PredictionStatus {
   PLANNED
 }
 
+enum ReportGranularity {
+  DAY
+  WEEK
+  MONTH
+}
+
 # Types
 type Family {
   id: ID!
@@ -1428,6 +1709,58 @@ input SleepDetailsInput {
   endTime: DateTime
 }
 
+type CareReport {
+  from: DateTime!
+  to: DateTime!
+  granularity: ReportGranularity!
+  totals: ReportTotals!
+  buckets: [ReportBucket!]!
+  hourlyPattern: [HourlyBucket!]!
+  goalAdherence: GoalAdherence
+}
+
+type ReportTotals {
+  totalFeeds: Int!
+  totalMl: Int!
+  medianFeedsPerDay: Float!
+  medianMlPerDay: Float!
+  feedTypeBreakdown: [FeedTypeCount!]!
+  totalDiaperChanges: Int!
+  totalPoops: Int!
+  totalPees: Int!
+  medianDiapersPerDay: Float!
+  totalSleepMinutes: Int!
+  medianSleepMinutesPerDay: Float!
+  medianLongestStretchMinutes: Float!
+}
+
+type ReportBucket {
+  bucketStart: DateTime!
+  feeds: Int!
+  ml: Int!
+  diapers: Int!
+  sleepMinutes: Int!
+}
+
+type HourlyBucket {
+  hour: Int!
+  feeds: Int!
+  sleepMinutes: Int!
+  diapers: Int!
+}
+
+type GoalAdherence {
+  wakeWindowAdherencePct: Float
+  feedIntervalAdherencePct: Float
+  napCountAdherencePct: Float
+  bedtimeAdherenceMinutesAvg: Float
+}
+
+type FeedTypeCount {
+  feedType: FeedType!
+  count: Int!
+}
+
 # Queries
 type Query {
   # Family & Auth
@@ -1452,6 +1785,9 @@ type Query {
 
   # Schedule Goals
   scheduleGoals: ScheduleGoals
+
+  # Reporting
+  careReport(from: DateTime!, to: DateTime!, granularity: ReportGranularity!): CareReport!
 }
 
 # Mutations
@@ -1704,6 +2040,27 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_careReport_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "from", ec.unmarshalNDateTime2timeᚐTime)
+	if err != nil {
+		return nil, err
+	}
+	args["from"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "to", ec.unmarshalNDateTime2timeᚐTime)
+	if err != nil {
+		return nil, err
+	}
+	args["to"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "granularity", ec.unmarshalNReportGranularity2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportGranularity)
+	if err != nil {
+		return nil, err
+	}
+	args["granularity"] = arg2
 	return args, nil
 }
 
@@ -2064,6 +2421,267 @@ func (ec *executionContext) fieldContext_BabyStatus_lastSleep(_ context.Context,
 				return ec.fieldContext_SleepActivity_sleepDetails(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SleepActivity", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareReport_from(ctx context.Context, field graphql.CollectedField, obj *model.CareReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareReport_from,
+		func(ctx context.Context) (any, error) {
+			return obj.From, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareReport_from(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareReport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareReport_to(ctx context.Context, field graphql.CollectedField, obj *model.CareReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareReport_to,
+		func(ctx context.Context) (any, error) {
+			return obj.To, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareReport_to(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareReport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareReport_granularity(ctx context.Context, field graphql.CollectedField, obj *model.CareReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareReport_granularity,
+		func(ctx context.Context) (any, error) {
+			return obj.Granularity, nil
+		},
+		nil,
+		ec.marshalNReportGranularity2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportGranularity,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareReport_granularity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareReport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ReportGranularity does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareReport_totals(ctx context.Context, field graphql.CollectedField, obj *model.CareReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareReport_totals,
+		func(ctx context.Context) (any, error) {
+			return obj.Totals, nil
+		},
+		nil,
+		ec.marshalNReportTotals2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportTotals,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareReport_totals(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareReport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "totalFeeds":
+				return ec.fieldContext_ReportTotals_totalFeeds(ctx, field)
+			case "totalMl":
+				return ec.fieldContext_ReportTotals_totalMl(ctx, field)
+			case "medianFeedsPerDay":
+				return ec.fieldContext_ReportTotals_medianFeedsPerDay(ctx, field)
+			case "medianMlPerDay":
+				return ec.fieldContext_ReportTotals_medianMlPerDay(ctx, field)
+			case "feedTypeBreakdown":
+				return ec.fieldContext_ReportTotals_feedTypeBreakdown(ctx, field)
+			case "totalDiaperChanges":
+				return ec.fieldContext_ReportTotals_totalDiaperChanges(ctx, field)
+			case "totalPoops":
+				return ec.fieldContext_ReportTotals_totalPoops(ctx, field)
+			case "totalPees":
+				return ec.fieldContext_ReportTotals_totalPees(ctx, field)
+			case "medianDiapersPerDay":
+				return ec.fieldContext_ReportTotals_medianDiapersPerDay(ctx, field)
+			case "totalSleepMinutes":
+				return ec.fieldContext_ReportTotals_totalSleepMinutes(ctx, field)
+			case "medianSleepMinutesPerDay":
+				return ec.fieldContext_ReportTotals_medianSleepMinutesPerDay(ctx, field)
+			case "medianLongestStretchMinutes":
+				return ec.fieldContext_ReportTotals_medianLongestStretchMinutes(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReportTotals", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareReport_buckets(ctx context.Context, field graphql.CollectedField, obj *model.CareReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareReport_buckets,
+		func(ctx context.Context) (any, error) {
+			return obj.Buckets, nil
+		},
+		nil,
+		ec.marshalNReportBucket2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportBucketᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareReport_buckets(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareReport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "bucketStart":
+				return ec.fieldContext_ReportBucket_bucketStart(ctx, field)
+			case "feeds":
+				return ec.fieldContext_ReportBucket_feeds(ctx, field)
+			case "ml":
+				return ec.fieldContext_ReportBucket_ml(ctx, field)
+			case "diapers":
+				return ec.fieldContext_ReportBucket_diapers(ctx, field)
+			case "sleepMinutes":
+				return ec.fieldContext_ReportBucket_sleepMinutes(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReportBucket", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareReport_hourlyPattern(ctx context.Context, field graphql.CollectedField, obj *model.CareReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareReport_hourlyPattern,
+		func(ctx context.Context) (any, error) {
+			return obj.HourlyPattern, nil
+		},
+		nil,
+		ec.marshalNHourlyBucket2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐHourlyBucketᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareReport_hourlyPattern(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareReport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hour":
+				return ec.fieldContext_HourlyBucket_hour(ctx, field)
+			case "feeds":
+				return ec.fieldContext_HourlyBucket_feeds(ctx, field)
+			case "sleepMinutes":
+				return ec.fieldContext_HourlyBucket_sleepMinutes(ctx, field)
+			case "diapers":
+				return ec.fieldContext_HourlyBucket_diapers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type HourlyBucket", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CareReport_goalAdherence(ctx context.Context, field graphql.CollectedField, obj *model.CareReport) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CareReport_goalAdherence,
+		func(ctx context.Context) (any, error) {
+			return obj.GoalAdherence, nil
+		},
+		nil,
+		ec.marshalOGoalAdherence2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐGoalAdherence,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_CareReport_goalAdherence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CareReport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "wakeWindowAdherencePct":
+				return ec.fieldContext_GoalAdherence_wakeWindowAdherencePct(ctx, field)
+			case "feedIntervalAdherencePct":
+				return ec.fieldContext_GoalAdherence_feedIntervalAdherencePct(ctx, field)
+			case "napCountAdherencePct":
+				return ec.fieldContext_GoalAdherence_napCountAdherencePct(ctx, field)
+			case "bedtimeAdherenceMinutesAvg":
+				return ec.fieldContext_GoalAdherence_bedtimeAdherenceMinutesAvg(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GoalAdherence", field.Name)
 		},
 	}
 	return fc, nil
@@ -3703,6 +4321,296 @@ func (ec *executionContext) fieldContext_FeedDetails_quantityUnit(_ context.Cont
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type SolidsUnit does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedTypeCount_feedType(ctx context.Context, field graphql.CollectedField, obj *model.FeedTypeCount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FeedTypeCount_feedType,
+		func(ctx context.Context) (any, error) {
+			return obj.FeedType, nil
+		},
+		nil,
+		ec.marshalNFeedType2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedType,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FeedTypeCount_feedType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedTypeCount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type FeedType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FeedTypeCount_count(ctx context.Context, field graphql.CollectedField, obj *model.FeedTypeCount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FeedTypeCount_count,
+		func(ctx context.Context) (any, error) {
+			return obj.Count, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FeedTypeCount_count(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FeedTypeCount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GoalAdherence_wakeWindowAdherencePct(ctx context.Context, field graphql.CollectedField, obj *model.GoalAdherence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GoalAdherence_wakeWindowAdherencePct,
+		func(ctx context.Context) (any, error) {
+			return obj.WakeWindowAdherencePct, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_GoalAdherence_wakeWindowAdherencePct(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GoalAdherence",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GoalAdherence_feedIntervalAdherencePct(ctx context.Context, field graphql.CollectedField, obj *model.GoalAdherence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GoalAdherence_feedIntervalAdherencePct,
+		func(ctx context.Context) (any, error) {
+			return obj.FeedIntervalAdherencePct, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_GoalAdherence_feedIntervalAdherencePct(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GoalAdherence",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GoalAdherence_napCountAdherencePct(ctx context.Context, field graphql.CollectedField, obj *model.GoalAdherence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GoalAdherence_napCountAdherencePct,
+		func(ctx context.Context) (any, error) {
+			return obj.NapCountAdherencePct, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_GoalAdherence_napCountAdherencePct(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GoalAdherence",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GoalAdherence_bedtimeAdherenceMinutesAvg(ctx context.Context, field graphql.CollectedField, obj *model.GoalAdherence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_GoalAdherence_bedtimeAdherenceMinutesAvg,
+		func(ctx context.Context) (any, error) {
+			return obj.BedtimeAdherenceMinutesAvg, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_GoalAdherence_bedtimeAdherenceMinutesAvg(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GoalAdherence",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HourlyBucket_hour(ctx context.Context, field graphql.CollectedField, obj *model.HourlyBucket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HourlyBucket_hour,
+		func(ctx context.Context) (any, error) {
+			return obj.Hour, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HourlyBucket_hour(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HourlyBucket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HourlyBucket_feeds(ctx context.Context, field graphql.CollectedField, obj *model.HourlyBucket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HourlyBucket_feeds,
+		func(ctx context.Context) (any, error) {
+			return obj.Feeds, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HourlyBucket_feeds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HourlyBucket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HourlyBucket_sleepMinutes(ctx context.Context, field graphql.CollectedField, obj *model.HourlyBucket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HourlyBucket_sleepMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.SleepMinutes, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HourlyBucket_sleepMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HourlyBucket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HourlyBucket_diapers(ctx context.Context, field graphql.CollectedField, obj *model.HourlyBucket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HourlyBucket_diapers,
+		func(ctx context.Context) (any, error) {
+			return obj.Diapers, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HourlyBucket_diapers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HourlyBucket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5477,6 +6385,63 @@ func (ec *executionContext) fieldContext_Query_scheduleGoals(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_careReport(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_careReport,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().CareReport(ctx, fc.Args["from"].(time.Time), fc.Args["to"].(time.Time), fc.Args["granularity"].(model.ReportGranularity))
+		},
+		nil,
+		ec.marshalNCareReport2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareReport,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_careReport(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "from":
+				return ec.fieldContext_CareReport_from(ctx, field)
+			case "to":
+				return ec.fieldContext_CareReport_to(ctx, field)
+			case "granularity":
+				return ec.fieldContext_CareReport_granularity(ctx, field)
+			case "totals":
+				return ec.fieldContext_CareReport_totals(ctx, field)
+			case "buckets":
+				return ec.fieldContext_CareReport_buckets(ctx, field)
+			case "hourlyPattern":
+				return ec.fieldContext_CareReport_hourlyPattern(ctx, field)
+			case "goalAdherence":
+				return ec.fieldContext_CareReport_goalAdherence(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CareReport", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_careReport_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5580,6 +6545,505 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportBucket_bucketStart(ctx context.Context, field graphql.CollectedField, obj *model.ReportBucket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportBucket_bucketStart,
+		func(ctx context.Context) (any, error) {
+			return obj.BucketStart, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportBucket_bucketStart(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportBucket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportBucket_feeds(ctx context.Context, field graphql.CollectedField, obj *model.ReportBucket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportBucket_feeds,
+		func(ctx context.Context) (any, error) {
+			return obj.Feeds, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportBucket_feeds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportBucket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportBucket_ml(ctx context.Context, field graphql.CollectedField, obj *model.ReportBucket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportBucket_ml,
+		func(ctx context.Context) (any, error) {
+			return obj.Ml, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportBucket_ml(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportBucket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportBucket_diapers(ctx context.Context, field graphql.CollectedField, obj *model.ReportBucket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportBucket_diapers,
+		func(ctx context.Context) (any, error) {
+			return obj.Diapers, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportBucket_diapers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportBucket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportBucket_sleepMinutes(ctx context.Context, field graphql.CollectedField, obj *model.ReportBucket) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportBucket_sleepMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.SleepMinutes, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportBucket_sleepMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportBucket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_totalFeeds(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_totalFeeds,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalFeeds, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_totalFeeds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_totalMl(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_totalMl,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalMl, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_totalMl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_medianFeedsPerDay(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_medianFeedsPerDay,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianFeedsPerDay, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_medianFeedsPerDay(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_medianMlPerDay(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_medianMlPerDay,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianMlPerDay, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_medianMlPerDay(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_feedTypeBreakdown(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_feedTypeBreakdown,
+		func(ctx context.Context) (any, error) {
+			return obj.FeedTypeBreakdown, nil
+		},
+		nil,
+		ec.marshalNFeedTypeCount2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedTypeCountᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_feedTypeBreakdown(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "feedType":
+				return ec.fieldContext_FeedTypeCount_feedType(ctx, field)
+			case "count":
+				return ec.fieldContext_FeedTypeCount_count(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FeedTypeCount", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_totalDiaperChanges(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_totalDiaperChanges,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalDiaperChanges, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_totalDiaperChanges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_totalPoops(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_totalPoops,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalPoops, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_totalPoops(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_totalPees(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_totalPees,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalPees, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_totalPees(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_medianDiapersPerDay(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_medianDiapersPerDay,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianDiapersPerDay, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_medianDiapersPerDay(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_totalSleepMinutes(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_totalSleepMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalSleepMinutes, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_totalSleepMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_medianSleepMinutesPerDay(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_medianSleepMinutesPerDay,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianSleepMinutesPerDay, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_medianSleepMinutesPerDay(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReportTotals_medianLongestStretchMinutes(ctx context.Context, field graphql.CollectedField, obj *model.ReportTotals) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ReportTotals_medianLongestStretchMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianLongestStretchMinutes, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ReportTotals_medianLongestStretchMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReportTotals",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7824,6 +9288,72 @@ func (ec *executionContext) _BabyStatus(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
+var careReportImplementors = []string{"CareReport"}
+
+func (ec *executionContext) _CareReport(ctx context.Context, sel ast.SelectionSet, obj *model.CareReport) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, careReportImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CareReport")
+		case "from":
+			out.Values[i] = ec._CareReport_from(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "to":
+			out.Values[i] = ec._CareReport_to(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "granularity":
+			out.Values[i] = ec._CareReport_granularity(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totals":
+			out.Values[i] = ec._CareReport_totals(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "buckets":
+			out.Values[i] = ec._CareReport_buckets(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "hourlyPattern":
+			out.Values[i] = ec._CareReport_hourlyPattern(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "goalAdherence":
+			out.Values[i] = ec._CareReport_goalAdherence(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var careSessionImplementors = []string{"CareSession"}
 
 func (ec *executionContext) _CareSession(ctx context.Context, sel ast.SelectionSet, obj *model.CareSession) graphql.Marshaler {
@@ -8418,6 +9948,146 @@ func (ec *executionContext) _FeedDetails(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var feedTypeCountImplementors = []string{"FeedTypeCount"}
+
+func (ec *executionContext) _FeedTypeCount(ctx context.Context, sel ast.SelectionSet, obj *model.FeedTypeCount) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feedTypeCountImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeedTypeCount")
+		case "feedType":
+			out.Values[i] = ec._FeedTypeCount_feedType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "count":
+			out.Values[i] = ec._FeedTypeCount_count(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var goalAdherenceImplementors = []string{"GoalAdherence"}
+
+func (ec *executionContext) _GoalAdherence(ctx context.Context, sel ast.SelectionSet, obj *model.GoalAdherence) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, goalAdherenceImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GoalAdherence")
+		case "wakeWindowAdherencePct":
+			out.Values[i] = ec._GoalAdherence_wakeWindowAdherencePct(ctx, field, obj)
+		case "feedIntervalAdherencePct":
+			out.Values[i] = ec._GoalAdherence_feedIntervalAdherencePct(ctx, field, obj)
+		case "napCountAdherencePct":
+			out.Values[i] = ec._GoalAdherence_napCountAdherencePct(ctx, field, obj)
+		case "bedtimeAdherenceMinutesAvg":
+			out.Values[i] = ec._GoalAdherence_bedtimeAdherenceMinutesAvg(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var hourlyBucketImplementors = []string{"HourlyBucket"}
+
+func (ec *executionContext) _HourlyBucket(ctx context.Context, sel ast.SelectionSet, obj *model.HourlyBucket) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hourlyBucketImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HourlyBucket")
+		case "hour":
+			out.Values[i] = ec._HourlyBucket_hour(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "feeds":
+			out.Values[i] = ec._HourlyBucket_feeds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sleepMinutes":
+			out.Values[i] = ec._HourlyBucket_sleepMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "diapers":
+			out.Values[i] = ec._HourlyBucket_diapers(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -8969,6 +10639,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "careReport":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_careReport(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -8977,6 +10669,159 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var reportBucketImplementors = []string{"ReportBucket"}
+
+func (ec *executionContext) _ReportBucket(ctx context.Context, sel ast.SelectionSet, obj *model.ReportBucket) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, reportBucketImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ReportBucket")
+		case "bucketStart":
+			out.Values[i] = ec._ReportBucket_bucketStart(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "feeds":
+			out.Values[i] = ec._ReportBucket_feeds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ml":
+			out.Values[i] = ec._ReportBucket_ml(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "diapers":
+			out.Values[i] = ec._ReportBucket_diapers(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sleepMinutes":
+			out.Values[i] = ec._ReportBucket_sleepMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var reportTotalsImplementors = []string{"ReportTotals"}
+
+func (ec *executionContext) _ReportTotals(ctx context.Context, sel ast.SelectionSet, obj *model.ReportTotals) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, reportTotalsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ReportTotals")
+		case "totalFeeds":
+			out.Values[i] = ec._ReportTotals_totalFeeds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalMl":
+			out.Values[i] = ec._ReportTotals_totalMl(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianFeedsPerDay":
+			out.Values[i] = ec._ReportTotals_medianFeedsPerDay(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianMlPerDay":
+			out.Values[i] = ec._ReportTotals_medianMlPerDay(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "feedTypeBreakdown":
+			out.Values[i] = ec._ReportTotals_feedTypeBreakdown(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalDiaperChanges":
+			out.Values[i] = ec._ReportTotals_totalDiaperChanges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPoops":
+			out.Values[i] = ec._ReportTotals_totalPoops(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPees":
+			out.Values[i] = ec._ReportTotals_totalPees(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianDiapersPerDay":
+			out.Values[i] = ec._ReportTotals_medianDiapersPerDay(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalSleepMinutes":
+			out.Values[i] = ec._ReportTotals_totalSleepMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianSleepMinutesPerDay":
+			out.Values[i] = ec._ReportTotals_medianSleepMinutesPerDay(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "medianLongestStretchMinutes":
+			out.Values[i] = ec._ReportTotals_medianLongestStretchMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -9610,6 +11455,20 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) marshalNCareReport2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareReport(ctx context.Context, sel ast.SelectionSet, v model.CareReport) graphql.Marshaler {
+	return ec._CareReport(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNCareReport2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareReport(ctx context.Context, sel ast.SelectionSet, v *model.CareReport) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CareReport(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNCareSession2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐCareSession(ctx context.Context, sel ast.SelectionSet, v model.CareSession) graphql.Marshaler {
 	return ec._CareSession(ctx, sel, &v)
 }
@@ -9898,6 +11757,140 @@ func (ec *executionContext) marshalNFamily2ᚖgithubᚗcomᚋswatkatzᚋbabybato
 	return ec._Family(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNFeedType2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedType(ctx context.Context, v any) (model.FeedType, error) {
+	var res model.FeedType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFeedType2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedType(ctx context.Context, sel ast.SelectionSet, v model.FeedType) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNFeedTypeCount2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedTypeCountᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FeedTypeCount) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNFeedTypeCount2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedTypeCount(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNFeedTypeCount2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐFeedTypeCount(ctx context.Context, sel ast.SelectionSet, v *model.FeedTypeCount) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FeedTypeCount(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.SelectionSet, v float64) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalFloatContext(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return graphql.WrapContextMarshaler(ctx, res)
+}
+
+func (ec *executionContext) marshalNHourlyBucket2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐHourlyBucketᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.HourlyBucket) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNHourlyBucket2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐHourlyBucket(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNHourlyBucket2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐHourlyBucket(ctx context.Context, sel ast.SelectionSet, v *model.HourlyBucket) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._HourlyBucket(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalID(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -10070,6 +12063,80 @@ func (ec *executionContext) unmarshalNPredictionType2githubᚗcomᚋswatkatzᚋb
 
 func (ec *executionContext) marshalNPredictionType2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐPredictionType(ctx context.Context, sel ast.SelectionSet, v model.PredictionType) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNReportBucket2ᚕᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportBucketᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ReportBucket) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNReportBucket2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportBucket(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNReportBucket2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportBucket(ctx context.Context, sel ast.SelectionSet, v *model.ReportBucket) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ReportBucket(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNReportGranularity2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportGranularity(ctx context.Context, v any) (model.ReportGranularity, error) {
+	var res model.ReportGranularity
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNReportGranularity2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportGranularity(ctx context.Context, sel ast.SelectionSet, v model.ReportGranularity) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNReportTotals2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐReportTotals(ctx context.Context, sel ast.SelectionSet, v *model.ReportTotals) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ReportTotals(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNScheduleGoals2githubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐScheduleGoals(ctx context.Context, sel ast.SelectionSet, v model.ScheduleGoals) graphql.Marshaler {
@@ -10520,6 +12587,13 @@ func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel as
 	_ = sel
 	res := graphql.MarshalFloatContext(*v)
 	return graphql.WrapContextMarshaler(ctx, res)
+}
+
+func (ec *executionContext) marshalOGoalAdherence2ᚖgithubᚗcomᚋswatkatzᚋbabybatonᚋbackendᚋgraphᚋmodelᚐGoalAdherence(ctx context.Context, sel ast.SelectionSet, v *model.GoalAdherence) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._GoalAdherence(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {
