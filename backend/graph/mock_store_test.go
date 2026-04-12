@@ -266,4 +266,9 @@ func (m *mockStore) UpsertScheduleGoals(_ context.Context, _ uuid.UUID, goals *d
 	return goals, nil
 }
 
+// Reporting operations
+func (m *mockStore) CareReport(_ context.Context, _ uuid.UUID, _ time.Time, _ time.Time, _ string) (*domain.CareReport, error) {
+	return nil, nil
+}
+
 func (m *mockStore) Close() error { return nil }
