@@ -34,6 +34,16 @@ type BabyStatus struct {
 	LastSleep  *SleepActivity  `json:"lastSleep,omitempty"`
 }
 
+type CareReport struct {
+	From          time.Time         `json:"from"`
+	To            time.Time         `json:"to"`
+	Granularity   ReportGranularity `json:"granularity"`
+	Totals        *ReportTotals     `json:"totals"`
+	Buckets       []*ReportBucket   `json:"buckets"`
+	HourlyPattern []*HourlyBucket   `json:"hourlyPattern"`
+	GoalAdherence *GoalAdherence    `json:"goalAdherence,omitempty"`
+}
+
 type CareSession struct {
 	ID          string              `json:"id"`
 	Caregiver   *Caregiver          `json:"caregiver"`
@@ -140,6 +150,25 @@ type FeedDetailsInput struct {
 	QuantityUnit *SolidsUnit `json:"quantityUnit,omitempty"`
 }
 
+type FeedTypeCount struct {
+	FeedType FeedType `json:"feedType"`
+	Count    int32    `json:"count"`
+}
+
+type GoalAdherence struct {
+	WakeWindowAdherencePct     *float64 `json:"wakeWindowAdherencePct,omitempty"`
+	FeedIntervalAdherencePct   *float64 `json:"feedIntervalAdherencePct,omitempty"`
+	NapCountAdherencePct       *float64 `json:"napCountAdherencePct,omitempty"`
+	BedtimeAdherenceMinutesAvg *float64 `json:"bedtimeAdherenceMinutesAvg,omitempty"`
+}
+
+type HourlyBucket struct {
+	Hour         int32 `json:"hour"`
+	Feeds        int32 `json:"feeds"`
+	SleepMinutes int32 `json:"sleepMinutes"`
+	Diapers      int32 `json:"diapers"`
+}
+
 type Mutation struct {
 }
 
@@ -171,6 +200,29 @@ type Prediction struct {
 }
 
 type Query struct {
+}
+
+type ReportBucket struct {
+	BucketStart  time.Time `json:"bucketStart"`
+	Feeds        int32     `json:"feeds"`
+	Ml           int32     `json:"ml"`
+	Diapers      int32     `json:"diapers"`
+	SleepMinutes int32     `json:"sleepMinutes"`
+}
+
+type ReportTotals struct {
+	TotalFeeds                  int32            `json:"totalFeeds"`
+	TotalMl                     int32            `json:"totalMl"`
+	MedianFeedsPerDay           float64          `json:"medianFeedsPerDay"`
+	MedianMlPerDay              float64          `json:"medianMlPerDay"`
+	FeedTypeBreakdown           []*FeedTypeCount `json:"feedTypeBreakdown"`
+	TotalDiaperChanges          int32            `json:"totalDiaperChanges"`
+	TotalPoops                  int32            `json:"totalPoops"`
+	TotalPees                   int32            `json:"totalPees"`
+	MedianDiapersPerDay         float64          `json:"medianDiapersPerDay"`
+	TotalSleepMinutes           int32            `json:"totalSleepMinutes"`
+	MedianSleepMinutesPerDay    float64          `json:"medianSleepMinutesPerDay"`
+	MedianLongestStretchMinutes float64          `json:"medianLongestStretchMinutes"`
 }
 
 type ScheduleGoals struct {
@@ -492,6 +544,63 @@ func (e *PredictionType) UnmarshalJSON(b []byte) error {
 }
 
 func (e PredictionType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ReportGranularity string
+
+const (
+	ReportGranularityDay   ReportGranularity = "DAY"
+	ReportGranularityWeek  ReportGranularity = "WEEK"
+	ReportGranularityMonth ReportGranularity = "MONTH"
+)
+
+var AllReportGranularity = []ReportGranularity{
+	ReportGranularityDay,
+	ReportGranularityWeek,
+	ReportGranularityMonth,
+}
+
+func (e ReportGranularity) IsValid() bool {
+	switch e {
+	case ReportGranularityDay, ReportGranularityWeek, ReportGranularityMonth:
+		return true
+	}
+	return false
+}
+
+func (e ReportGranularity) String() string {
+	return string(e)
+}
+
+func (e *ReportGranularity) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ReportGranularity(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ReportGranularity", str)
+	}
+	return nil
+}
+
+func (e ReportGranularity) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ReportGranularity) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ReportGranularity) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil
