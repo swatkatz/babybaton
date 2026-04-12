@@ -130,17 +130,158 @@ GROUP BY bucket
 ORDER BY bucket;
 ```
 
-**Diaper buckets:** Same pattern, joining `diaper_details` on `changed_at`.
+**Diaper buckets:**
+```sql
+SELECT date_trunc($1, dd.changed_at) AS bucket,
+       count(*) AS diapers,
+       count(*) FILTER (WHERE dd.had_poop) AS poops,
+       count(*) FILTER (WHERE dd.had_pee) AS pees
+FROM activities a
+JOIN care_sessions cs ON a.care_session_id = cs.id
+JOIN diaper_details dd ON dd.activity_id = a.id
+WHERE cs.family_id = $2
+  AND dd.changed_at BETWEEN $3 AND $4
+  AND a.activity_type = 'diaper'
+GROUP BY bucket
+ORDER BY bucket;
+```
 
-**Sleep buckets:** Same pattern, joining `sleep_details` on `start_time`, summing `duration_minutes`.
+**Sleep buckets:**
+```sql
+SELECT date_trunc($1, sd.start_time) AS bucket,
+       count(*) AS sleeps,
+       coalesce(sum(sd.duration_minutes), 0) AS sleep_minutes
+FROM activities a
+JOIN care_sessions cs ON a.care_session_id = cs.id
+JOIN sleep_details sd ON sd.activity_id = a.id
+WHERE cs.family_id = $2
+  AND sd.start_time BETWEEN $3 AND $4
+  AND a.activity_type = 'sleep'
+GROUP BY bucket
+ORDER BY bucket;
+```
 
-**Hourly histogram:** Same three queries but grouping by `extract(hour from <detail_time>)` instead of `date_trunc`.
+**Hourly histogram (feeds):**
+```sql
+SELECT extract(hour FROM fd.start_time)::int AS hour,
+       count(*) AS feeds
+FROM activities a
+JOIN care_sessions cs ON a.care_session_id = cs.id
+JOIN feed_details fd ON fd.activity_id = a.id
+WHERE cs.family_id = $1
+  AND fd.start_time BETWEEN $2 AND $3
+  AND a.activity_type = 'feed'
+GROUP BY hour
+ORDER BY hour;
+```
+
+**Hourly histogram (diapers):**
+```sql
+SELECT extract(hour FROM dd.changed_at)::int AS hour,
+       count(*) AS diapers
+FROM activities a
+JOIN care_sessions cs ON a.care_session_id = cs.id
+JOIN diaper_details dd ON dd.activity_id = a.id
+WHERE cs.family_id = $1
+  AND dd.changed_at BETWEEN $2 AND $3
+  AND a.activity_type = 'diaper'
+GROUP BY hour
+ORDER BY hour;
+```
+
+**Hourly histogram (sleep):**
+```sql
+SELECT extract(hour FROM sd.start_time)::int AS hour,
+       coalesce(sum(sd.duration_minutes), 0) AS sleep_minutes
+FROM activities a
+JOIN care_sessions cs ON a.care_session_id = cs.id
+JOIN sleep_details sd ON sd.activity_id = a.id
+WHERE cs.family_id = $1
+  AND sd.start_time BETWEEN $2 AND $3
+  AND a.activity_type = 'sleep'
+GROUP BY hour
+ORDER BY hour;
+```
+
+**Median computations (feeds per day example):**
+
+Medians require a two-step aggregation — first compute daily totals, then take the median across days:
+
+```sql
+SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY daily_feeds) AS median_feeds_per_day,
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY daily_ml) AS median_ml_per_day
+FROM (
+  SELECT date_trunc('day', fd.start_time) AS day,
+         count(*) AS daily_feeds,
+         coalesce(sum(fd.amount_ml), 0) AS daily_ml
+  FROM activities a
+  JOIN care_sessions cs ON a.care_session_id = cs.id
+  JOIN feed_details fd ON fd.activity_id = a.id
+  WHERE cs.family_id = $1
+    AND fd.start_time BETWEEN $2 AND $3
+    AND a.activity_type = 'feed'
+  GROUP BY day
+) daily_totals;
+```
+
+**Median diapers per day:**
+```sql
+SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY daily_diapers) AS median_diapers_per_day
+FROM (
+  SELECT date_trunc('day', dd.changed_at) AS day,
+         count(*) AS daily_diapers
+  FROM activities a
+  JOIN care_sessions cs ON a.care_session_id = cs.id
+  JOIN diaper_details dd ON dd.activity_id = a.id
+  WHERE cs.family_id = $1
+    AND dd.changed_at BETWEEN $2 AND $3
+    AND a.activity_type = 'diaper'
+  GROUP BY day
+) daily_totals;
+```
+
+**Median sleep per day + median longest stretch:**
+```sql
+SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY daily_sleep) AS median_sleep_minutes_per_day,
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY longest_stretch) AS median_longest_stretch_minutes
+FROM (
+  SELECT date_trunc('day', sd.start_time) AS day,
+         coalesce(sum(sd.duration_minutes), 0) AS daily_sleep,
+         max(sd.duration_minutes) AS longest_stretch
+  FROM activities a
+  JOIN care_sessions cs ON a.care_session_id = cs.id
+  JOIN sleep_details sd ON sd.activity_id = a.id
+  WHERE cs.family_id = $1
+    AND sd.start_time BETWEEN $2 AND $3
+    AND a.activity_type = 'sleep'
+  GROUP BY day
+) daily_totals;
+```
 
 **Goal adherence:** Computed in Go by:
 1. Loading the family's `ScheduleGoals` (if none, return nil)
 2. Querying consecutive feed times and sleep times in the range
-3. Computing actual intervals using `LAG()` window function
-4. Comparing against target intervals/counts and computing percentages
+3. Computing actual intervals using `LAG()` window function:
+
+```sql
+-- Feed intervals (for feed interval adherence)
+SELECT feed_interval_minutes
+FROM (
+  SELECT extract(epoch FROM (fd.start_time - LAG(fd.start_time) OVER (ORDER BY fd.start_time))) / 60
+         AS feed_interval_minutes
+  FROM activities a
+  JOIN care_sessions cs ON a.care_session_id = cs.id
+  JOIN feed_details fd ON fd.activity_id = a.id
+  WHERE cs.family_id = $1
+    AND fd.start_time BETWEEN $2 AND $3
+    AND a.activity_type = 'feed'
+) intervals
+WHERE feed_interval_minutes IS NOT NULL;
+```
+
+4. In Go: compare each interval against `targetFeedIntervalMinutes`, compute percentage within tolerance
+5. Nap count adherence: count sleeps per day, compare against `targetNapCount`
+6. Bedtime adherence: extract sleep start times, compare against `targetBedtime`, compute average minutes off
 
 ### Feed Type Breakdown
 
