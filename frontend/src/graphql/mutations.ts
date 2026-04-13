@@ -80,6 +80,9 @@ export const PARSE_VOICE_INPUT = gql`
           amountMl
           feedType
           durationMinutes
+          foodName
+          quantity
+          quantityUnit
         }
         diaperDetails {
           changedAt

@@ -203,6 +203,7 @@ export function LogActivityScreen({ navigation }: Props) {
             <Text style={styles.examplesTitle}>Examples:</Text>
             <Text style={styles.exampleText}>{'\u2022'} &quot;Fed baby 120ml at 3pm&quot;</Text>
             <Text style={styles.exampleText}>{'\u2022'} &quot;Changed diaper at 4pm, had poop&quot;</Text>
+            <Text style={styles.exampleText}>{'\u2022'} &quot;Baby ate some mashed carrots at noon&quot;</Text>
             <Text style={styles.exampleText}>{'\u2022'} &quot;Baby slept from 2pm to 4pm&quot;</Text>
           </View>
         </View>
