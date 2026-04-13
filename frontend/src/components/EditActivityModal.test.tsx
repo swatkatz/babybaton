@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { EditActivityModal } from './EditActivityModal';
-import { ActivityType, FeedType } from '../types/__generated__/graphql';
+import { ActivityType, FeedType, SolidsUnit } from '../types/__generated__/graphql';
 
 // Mock lucide icons
 jest.mock('lucide-react-native', () => ({
@@ -44,6 +44,24 @@ const makeFeedActivity = () => ({
     foodName: null,
     quantity: null,
     quantityUnit: null,
+  },
+});
+
+const makeSolidsActivity = () => ({
+  __typename: 'FeedActivity' as const,
+  id: 'feed-2',
+  activityType: ActivityType.Feed,
+  createdAt: '2025-01-15T12:00:00Z',
+  feedDetails: {
+    __typename: 'FeedDetails' as const,
+    startTime: '2025-01-15T12:00:00Z',
+    endTime: null,
+    amountMl: null,
+    feedType: FeedType.Solids,
+    durationMinutes: null,
+    foodName: 'mushed carrots',
+    quantity: 5,
+    quantityUnit: SolidsUnit.Spoons,
   },
 });
 
@@ -125,6 +143,66 @@ describe('EditActivityModal', () => {
       fireEvent.press(getByText('Save Changes'));
 
       expect(getByText('Please enter a valid amount in ml')).toBeTruthy();
+      expect(baseProps.onSave).not.toHaveBeenCalled();
+    });
+
+    it('should preserve Solids feed type (not coerce to Formula)', () => {
+      const { getByText, getByDisplayValue } = render(
+        <EditActivityModal {...baseProps} activity={makeSolidsActivity()} />,
+      );
+
+      expect(getByText('Edit Feed')).toBeTruthy();
+      expect(getByDisplayValue('mushed carrots')).toBeTruthy();
+      expect(getByDisplayValue('5')).toBeTruthy();
+    });
+
+    it('should show solids fields when editing a solids activity', () => {
+      const { getByText } = render(
+        <EditActivityModal {...baseProps} activity={makeSolidsActivity()} />,
+      );
+
+      expect(getByText('Food Name')).toBeTruthy();
+      expect(getByText('Quantity (optional)')).toBeTruthy();
+      expect(getByText('Unit (optional)')).toBeTruthy();
+    });
+
+    it('should call onSave with solids details', () => {
+      const { getByText } = render(
+        <EditActivityModal {...baseProps} activity={makeSolidsActivity()} />,
+      );
+
+      fireEvent.press(getByText('Save Changes'));
+
+      expect(baseProps.onSave).toHaveBeenCalledWith(
+        'feed-2',
+        expect.objectContaining({
+          activityType: ActivityType.Feed,
+          feedDetails: expect.objectContaining({
+            feedType: FeedType.Solids,
+            foodName: 'mushed carrots',
+            quantity: 5,
+            quantityUnit: SolidsUnit.Spoons,
+          }),
+        }),
+      );
+    });
+
+    it('should validate food name for solids', () => {
+      const activity = {
+        ...makeSolidsActivity(),
+        feedDetails: {
+          ...makeSolidsActivity().feedDetails,
+          foodName: '',
+        },
+      };
+
+      const { getByText } = render(
+        <EditActivityModal {...baseProps} activity={activity} />,
+      );
+
+      fireEvent.press(getByText('Save Changes'));
+
+      expect(getByText('Please enter a food name')).toBeTruthy();
       expect(baseProps.onSave).not.toHaveBeenCalled();
     });
 

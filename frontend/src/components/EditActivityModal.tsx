@@ -18,6 +18,7 @@ import {
   ActivityInput,
   ActivityType,
   FeedType,
+  SolidsUnit,
   GetCurrentSessionQuery,
 } from '../types/__generated__/graphql';
 
@@ -43,6 +44,9 @@ export function EditActivityModal({
   const [feedTime, setFeedTime] = useState(new Date());
   const [feedAmount, setFeedAmount] = useState('');
   const [feedType, setFeedType] = useState<FeedType>(FeedType.Formula);
+  const [foodName, setFoodName] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [quantityUnit, setQuantityUnit] = useState<SolidsUnit | null>(null);
 
   // Diaper state
   const [diaperTime, setDiaperTime] = useState(new Date());
@@ -72,8 +76,18 @@ export function EditActivityModal({
         const details = activity.feedDetails;
         if (details) {
           setFeedTime(new Date(details.startTime));
-          setFeedAmount(details.amountMl != null ? String(details.amountMl) : '');
-          setFeedType(details.feedType === FeedType.BreastMilk ? FeedType.BreastMilk : FeedType.Formula);
+          setFeedType(details.feedType ?? FeedType.Formula);
+          if (details.feedType === FeedType.Solids) {
+            setFoodName(details.foodName ?? '');
+            setQuantity(details.quantity != null ? String(details.quantity) : '');
+            setQuantityUnit(details.quantityUnit ?? null);
+            setFeedAmount('');
+          } else {
+            setFeedAmount(details.amountMl != null ? String(details.amountMl) : '');
+            setFoodName('');
+            setQuantity('');
+            setQuantityUnit(null);
+          }
         }
         break;
       }
@@ -107,8 +121,14 @@ export function EditActivityModal({
     const newErrors: Record<string, string> = {};
 
     if (activity?.__typename === 'FeedActivity') {
-      if (!feedAmount.trim() || isNaN(Number(feedAmount)) || Number(feedAmount) <= 0) {
-        newErrors.feedAmount = 'Please enter a valid amount in ml';
+      if (feedType === FeedType.Solids) {
+        if (!foodName.trim()) {
+          newErrors.foodName = 'Please enter a food name';
+        }
+      } else {
+        if (!feedAmount.trim() || isNaN(Number(feedAmount)) || Number(feedAmount) <= 0) {
+          newErrors.feedAmount = 'Please enter a valid amount in ml';
+        }
       }
     }
 
@@ -131,11 +151,19 @@ export function EditActivityModal({
       case 'FeedActivity':
         input = {
           activityType: ActivityType.Feed,
-          feedDetails: {
-            startTime: feedTime.toISOString(),
-            amountMl: Number(feedAmount),
-            feedType: feedType,
-          },
+          feedDetails: feedType === FeedType.Solids
+            ? {
+                startTime: feedTime.toISOString(),
+                feedType: FeedType.Solids,
+                foodName: foodName.trim(),
+                quantity: quantity.trim() ? Number(quantity) : undefined,
+                quantityUnit: quantityUnit ?? undefined,
+              }
+            : {
+                startTime: feedTime.toISOString(),
+                amountMl: Number(feedAmount),
+                feedType: feedType,
+              },
         };
         break;
       case 'DiaperActivity':
@@ -268,28 +296,83 @@ export function EditActivityModal({
     );
   };
 
-  const renderFeedForm = () => (
-    <View style={styles.formSection}>
-      {renderTimePicker('Time', feedTime, setFeedTime, 'feedTime')}
+  const renderSolidsFields = () => (
+    <>
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Food Name</Text>
+        <TextInput
+          style={[styles.input, errors.foodName && styles.inputError]}
+          placeholder="e.g., mushed carrots"
+          placeholderTextColor={colors.textLight}
+          value={foodName}
+          onChangeText={(text) => {
+            setFoodName(text);
+            setErrors({ ...errors, foodName: '' });
+          }}
+          editable={!saving}
+        />
+        {errors.foodName ? (
+          <Text style={styles.errorText}>{errors.foodName}</Text>
+        ) : null}
+      </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Amount (ml)</Text>
+        <Text style={styles.label}>Quantity (optional)</Text>
         <TextInput
-          style={[styles.input, errors.feedAmount && styles.inputError]}
-          placeholder="e.g., 120"
+          style={styles.input}
+          placeholder="e.g., 10"
           placeholderTextColor={colors.textLight}
-          value={feedAmount}
-          onChangeText={(text) => {
-            setFeedAmount(text);
-            setErrors({ ...errors, feedAmount: '' });
-          }}
+          value={quantity}
+          onChangeText={setQuantity}
           keyboardType="numeric"
           editable={!saving}
         />
-        {errors.feedAmount ? (
-          <Text style={styles.errorText}>{errors.feedAmount}</Text>
-        ) : null}
       </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Unit (optional)</Text>
+        <View style={styles.chipsContainer}>
+          {[SolidsUnit.Spoons, SolidsUnit.Bowls, SolidsUnit.Pieces, SolidsUnit.Portions].map((unit) => (
+            <TouchableOpacity
+              key={unit}
+              style={[styles.chip, quantityUnit === unit && styles.chipSelected]}
+              onPress={() => setQuantityUnit(quantityUnit === unit ? null : unit)}
+              disabled={saving}
+            >
+              <Text style={[styles.chipText, quantityUnit === unit && styles.chipTextSelected]}>
+                {unit.charAt(0) + unit.slice(1).toLowerCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </>
+  );
+
+  const renderLiquidFields = () => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.label}>Amount (ml)</Text>
+      <TextInput
+        style={[styles.input, errors.feedAmount && styles.inputError]}
+        placeholder="e.g., 120"
+        placeholderTextColor={colors.textLight}
+        value={feedAmount}
+        onChangeText={(text) => {
+          setFeedAmount(text);
+          setErrors({ ...errors, feedAmount: '' });
+        }}
+        keyboardType="numeric"
+        editable={!saving}
+      />
+      {errors.feedAmount ? (
+        <Text style={styles.errorText}>{errors.feedAmount}</Text>
+      ) : null}
+    </View>
+  );
+
+  const renderFeedForm = () => (
+    <View style={styles.formSection}>
+      {renderTimePicker('Time', feedTime, setFeedTime, 'feedTime')}
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Feed Type</Text>
@@ -312,8 +395,19 @@ export function EditActivityModal({
               Breast Milk
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chip, feedType === FeedType.Solids && styles.chipSelected]}
+            onPress={() => setFeedType(FeedType.Solids)}
+            disabled={saving}
+          >
+            <Text style={[styles.chipText, feedType === FeedType.Solids && styles.chipTextSelected]}>
+              Solids
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
+
+      {feedType === FeedType.Solids ? renderSolidsFields() : renderLiquidFields()}
     </View>
   );
 
