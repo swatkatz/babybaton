@@ -104,6 +104,18 @@ babybaton/
 
 ## Rules
 
+### Planning workflow override (supersedes writing-plans skill)
+
+When the `writing-plans` skill would write a markdown plan to `docs/superpowers/plans/`, do this instead:
+- File one GitHub issue per task / logical chunk via `gh issue create`
+- Put requirements in the issue body; put full implementation details (exact file paths, code blocks, tests, commands) as a separate `gh issue comment`
+- Add `Blocked by #N` lines to the body for dependencies — an autodev script consumes issues in dependency order
+- Add the `ready to implement` label to each issue
+- Do NOT write a `plan.md` file
+- Do NOT start implementation after filing the issues — stop there and let the user/autodev pick them up
+
+All other writing-plans guidance (bite-sized tasks, no placeholders, exact file paths, complete code in every step, TDD) still applies — it just lives inside issue comments instead of a plan doc.
+
 ### Test-Driven Development
 - **Write tests first.** For new features, write failing tests, then implement until they pass.
 - Run backend tests (`go test -v -count=1 ./...` in backend/) for any backend changes.
