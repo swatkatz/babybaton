@@ -362,7 +362,9 @@ func CareReportToGraphQL(r *domain.CareReport) *model.CareReport {
 				MedianMinutesPerNight:       r.Totals.OvernightStats.MedianMinutesPerNight,
 				MedianLongestStretchMinutes: r.Totals.OvernightStats.MedianLongestStretchMinutes,
 				MedianBedtime:               r.Totals.OvernightStats.MedianBedtime,
+				MedianBedtimeSampleCount:    int32(r.Totals.OvernightStats.MedianBedtimeSampleCount),
 				MedianWakeTime:              r.Totals.OvernightStats.MedianWakeTime,
+				MedianWakeTimeSampleCount:   int32(r.Totals.OvernightStats.MedianWakeTimeSampleCount),
 				Count:                       int32(r.Totals.OvernightStats.Count),
 			},
 			NapStats: &model.NapStats{

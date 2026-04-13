@@ -185,7 +185,9 @@ type OvernightSleepStats struct {
 	MedianMinutesPerNight       float64 `json:"medianMinutesPerNight"`
 	MedianLongestStretchMinutes float64 `json:"medianLongestStretchMinutes"`
 	MedianBedtime               *string `json:"medianBedtime,omitempty"`
+	MedianBedtimeSampleCount    int32   `json:"medianBedtimeSampleCount"`
 	MedianWakeTime              *string `json:"medianWakeTime,omitempty"`
+	MedianWakeTimeSampleCount   int32   `json:"medianWakeTimeSampleCount"`
 	Count                       int32   `json:"count"`
 }
 

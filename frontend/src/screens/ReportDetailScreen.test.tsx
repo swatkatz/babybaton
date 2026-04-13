@@ -65,7 +65,9 @@ const mockReport = {
       medianMinutesPerNight: 600,
       medianLongestStretchMinutes: 540,
       medianBedtime: '20:00',
+      medianBedtimeSampleCount: 5,
       medianWakeTime: '07:00',
+      medianWakeTimeSampleCount: 5,
       count: 7,
     },
     napStats: {
@@ -191,9 +193,9 @@ describe('ReportDetailScreen', () => {
       expect(await findByText('10h')).toBeTruthy(); // 600 min = 10h
       expect(await findByText('median/night')).toBeTruthy();
       expect(await findByText('20:00')).toBeTruthy();
-      expect(await findByText('median bedtime')).toBeTruthy();
+      expect(await findByText('median bedtime (5 nights)')).toBeTruthy();
       expect(await findByText('07:00')).toBeTruthy();
-      expect(await findByText('median wake')).toBeTruthy();
+      expect(await findByText('median wake (5 nights)')).toBeTruthy();
     });
 
     it('renders Naps section with nap stats', async () => {

@@ -274,7 +274,9 @@ type OvernightSleepStats {
   medianMinutesPerNight: Float!
   medianLongestStretchMinutes: Float!
   medianBedtime: String
+  medianBedtimeSampleCount: Int!
   medianWakeTime: String
+  medianWakeTimeSampleCount: Int!
   count: Int!
 }
 

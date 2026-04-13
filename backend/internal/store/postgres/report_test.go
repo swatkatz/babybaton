@@ -575,15 +575,18 @@ func TestOvernightAndNapStats(t *testing.T) {
 		if report.Totals.OvernightStats.TotalMinutes != 480 {
 			t.Errorf("overnight total minutes = %d, want 480", report.Totals.OvernightStats.TotalMinutes)
 		}
-		if report.Totals.OvernightStats.MedianBedtime == nil {
-			t.Error("overnight median bedtime should not be nil")
-		} else if *report.Totals.OvernightStats.MedianBedtime != "20:00" {
-			t.Errorf("overnight median bedtime = %s, want 20:00", *report.Totals.OvernightStats.MedianBedtime)
+		// Only 1 sample — below minimum of 3, so bedtime/wake should be nil
+		if report.Totals.OvernightStats.MedianBedtime != nil {
+			t.Errorf("overnight median bedtime should be nil with <3 samples, got %s", *report.Totals.OvernightStats.MedianBedtime)
 		}
-		if report.Totals.OvernightStats.MedianWakeTime == nil {
-			t.Error("overnight median wake time should not be nil")
-		} else if *report.Totals.OvernightStats.MedianWakeTime != "04:00" {
-			t.Errorf("overnight median wake time = %s, want 04:00", *report.Totals.OvernightStats.MedianWakeTime)
+		if report.Totals.OvernightStats.MedianBedtimeSampleCount != 1 {
+			t.Errorf("bedtime sample count = %d, want 1", report.Totals.OvernightStats.MedianBedtimeSampleCount)
+		}
+		if report.Totals.OvernightStats.MedianWakeTime != nil {
+			t.Errorf("overnight median wake time should be nil with <3 samples, got %s", *report.Totals.OvernightStats.MedianWakeTime)
+		}
+		if report.Totals.OvernightStats.MedianWakeTimeSampleCount != 1 {
+			t.Errorf("wake time sample count = %d, want 1", report.Totals.OvernightStats.MedianWakeTimeSampleCount)
 		}
 
 		// Nap stats
@@ -622,17 +625,18 @@ func TestOvernightAndNapStats(t *testing.T) {
 		if stats.TotalMinutes != 960 {
 			t.Errorf("total minutes = %d, want 960", stats.TotalMinutes)
 		}
-		// Median bedtime: between 19:30 and 20:30 = 20:00
-		if stats.MedianBedtime == nil {
-			t.Error("median bedtime should not be nil")
-		} else if *stats.MedianBedtime != "20:00" {
-			t.Errorf("median bedtime = %s, want 20:00", *stats.MedianBedtime)
+		// Only 2 samples — below minimum of 3, so bedtime/wake should be nil
+		if stats.MedianBedtime != nil {
+			t.Errorf("median bedtime should be nil with <3 samples, got %s", *stats.MedianBedtime)
 		}
-		// Median wake time: between 04:30 and 03:30 = 04:00
-		if stats.MedianWakeTime == nil {
-			t.Error("median wake time should not be nil")
-		} else if *stats.MedianWakeTime != "04:00" {
-			t.Errorf("median wake time = %s, want 04:00", *stats.MedianWakeTime)
+		if stats.MedianBedtimeSampleCount != 2 {
+			t.Errorf("bedtime sample count = %d, want 2", stats.MedianBedtimeSampleCount)
+		}
+		if stats.MedianWakeTime != nil {
+			t.Errorf("median wake time should be nil with <3 samples, got %s", *stats.MedianWakeTime)
+		}
+		if stats.MedianWakeTimeSampleCount != 2 {
+			t.Errorf("wake time sample count = %d, want 2", stats.MedianWakeTimeSampleCount)
 		}
 	})
 
@@ -653,6 +657,12 @@ func TestOvernightAndNapStats(t *testing.T) {
 		if overnight.MedianBedtime != nil {
 			t.Error("median bedtime should be nil for no data")
 		}
+		if overnight.MedianBedtimeSampleCount != 0 {
+			t.Errorf("bedtime sample count = %d, want 0", overnight.MedianBedtimeSampleCount)
+		}
+		if overnight.MedianWakeTimeSampleCount != 0 {
+			t.Errorf("wake time sample count = %d, want 0", overnight.MedianWakeTimeSampleCount)
+		}
 
 		naps, err := store.napSleepStats(ctx, family.ID, farFuture, farFuture.Add(24*time.Hour))
 		if err != nil {
@@ -663,6 +673,120 @@ func TestOvernightAndNapStats(t *testing.T) {
 		}
 		if naps.TotalMinutes != 0 {
 			t.Errorf("nap total = %d, want 0", naps.TotalMinutes)
+		}
+	})
+
+	t.Run("3+ samples returns median bedtime and wake with counts", func(t *testing.T) {
+		family, session := setupFamily(t)
+		day1 := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, -4).Add(5 * time.Hour)
+
+		// 4 nights with valid durations (240-840 min range)
+		// Night 1: 19:00, 600 min (10h), wakes 05:00
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(14*time.Hour), 600)
+		// Night 2: 20:00, 480 min (8h), wakes 04:00
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(24*time.Hour+15*time.Hour), 480)
+		// Night 3: 21:00, 540 min (9h), wakes 06:00
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(2*24*time.Hour+16*time.Hour), 540)
+		// Night 4: 20:00, 480 min (8h), wakes 04:00
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(3*24*time.Hour+15*time.Hour), 480)
+
+		from := day1.Add(-1 * time.Hour)
+		to := day1.Add(5 * 24 * time.Hour)
+
+		stats, err := store.overnightSleepStats(ctx, family.ID, from, to)
+		if err != nil {
+			t.Fatalf("overnightSleepStats failed: %v", err)
+		}
+
+		if stats.Count != 4 {
+			t.Errorf("count = %d, want 4", stats.Count)
+		}
+		if stats.MedianBedtimeSampleCount != 4 {
+			t.Errorf("bedtime sample count = %d, want 4", stats.MedianBedtimeSampleCount)
+		}
+		if stats.MedianBedtime == nil {
+			t.Error("median bedtime should not be nil with 4 samples")
+		}
+		if stats.MedianWakeTimeSampleCount != 4 {
+			t.Errorf("wake time sample count = %d, want 4", stats.MedianWakeTimeSampleCount)
+		}
+		if stats.MedianWakeTime == nil {
+			t.Error("median wake time should not be nil with 4 samples")
+		}
+	})
+
+	t.Run("outlier excluded from bedtime median but included in totals", func(t *testing.T) {
+		family, session := setupFamily(t)
+		day1 := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, -5).Add(5 * time.Hour)
+
+		// 3 normal overnight sleeps at 20:00, each 600 min (10h)
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(15*time.Hour), 600)
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(24*time.Hour+15*time.Hour), 600)
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(2*24*time.Hour+15*time.Hour), 600)
+		// 1 outlier: 18:00, 1200 min (20h) — exceeds 840 min cap
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(3*24*time.Hour+13*time.Hour), 1200)
+
+		from := day1.Add(-1 * time.Hour)
+		to := day1.Add(5 * 24 * time.Hour)
+
+		stats, err := store.overnightSleepStats(ctx, family.ID, from, to)
+		if err != nil {
+			t.Fatalf("overnightSleepStats failed: %v", err)
+		}
+
+		// All 4 counted as overnight
+		if stats.Count != 4 {
+			t.Errorf("count = %d, want 4", stats.Count)
+		}
+		// Total includes outlier: 3*600 + 1200 = 3000
+		if stats.TotalMinutes != 3000 {
+			t.Errorf("total minutes = %d, want 3000", stats.TotalMinutes)
+		}
+		// Only 3 pass the 240-840 filter
+		if stats.MedianBedtimeSampleCount != 3 {
+			t.Errorf("bedtime sample count = %d, want 3", stats.MedianBedtimeSampleCount)
+		}
+		if stats.MedianBedtime == nil {
+			t.Error("median bedtime should not be nil with 3 qualifying samples")
+		} else if *stats.MedianBedtime != "20:00" {
+			t.Errorf("median bedtime = %s, want 20:00", *stats.MedianBedtime)
+		}
+	})
+
+	t.Run("missing end_time excluded from wake median", func(t *testing.T) {
+		family, session := setupFamily(t)
+		day1 := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, -6).Add(5 * time.Hour)
+
+		// 4 overnight sleeps, all valid duration
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(15*time.Hour), 480)
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(24*time.Hour+15*time.Hour), 480)
+		createSleepActivity(t, ctx, store, session.ID, day1.Add(2*24*time.Hour+15*time.Hour), 480)
+
+		// 4th sleep: create manually without end_time
+		sleepTime := day1.Add(3*24*time.Hour + 15*time.Hour)
+		createSleepActivityNoEndTime(t, ctx, store, session.ID, sleepTime, 480)
+
+		from := day1.Add(-1 * time.Hour)
+		to := day1.Add(5 * 24 * time.Hour)
+
+		stats, err := store.overnightSleepStats(ctx, family.ID, from, to)
+		if err != nil {
+			t.Fatalf("overnightSleepStats failed: %v", err)
+		}
+
+		// All 4 pass the duration filter
+		if stats.MedianBedtimeSampleCount != 4 {
+			t.Errorf("bedtime sample count = %d, want 4", stats.MedianBedtimeSampleCount)
+		}
+		if stats.MedianBedtime == nil {
+			t.Error("median bedtime should not be nil with 4 samples")
+		}
+		// Only 3 have end_time
+		if stats.MedianWakeTimeSampleCount != 3 {
+			t.Errorf("wake time sample count = %d, want 3", stats.MedianWakeTimeSampleCount)
+		}
+		if stats.MedianWakeTime == nil {
+			t.Error("median wake time should not be nil with 3 qualifying samples")
 		}
 	})
 }
@@ -850,6 +974,33 @@ func createSleepActivity(t *testing.T, ctx context.Context, store *PostgresStore
 		ActivityID:      activity.ID,
 		StartTime:       startTime,
 		EndTime:         &endTime,
+		DurationMinutes: &durationMinutes,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+	if err := store.CreateSleepDetails(ctx, details); err != nil {
+		t.Fatalf("Failed to create sleep details: %v", err)
+	}
+}
+
+func createSleepActivityNoEndTime(t *testing.T, ctx context.Context, store *PostgresStore, sessionID uuid.UUID, startTime time.Time, durationMinutes int) {
+	t.Helper()
+	activity := &domain.Activity{
+		ID:            uuid.New(),
+		CareSessionID: sessionID,
+		ActivityType:  domain.ActivityTypeSleep,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	if err := store.CreateActivity(ctx, activity); err != nil {
+		t.Fatalf("Failed to create sleep activity: %v", err)
+	}
+
+	details := &domain.SleepDetails{
+		ID:              uuid.New(),
+		ActivityID:      activity.ID,
+		StartTime:       startTime,
+		EndTime:         nil,
 		DurationMinutes: &durationMinutes,
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),

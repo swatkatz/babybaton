@@ -644,6 +644,8 @@ ORDER BY sd.start_time`
 }
 
 func (s *PostgresStore) overnightSleepStats(ctx context.Context, familyID uuid.UUID, from, to time.Time) (domain.OvernightSleepStats, error) {
+	const minSampleSize = 3
+
 	query := `
 WITH overnight AS (
   SELECT sd.start_time, sd.end_time, sd.duration_minutes
@@ -654,6 +656,11 @@ WITH overnight AS (
     AND sd.start_time >= $2 AND sd.start_time < $3
     AND a.activity_type = 'sleep'
     AND (extract(hour FROM sd.start_time) >= 18 OR extract(hour FROM sd.start_time) < 5)
+),
+filtered AS (
+  SELECT start_time, end_time
+  FROM overnight
+  WHERE duration_minutes BETWEEN 240 AND 840
 ),
 nightly AS (
   SELECT date_trunc('day', start_time) AS night,
@@ -666,17 +673,22 @@ SELECT
   coalesce((SELECT sum(duration_minutes) FROM overnight), 0) AS total_minutes,
   (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY minutes) FROM nightly) AS median_per_night,
   (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY longest_stretch) FROM nightly) AS median_longest,
-  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM start_time)::bigint % 86400) FROM overnight) AS median_bedtime_sec,
-  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM end_time)::bigint % 86400) FROM overnight WHERE end_time IS NOT NULL) AS median_waketime_sec,
+  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM start_time)::bigint % 86400) FROM filtered) AS median_bedtime_sec,
+  (SELECT count(*) FROM filtered) AS bedtime_sample_count,
+  (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM end_time)::bigint % 86400) FROM filtered WHERE end_time IS NOT NULL) AS median_waketime_sec,
+  (SELECT count(*) FROM filtered WHERE end_time IS NOT NULL) AS waketime_sample_count,
   coalesce((SELECT count(*) FROM overnight), 0) AS count`
 
 	var result domain.OvernightSleepStats
 	var totalMin int64
 	var medianPerNight, medianLongest, medianBedtimeSec, medianWaketimeSec sql.NullFloat64
-	var cnt int64
+	var bedtimeSampleCount, waketimeSampleCount, cnt int64
 
 	err := s.db.QueryRowContext(ctx, query, familyID, from, to).Scan(
-		&totalMin, &medianPerNight, &medianLongest, &medianBedtimeSec, &medianWaketimeSec, &cnt,
+		&totalMin, &medianPerNight, &medianLongest,
+		&medianBedtimeSec, &bedtimeSampleCount,
+		&medianWaketimeSec, &waketimeSampleCount,
+		&cnt,
 	)
 	if err != nil {
 		return result, fmt.Errorf("failed to query overnight sleep stats: %w", err)
@@ -684,16 +696,18 @@ SELECT
 
 	result.TotalMinutes = int(totalMin)
 	result.Count = int(cnt)
+	result.MedianBedtimeSampleCount = int(bedtimeSampleCount)
+	result.MedianWakeTimeSampleCount = int(waketimeSampleCount)
 	if medianPerNight.Valid {
 		result.MedianMinutesPerNight = medianPerNight.Float64
 	}
 	if medianLongest.Valid {
 		result.MedianLongestStretchMinutes = medianLongest.Float64
 	}
-	if medianBedtimeSec.Valid {
+	if medianBedtimeSec.Valid && bedtimeSampleCount >= minSampleSize {
 		result.MedianBedtime = secondsToHHMM(medianBedtimeSec.Float64)
 	}
-	if medianWaketimeSec.Valid {
+	if medianWaketimeSec.Valid && waketimeSampleCount >= minSampleSize {
 		result.MedianWakeTime = secondsToHHMM(medianWaketimeSec.Float64)
 	}
 
