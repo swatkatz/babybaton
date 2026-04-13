@@ -220,8 +220,10 @@ type OvernightSleepStats struct {
 	TotalMinutes                int
 	MedianMinutesPerNight       float64
 	MedianLongestStretchMinutes float64
-	MedianBedtime               *string // "HH:MM", nil if no data
-	MedianWakeTime              *string // "HH:MM", nil if no data
+	MedianBedtime               *string // "HH:MM", nil if < 3 qualifying samples
+	MedianBedtimeSampleCount    int
+	MedianWakeTime              *string // "HH:MM", nil if < 3 qualifying samples
+	MedianWakeTimeSampleCount   int
 	Count                       int
 }
 

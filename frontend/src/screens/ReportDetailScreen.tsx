@@ -70,11 +70,23 @@ function formatAdherenceMinutes(minutes: number | null | undefined): number | nu
 
 function getOvernightStats(totals: ReportTotals): Array<{ value: string; label: string }> {
   const os = totals.overnightStats;
+  const bedtimeValue = os.medianBedtime != null
+    ? os.medianBedtime
+    : 'Not enough data';
+  const bedtimeLabel = os.medianBedtime != null
+    ? `median bedtime (${os.medianBedtimeSampleCount} nights)`
+    : 'median bedtime';
+  const wakeValue = os.medianWakeTime != null
+    ? os.medianWakeTime
+    : 'Not enough data';
+  const wakeLabel = os.medianWakeTime != null
+    ? `median wake (${os.medianWakeTimeSampleCount} nights)`
+    : 'median wake';
   return [
     { value: formatSleepHours(os.totalMinutes), label: 'total overnight' },
     { value: formatSleepHours(os.medianMinutesPerNight), label: 'median/night' },
-    { value: os.medianBedtime ?? '--', label: 'median bedtime' },
-    { value: os.medianWakeTime ?? '--', label: 'median wake' },
+    { value: bedtimeValue, label: bedtimeLabel },
+    { value: wakeValue, label: wakeLabel },
   ];
 }
 

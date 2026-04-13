@@ -275,7 +275,9 @@ export const GET_CARE_REPORT = gql`
           medianMinutesPerNight
           medianLongestStretchMinutes
           medianBedtime
+          medianBedtimeSampleCount
           medianWakeTime
+          medianWakeTimeSampleCount
           count
         }
         napStats {

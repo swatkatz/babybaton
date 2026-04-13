@@ -203,9 +203,11 @@ type ComplexityRoot struct {
 	OvernightSleepStats struct {
 		Count                       func(childComplexity int) int
 		MedianBedtime               func(childComplexity int) int
+		MedianBedtimeSampleCount    func(childComplexity int) int
 		MedianLongestStretchMinutes func(childComplexity int) int
 		MedianMinutesPerNight       func(childComplexity int) int
 		MedianWakeTime              func(childComplexity int) int
+		MedianWakeTimeSampleCount   func(childComplexity int) int
 		TotalMinutes                func(childComplexity int) int
 	}
 
@@ -1017,6 +1019,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.OvernightSleepStats.MedianBedtime(childComplexity), true
+	case "OvernightSleepStats.medianBedtimeSampleCount":
+		if e.complexity.OvernightSleepStats.MedianBedtimeSampleCount == nil {
+			break
+		}
+
+		return e.complexity.OvernightSleepStats.MedianBedtimeSampleCount(childComplexity), true
 	case "OvernightSleepStats.medianLongestStretchMinutes":
 		if e.complexity.OvernightSleepStats.MedianLongestStretchMinutes == nil {
 			break
@@ -1035,6 +1043,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.OvernightSleepStats.MedianWakeTime(childComplexity), true
+	case "OvernightSleepStats.medianWakeTimeSampleCount":
+		if e.complexity.OvernightSleepStats.MedianWakeTimeSampleCount == nil {
+			break
+		}
+
+		return e.complexity.OvernightSleepStats.MedianWakeTimeSampleCount(childComplexity), true
 	case "OvernightSleepStats.totalMinutes":
 		if e.complexity.OvernightSleepStats.TotalMinutes == nil {
 			break
@@ -1840,7 +1854,9 @@ type OvernightSleepStats {
   medianMinutesPerNight: Float!
   medianLongestStretchMinutes: Float!
   medianBedtime: String
+  medianBedtimeSampleCount: Int!
   medianWakeTime: String
+  medianWakeTimeSampleCount: Int!
   count: Int!
 }
 
@@ -5683,6 +5699,35 @@ func (ec *executionContext) fieldContext_OvernightSleepStats_medianBedtime(_ con
 	return fc, nil
 }
 
+func (ec *executionContext) _OvernightSleepStats_medianBedtimeSampleCount(ctx context.Context, field graphql.CollectedField, obj *model.OvernightSleepStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OvernightSleepStats_medianBedtimeSampleCount,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianBedtimeSampleCount, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OvernightSleepStats_medianBedtimeSampleCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OvernightSleepStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _OvernightSleepStats_medianWakeTime(ctx context.Context, field graphql.CollectedField, obj *model.OvernightSleepStats) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5707,6 +5752,35 @@ func (ec *executionContext) fieldContext_OvernightSleepStats_medianWakeTime(_ co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OvernightSleepStats_medianWakeTimeSampleCount(ctx context.Context, field graphql.CollectedField, obj *model.OvernightSleepStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OvernightSleepStats_medianWakeTimeSampleCount,
+		func(ctx context.Context) (any, error) {
+			return obj.MedianWakeTimeSampleCount, nil
+		},
+		nil,
+		ec.marshalNInt2int32,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OvernightSleepStats_medianWakeTimeSampleCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OvernightSleepStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7524,8 +7598,12 @@ func (ec *executionContext) fieldContext_ReportTotals_overnightStats(_ context.C
 				return ec.fieldContext_OvernightSleepStats_medianLongestStretchMinutes(ctx, field)
 			case "medianBedtime":
 				return ec.fieldContext_OvernightSleepStats_medianBedtime(ctx, field)
+			case "medianBedtimeSampleCount":
+				return ec.fieldContext_OvernightSleepStats_medianBedtimeSampleCount(ctx, field)
 			case "medianWakeTime":
 				return ec.fieldContext_OvernightSleepStats_medianWakeTime(ctx, field)
+			case "medianWakeTimeSampleCount":
+				return ec.fieldContext_OvernightSleepStats_medianWakeTimeSampleCount(ctx, field)
 			case "count":
 				return ec.fieldContext_OvernightSleepStats_count(ctx, field)
 			}
@@ -10837,8 +10915,18 @@ func (ec *executionContext) _OvernightSleepStats(ctx context.Context, sel ast.Se
 			}
 		case "medianBedtime":
 			out.Values[i] = ec._OvernightSleepStats_medianBedtime(ctx, field, obj)
+		case "medianBedtimeSampleCount":
+			out.Values[i] = ec._OvernightSleepStats_medianBedtimeSampleCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "medianWakeTime":
 			out.Values[i] = ec._OvernightSleepStats_medianWakeTime(ctx, field, obj)
+		case "medianWakeTimeSampleCount":
+			out.Values[i] = ec._OvernightSleepStats_medianWakeTimeSampleCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "count":
 			out.Values[i] = ec._OvernightSleepStats_count(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
