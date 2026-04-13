@@ -147,6 +147,9 @@ export const UPDATE_ACTIVITY = gql`
           amountMl
           feedType
           durationMinutes
+          foodName
+          quantity
+          quantityUnit
         }
       }
       ... on DiaperActivity {
