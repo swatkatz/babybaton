@@ -23,7 +23,7 @@ interface AuthContextType {
   refreshFamily: () => Promise<void>;
   /** True when a Supabase PASSWORD_RECOVERY event was received and the user must set a new password */
   needsPasswordReset: boolean;
-  clearPasswordReset: () => void;
+  clearPasswordReset: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -209,8 +209,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLegacyAuthData(null);
   }
 
-  function clearPasswordReset() {
+  async function clearPasswordReset() {
     setNeedsPasswordReset(false);
+    // Fetch family data that was skipped during PASSWORD_RECOVERY
+    if (supabaseSession) {
+      setIsLoading(true);
+      await fetchFamilyFromServer();
+      setIsLoading(false);
+    }
   }
 
   const refreshFamily = useCallback(async () => {

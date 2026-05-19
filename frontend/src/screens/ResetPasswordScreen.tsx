@@ -47,9 +47,8 @@ export function ResetPasswordScreen() {
       if (error) {
         Alert.alert('Error', error.message);
       } else {
-        Alert.alert('Password Updated', 'Your password has been reset successfully.', [
-          { text: 'OK', onPress: () => clearPasswordReset() },
-        ]);
+        Alert.alert('Password Updated', 'Your password has been reset successfully.');
+        await clearPasswordReset();
       }
     } catch (error) {
       console.error('Reset password error:', error);
