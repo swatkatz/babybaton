@@ -97,7 +97,7 @@ describe('ResetPasswordScreen', () => {
     expect(mockClearPasswordReset).not.toHaveBeenCalled();
   });
 
-  it('calls clearPasswordReset when success alert OK is pressed', async () => {
+  it('calls clearPasswordReset after successful password update', async () => {
     const { getByTestId, getByPlaceholderText } = render(<ResetPasswordScreen />);
 
     fireEvent.changeText(getByPlaceholderText('Enter new password'), 'password123');
@@ -107,17 +107,9 @@ describe('ResetPasswordScreen', () => {
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Password Updated',
-        'Your password has been reset successfully.',
-        [{ text: 'OK', onPress: expect.any(Function) }]
+        'Your password has been reset successfully.'
       );
     });
-
-    // Invoke the OK button's onPress handler
-    const alertCall = (Alert.alert as jest.Mock).mock.calls.find(
-      (call) => call[0] === 'Password Updated'
-    );
-    const okButton = alertCall![2][0];
-    okButton.onPress();
 
     expect(mockClearPasswordReset).toHaveBeenCalled();
   });
