@@ -21,6 +21,9 @@ interface AuthContextType {
   leaveFamily: () => Promise<void>;
   clearLegacyAuth: () => Promise<void>;
   refreshFamily: () => Promise<void>;
+  /** True when a Supabase PASSWORD_RECOVERY event was received and the user must set a new password */
+  needsPasswordReset: boolean;
+  clearPasswordReset: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,6 +37,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [authData, setAuthData] = useState<AuthData | null>(null);
   const [supabaseSession, setSupabaseSession] = useState<Session | null>(null);
   const [legacyAuthData, setLegacyAuthData] = useState<AuthData | null>(null);
+  const [needsPasswordReset, setNeedsPasswordReset] = useState(false);
   const client = useApolloClient();
 
   useEffect(() => {
@@ -41,9 +45,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadAuth().then(() => { initialLoadDone = true; });
 
     // Listen for Supabase auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('AuthContext: Supabase auth state changed:', _event, session ? 'has session' : 'no session');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('AuthContext: Supabase auth state changed:', event, session ? 'has session' : 'no session');
       setSupabaseSession(session);
+
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('AuthContext: Password recovery detected');
+        setNeedsPasswordReset(true);
+        return; // Don't fetch family data during recovery
+      }
 
       // After initial load, fetch family data when session changes (e.g. sign in)
       if (initialLoadDone && session) {
@@ -199,6 +209,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLegacyAuthData(null);
   }
 
+  function clearPasswordReset() {
+    setNeedsPasswordReset(false);
+  }
+
   const refreshFamily = useCallback(async () => {
     if (supabaseSession) {
       // Supabase user: refetch family data from server
@@ -231,6 +245,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     leaveFamily: leaveFamilyAuth,
     clearLegacyAuth,
     refreshFamily,
+    needsPasswordReset,
+    clearPasswordReset,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

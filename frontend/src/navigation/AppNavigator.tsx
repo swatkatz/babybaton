@@ -7,6 +7,7 @@ import { SignUpScreen } from '../screens/SignUpScreen';
 import { CreateFamilyScreen } from '../screens/CreateFamilyScreen';
 import { JoinFamilyScreen } from '../screens/JoinFamilyScreen';
 import { MigrationScreen } from '../screens/MigrationScreen';
+import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { CustomHeader } from '../components/CustomHeader';
 import { MainTabNavigator } from './MainTabNavigator';
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   CreateFamily: undefined;
   JoinFamily: undefined;
   Migration: undefined;
+  ResetPassword: undefined;
   MainTabs: undefined;
   Dashboard: undefined;
 };
@@ -27,7 +29,14 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 
 export function AppNavigator() {
-  const { isAuthenticated, hasFamily, isLoading, supabaseSession, legacyAuthData } = useAuth();
+  const {
+    isAuthenticated,
+    hasFamily,
+    isLoading,
+    supabaseSession,
+    legacyAuthData,
+    needsPasswordReset,
+  } = useAuth();
 
   console.log(
     'AppNavigator render: isLoading =',
@@ -78,7 +87,16 @@ export function AppNavigator() {
         cardStyle: { flex: 1 },
       }}
     >
-      {needsMigration ? (
+      {needsPasswordReset && supabaseSession ? (
+        // Password recovery: user followed a reset link, must set a new password
+        <>
+          <Stack.Screen
+            name="ResetPassword"
+            component={ResetPasswordScreen}
+            options={{ title: 'Reset Password', headerLeft: () => null }}
+          />
+        </>
+      ) : needsMigration ? (
         // Migration flow: old device auth detected, prompt to create Supabase account
         <>
           <Stack.Screen
