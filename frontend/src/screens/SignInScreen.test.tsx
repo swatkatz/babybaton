@@ -6,11 +6,13 @@ import { SignInScreen } from './SignInScreen';
 // Mock Supabase
 const mockSignInWithPassword = jest.fn();
 const mockSignInWithOAuth = jest.fn();
+const mockResetPasswordForEmail = jest.fn();
 jest.mock('../services/supabase', () => ({
   supabase: {
     auth: {
       signInWithPassword: (...args: unknown[]) => mockSignInWithPassword(...args),
       signInWithOAuth: (...args: unknown[]) => mockSignInWithOAuth(...args),
+      resetPasswordForEmail: (...args: unknown[]) => mockResetPasswordForEmail(...args),
     },
   },
 }));
@@ -46,6 +48,7 @@ describe('SignInScreen', () => {
     jest.clearAllMocks();
     mockSignInWithPassword.mockResolvedValue({ error: null });
     mockSignInWithOAuth.mockResolvedValue({ error: null });
+    mockResetPasswordForEmail.mockResolvedValue({ error: null });
   });
 
   it('renders all form fields and buttons', () => {
@@ -139,6 +142,94 @@ describe('SignInScreen', () => {
     fireEvent.press(getByText('Sign Up'));
 
     expect(mockNavigate).toHaveBeenCalledWith('SignUp');
+  });
+
+  it('renders the Forgot Password link', () => {
+    const { getByText } = render(
+      <SignInScreen navigation={mockNavigation} route={mockRoute} />
+    );
+
+    expect(getByText('Forgot Password?')).toBeTruthy();
+  });
+
+  it('shows validation alert when tapping Forgot Password with empty email', () => {
+    const { getByText } = render(
+      <SignInScreen navigation={mockNavigation} route={mockRoute} />
+    );
+
+    fireEvent.press(getByText('Forgot Password?'));
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Email Required',
+      'Please enter a valid email address first.'
+    );
+    expect(mockResetPasswordForEmail).not.toHaveBeenCalled();
+  });
+
+  it('shows validation alert when tapping Forgot Password with invalid email', () => {
+    const { getByText, getByPlaceholderText } = render(
+      <SignInScreen navigation={mockNavigation} route={mockRoute} />
+    );
+
+    fireEvent.changeText(getByPlaceholderText('you@example.com'), 'notanemail');
+    fireEvent.press(getByText('Forgot Password?'));
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Email Required',
+      'Please enter a valid email address first.'
+    );
+    expect(mockResetPasswordForEmail).not.toHaveBeenCalled();
+  });
+
+  it('calls resetPasswordForEmail with trimmed email on tap', async () => {
+    const { getByText, getByPlaceholderText } = render(
+      <SignInScreen navigation={mockNavigation} route={mockRoute} />
+    );
+
+    fireEvent.changeText(
+      getByPlaceholderText('you@example.com'),
+      '  test@example.com  '
+    );
+    fireEvent.press(getByText('Forgot Password?'));
+
+    await waitFor(() => {
+      expect(mockResetPasswordForEmail).toHaveBeenCalledWith('test@example.com', {
+        redirectTo: 'https://baby-baton-production.up.railway.app',
+      });
+    });
+  });
+
+  it('shows success alert after a reset email is sent', async () => {
+    const { getByText, getByPlaceholderText } = render(
+      <SignInScreen navigation={mockNavigation} route={mockRoute} />
+    );
+
+    fireEvent.changeText(getByPlaceholderText('you@example.com'), 'test@example.com');
+    fireEvent.press(getByText('Forgot Password?'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Check Your Email',
+        'If an account exists for that email, a password reset link has been sent.'
+      );
+    });
+  });
+
+  it('shows error alert when resetPasswordForEmail fails', async () => {
+    mockResetPasswordForEmail.mockResolvedValue({
+      error: { message: 'Rate limit exceeded' },
+    });
+
+    const { getByText, getByPlaceholderText } = render(
+      <SignInScreen navigation={mockNavigation} route={mockRoute} />
+    );
+
+    fireEvent.changeText(getByPlaceholderText('you@example.com'), 'test@example.com');
+    fireEvent.press(getByText('Forgot Password?'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith('Error', 'Rate limit exceeded');
+    });
   });
 
   it('clears field errors when user types', () => {
