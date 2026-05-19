@@ -66,6 +66,12 @@ jest.mock('../screens/MigrationScreen', () => ({
     return <Text>Migration Screen</Text>;
   },
 }));
+jest.mock('../screens/ResetPasswordScreen', () => ({
+  ResetPasswordScreen: () => {
+    const { Text } = require('react-native');
+    return <Text>Reset Password Screen</Text>;
+  },
+}));
 jest.mock('../components/CustomHeader', () => ({
   CustomHeader: () => null,
 }));
@@ -161,6 +167,20 @@ describe('AppNavigator', () => {
 
     const { getByText } = renderNavigator();
     expect(getByText('Main Tab Navigator')).toBeTruthy();
+  });
+
+  it('shows ResetPasswordScreen when needsPasswordReset is true and session exists', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      hasFamily: true,
+      isLoading: false,
+      supabaseSession: { access_token: 'token', user: { id: 'u-1' } },
+      legacyAuthData: null,
+      needsPasswordReset: true,
+    });
+
+    const { getByText } = renderNavigator();
+    expect(getByText('Reset Password Screen')).toBeTruthy();
   });
 
   it('shows MainTabNavigator for device-auth user with family (backward compat, both auth + legacy)', () => {

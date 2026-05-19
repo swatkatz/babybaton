@@ -74,6 +74,7 @@ function TestConsumer({
       <Text testID="familyId">{auth.authData?.familyId ?? 'none'}</Text>
       <Text testID="hasLegacy">{String(auth.legacyAuthData !== null)}</Text>
       <Text testID="hasSupabase">{String(auth.supabaseSession !== null)}</Text>
+      <Text testID="needsPasswordReset">{String(auth.needsPasswordReset)}</Text>
       <TouchableOpacity
         testID="login"
         onPress={() => auth.login(mockAuthData)}
@@ -82,6 +83,10 @@ function TestConsumer({
       <TouchableOpacity testID="signOut" onPress={() => auth.signOut()} />
       <TouchableOpacity testID="leaveFamily" onPress={() => auth.leaveFamily()} />
       <TouchableOpacity testID="clearLegacy" onPress={() => auth.clearLegacyAuth()} />
+      <TouchableOpacity
+        testID="clearPasswordReset"
+        onPress={() => auth.clearPasswordReset()}
+      />
     </>
   );
 }
@@ -410,6 +415,71 @@ describe('AuthContext', () => {
     });
 
     expect(capturedAuth!.supabaseSession).toEqual(mockSupabaseSession);
+  });
+
+  it('sets needsPasswordReset on PASSWORD_RECOVERY event', async () => {
+    let authChangeCallback: (event: string, session: unknown) => void;
+    mockOnAuthStateChange.mockImplementation((callback: (event: string, session: unknown) => void) => {
+      authChangeCallback = callback;
+      return { data: { subscription: { unsubscribe: jest.fn() } } };
+    });
+
+    let capturedAuth: ReturnType<typeof useAuth> | undefined;
+    renderWithProviders(
+      <AuthProvider>
+        <TestConsumer
+          onRender={(ctx) => {
+            capturedAuth = ctx;
+          }}
+        />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedAuth!.isLoading).toBe(false);
+    });
+
+    expect(capturedAuth!.needsPasswordReset).toBe(false);
+
+    act(() => {
+      authChangeCallback!('PASSWORD_RECOVERY', mockSupabaseSession);
+    });
+
+    expect(capturedAuth!.needsPasswordReset).toBe(true);
+  });
+
+  it('clears needsPasswordReset via clearPasswordReset()', async () => {
+    let authChangeCallback: (event: string, session: unknown) => void;
+    mockOnAuthStateChange.mockImplementation((callback: (event: string, session: unknown) => void) => {
+      authChangeCallback = callback;
+      return { data: { subscription: { unsubscribe: jest.fn() } } };
+    });
+
+    let capturedAuth: ReturnType<typeof useAuth> | undefined;
+    renderWithProviders(
+      <AuthProvider>
+        <TestConsumer
+          onRender={(ctx) => {
+            capturedAuth = ctx;
+          }}
+        />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(capturedAuth!.isLoading).toBe(false);
+    });
+
+    act(() => {
+      authChangeCallback!('PASSWORD_RECOVERY', mockSupabaseSession);
+    });
+    expect(capturedAuth!.needsPasswordReset).toBe(true);
+
+    act(() => {
+      capturedAuth!.clearPasswordReset();
+    });
+
+    expect(capturedAuth!.needsPasswordReset).toBe(false);
   });
 });
 

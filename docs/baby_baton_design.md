@@ -1698,7 +1698,10 @@ const KEYS = {
 - Passwords hashed with bcrypt (default cost)
 - Plain text stored in `password` column and displayed in settings for sharing
 - Min 6 characters (family-friendly, not high security)
-- No password recovery (intentional - ask family member)
+- Password recovery via Supabase: "Forgot Password?" on the Sign In screen sends a
+  reset email; following the link fires a `PASSWORD_RECOVERY` event that routes the
+  user to `ResetPasswordScreen` to set a new password (legacy device-auth users still
+  share credentials via a family member)
 
 ### 12.3 Data Isolation
 
