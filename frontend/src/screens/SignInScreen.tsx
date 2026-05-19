@@ -92,6 +92,31 @@ export function SignInScreen({ navigation }: Props) {
     }
   };
 
+  const handleForgotPassword = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !/\S+@\S+\.\S+/.test(trimmedEmail)) {
+      Alert.alert('Email Required', 'Please enter a valid email address first.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: 'https://baby-baton-production.up.railway.app',
+      });
+      if (error) {
+        Alert.alert('Error', error.message);
+      } else {
+        Alert.alert(
+          'Check Your Email',
+          'If an account exists for that email, a password reset link has been sent.'
+        );
+      }
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -152,6 +177,14 @@ export function SignInScreen({ navigation }: Props) {
                 <Text style={styles.errorText}>{errors.password}</Text>
               ) : null}
             </View>
+
+            {/* Forgot Password */}
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              style={styles.forgotPassword}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
 
             {/* Sign In Button */}
             <TouchableOpacity
@@ -262,6 +295,15 @@ const styles = StyleSheet.create({
     fontSize: typography.sm,
     color: colors.error,
     marginTop: spacing.xs,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.sm,
+  },
+  forgotPasswordText: {
+    fontSize: typography.sm,
+    color: colors.primary,
+    fontWeight: '600' as const,
   },
   signInButton: {
     height: 60,
