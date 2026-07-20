@@ -1,6 +1,6 @@
 {
   "name": "baby-baton",
-  "version": "0.9.4",
+  "version": "0.95",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
