@@ -29,7 +29,7 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - uses: expo/expo-github-action@v8
+      - uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
@@ -55,7 +55,7 @@ jobs:
       # --- Publish update pinned to the build's runtimeVersion ---
       - name: Publish preview update
         if: steps.build-info.outputs.runtime_version != ''
-        uses: expo/expo-github-action/preview@v8
+        uses: expo/expo-github-action/preview@v9
         with:
           command: eas update --branch pr-${{ github.event.pull_request.number }} --message pr-${{ github.event.pull_request.number }}
           working-directory: frontend
