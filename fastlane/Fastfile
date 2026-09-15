@@ -21,8 +21,6 @@ platform :ios do
       precheck_include_in_app_purchases: false,
       precheck_default_rule_level: :warn, # log issues but don't block submission
       primary_category: "Lifestyle",
-      privacy_url: "https://swatkatz.github.io/babybaton/privacy-policy.html",
-      copyright: "#{Time.now.year} Swati Kumar",
     )
   end
 end
