@@ -19,7 +19,7 @@ platform :ios do
       skip_binary_upload: true,          # EAS already uploaded the binary
       overwrite_screenshots: true,
       precheck_include_in_app_purchases: false,
-      run_precheck_before_submit: false, # precheck is too strict on copyright format
+      precheck_default_rule_level: :warn, # log issues but don't block submission
       primary_category: "Lifestyle",
       privacy_url: "https://swatkatz.github.io/babybaton/privacy-policy.html",
       copyright: "#{Time.now.year} Swati Kumar",
