@@ -17,10 +17,10 @@ platform :ios do
       automatic_release: false,
       force: true,                       # skip HTML verification report
       skip_binary_upload: true,          # EAS already uploaded the binary
-      overwrite_screenshots: true,
+      skip_screenshots: true,              # upload manually — Simulator resolutions don't match Fastlane's expected sizes
       precheck_include_in_app_purchases: false,
       precheck_default_rule_level: :error, # fail if precheck finds issues
-      primary_category: "Lifestyle",
+      primary_category: "LIFESTYLE",
     )
   end
 end
