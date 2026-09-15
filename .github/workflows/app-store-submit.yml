@@ -1,0 +1,41 @@
+# .github/workflows/app-store-submit.yml
+#
+# Uploads App Store metadata + screenshots and submits the latest TestFlight
+# build for App Store review. Triggered by scripts/prepare-app-store.sh after
+# confirming all inputs are ready.
+#
+# Required GitHub secrets:
+#   ASC_KEY_ID       — App Store Connect API key ID
+#   ASC_ISSUER_ID    — App Store Connect API issuer ID
+#   ASC_KEY_CONTENT  — Base64-encoded .p8 private key
+#
+name: Submit to App Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'App version being submitted (e.g. 1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  submit:
+    name: Submit to App Store Review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Install Fastlane
+        run: gem install fastlane --no-document
+
+      - name: Upload metadata, screenshots, and submit for review
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+        run: fastlane submit

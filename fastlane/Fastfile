@@ -1,0 +1,24 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Upload metadata + screenshots and submit for App Store review"
+  lane :submit do
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_CONTENT"],
+      is_key_content_base64: true,
+    )
+
+    deliver(
+      api_key: api_key,
+      app_identifier: "com.swatkatz.babybaton",
+      submit_for_review: true,
+      automatic_release: false,
+      force: true,                       # skip HTML verification report
+      skip_binary_upload: true,          # EAS already uploaded the binary
+      overwrite_screenshots: true,
+      precheck_include_in_app_purchases: false,
+    )
+  end
+end
