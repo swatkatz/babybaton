@@ -17,7 +17,7 @@ platform :ios do
       automatic_release: false,
       force: true,                       # skip HTML verification report
       skip_binary_upload: true,          # EAS already uploaded the binary
-      skip_screenshots: true,              # screenshots uploaded manually for now
+      overwrite_screenshots: true,
       precheck_include_in_app_purchases: false,
       run_precheck_before_submit: false, # precheck is too strict on copyright format
       primary_category: "Lifestyle",
