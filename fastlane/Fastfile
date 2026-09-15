@@ -19,7 +19,7 @@ platform :ios do
       skip_binary_upload: true,          # EAS already uploaded the binary
       overwrite_screenshots: true,
       precheck_include_in_app_purchases: false,
-      precheck_default_rule_level: :warn, # log issues but don't block submission
+      precheck_default_rule_level: :error, # fail if precheck finds issues
       primary_category: "Lifestyle",
     )
   end
