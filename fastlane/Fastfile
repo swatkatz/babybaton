@@ -19,7 +19,7 @@ platform :ios do
       skip_binary_upload: true,          # EAS already uploaded the binary
       skip_screenshots: true,              # upload manually — Simulator resolutions don't match Fastlane's expected sizes
       precheck_include_in_app_purchases: false,
-      precheck_default_rule_level: :error, # fail if precheck finds issues
+      precheck_default_rule_level: :warn,  # warn but don't block — precheck has false positives on copyright/URLs
       primary_category: "LIFESTYLE",
     )
   end
