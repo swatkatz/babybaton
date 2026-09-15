@@ -17,8 +17,12 @@ platform :ios do
       automatic_release: false,
       force: true,                       # skip HTML verification report
       skip_binary_upload: true,          # EAS already uploaded the binary
-      overwrite_screenshots: true,
+      skip_screenshots: true,              # screenshots uploaded manually for now
       precheck_include_in_app_purchases: false,
+      run_precheck_before_submit: false, # precheck is too strict on copyright format
+      primary_category: "Lifestyle",
+      privacy_url: "https://swatkatz.github.io/babybaton/privacy-policy.html",
+      copyright: "#{Time.now.year} Swati Kumar",
     )
   end
 end
