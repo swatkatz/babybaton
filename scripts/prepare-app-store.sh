@@ -10,7 +10,10 @@ set -euo pipefail
 
 REPO="swatkatz/babybaton"
 WORKFLOW="app-store-submit.yml"
-METADATA_DIR="fastlane/metadata/en-US"
+PRIMARY_LOCALE="en-CA"
+FALLBACK_LOCALE="en-US"
+METADATA_DIR="fastlane/metadata/${PRIMARY_LOCALE}"
+FALLBACK_METADATA_DIR="fastlane/metadata/${FALLBACK_LOCALE}"
 SCREENSHOTS_DIR="fastlane/screenshots/en-US"
 
 RED='\033[0;31m'
@@ -103,8 +106,43 @@ if [ "$SECRETS_OK" = false ]; then
   if [ "$SECRETS_OK" = false ]; then exit 1; fi
 fi
 
-# ── 4. Metadata ───────────────────────────────────────────────────────────────
-step "Step 4: App Store metadata"
+# ── 4. Locale sync ───────────────────────────────────────────────────────────
+step "Step 4: Locale sync (en-US -> en-CA)"
+
+if [ ! -d "$METADATA_DIR" ]; then
+  info "Creating ${PRIMARY_LOCALE} metadata directory..."
+  mkdir -p "$METADATA_DIR"
+fi
+
+# Sync any missing en-CA files from en-US
+SYNCED=0
+for FILE in "$FALLBACK_METADATA_DIR"/*.txt; do
+  BASENAME=$(basename "$FILE")
+  TARGET="${METADATA_DIR}/${BASENAME}"
+  if [ ! -f "$TARGET" ] || [ ! -s "$TARGET" ]; then
+    cp "$FILE" "$TARGET"
+    warn "Copied ${BASENAME} from ${FALLBACK_LOCALE} to ${PRIMARY_LOCALE}"
+    SYNCED=$((SYNCED + 1))
+  fi
+done
+
+if [ "$SYNCED" -eq 0 ]; then
+  ok "${PRIMARY_LOCALE} metadata is complete (all files present)"
+else
+  ok "Synced ${SYNCED} file(s) from ${FALLBACK_LOCALE} to ${PRIMARY_LOCALE}"
+fi
+
+# Verify en-CA and en-US are in sync (warn on differences)
+for FILE in "$METADATA_DIR"/*.txt; do
+  BASENAME=$(basename "$FILE")
+  US_FILE="${FALLBACK_METADATA_DIR}/${BASENAME}"
+  if [ -f "$US_FILE" ] && ! diff -q "$FILE" "$US_FILE" &>/dev/null; then
+    warn "${BASENAME} differs between ${PRIMARY_LOCALE} and ${FALLBACK_LOCALE}"
+  fi
+done
+
+# ── 5. Metadata ───────────────────────────────────────────────────────────────
+step "Step 5: App Store metadata"
 
 METADATA_OK=true
 EDITOR_CMD="${EDITOR:-nano}"
@@ -148,8 +186,8 @@ if [[ ! "$META_OK" =~ ^[Yy]$ ]]; then
   exit 0
 fi
 
-# ── 5. Screenshots ────────────────────────────────────────────────────────────
-step "Step 5: Screenshots"
+# ── 6. Screenshots ────────────────────────────────────────────────────────────
+step "Step 6: Screenshots"
 
 SCREENSHOT_COUNT=$(find "$SCREENSHOTS_DIR" -name "*.png" -o -name "*.jpg" | wc -l | tr -d ' ')
 
@@ -176,7 +214,6 @@ if [ "$SCREENSHOT_COUNT" -eq 0 ]; then
   read -rp "Skip screenshots for now and submit metadata only? [y/N] " SKIP_SHOTS
   if [[ "$SKIP_SHOTS" =~ ^[Yy]$ ]]; then
     warn "Submitting without screenshots. You'll need to add them in App Store Connect before approval."
-    # Patch Fastfile temporarily to skip screenshots
     SKIP_SCREENSHOTS=true
   else
     info "Add screenshots to ${SCREENSHOTS_DIR}/ then re-run this script."
@@ -190,8 +227,49 @@ else
   SKIP_SCREENSHOTS=false
 fi
 
-# ── 6. Build availability ─────────────────────────────────────────────────────
-step "Step 6: Verify build is on TestFlight"
+# ── 7. Resize screenshots ───────────────────────────────────────────────────
+if [ "$SKIP_SCREENSHOTS" = false ] && command -v sips &>/dev/null; then
+  step "Step 7: Resize screenshots to App Store dimensions"
+
+  # Expected dimensions:
+  #   iPhone 6.7"  — 1284 x 2778
+  #   iPad 12.9"   — 2048 x 2732
+  IPHONE_W=1284; IPHONE_H=2778
+  IPAD_W=2048;   IPAD_H=2732
+
+  RESIZED=0
+  find "${SCREENSHOTS_DIR}" \( -name "*.png" -o -name "*.jpg" \) -print0 | while IFS= read -r -d '' f; do
+    W=$(sips -g pixelWidth "$f" 2>/dev/null | tail -1 | awk '{print $2}')
+    H=$(sips -g pixelHeight "$f" 2>/dev/null | tail -1 | awk '{print $2}')
+
+    # Determine target: iPad if width > 1500, else iPhone
+    if [ "$W" -gt 1500 ]; then
+      TW=$IPAD_W; TH=$IPAD_H
+    else
+      TW=$IPHONE_W; TH=$IPHONE_H
+    fi
+
+    if [ "$W" -ne "$TW" ] || [ "$H" -ne "$TH" ]; then
+      info "Resizing $(basename "$f"): ${W}x${H} -> ${TW}x${TH}"
+      sips --resampleHeightWidth "$TH" "$TW" "$f" >/dev/null 2>&1
+      RESIZED=$((RESIZED + 1))
+    fi
+  done
+
+  if [ "$RESIZED" -eq 0 ]; then
+    ok "All screenshots already at correct dimensions"
+  else
+    ok "Resized ${RESIZED} screenshot(s)"
+  fi
+else
+  if [ "$SKIP_SCREENSHOTS" = false ]; then
+    warn "sips not available (not macOS?) — skipping screenshot resize"
+    warn "Ensure screenshots are 1284x2778 (iPhone) or 2048x2732 (iPad) before submitting"
+  fi
+fi
+
+# ── 8. Build availability ─────────────────────────────────────────────────────
+step "Step 8: Verify build is on TestFlight"
 
 echo ""
 echo "  The GitHub Actions build must have finished and appeared in TestFlight"
@@ -209,8 +287,8 @@ if [[ ! "$BUILD_READY" =~ ^[Yy]$ ]]; then
 fi
 ok "Build confirmed on TestFlight"
 
-# ── 7. Commit and trigger ─────────────────────────────────────────────────────
-step "Step 7: Commit metadata and trigger submission"
+# ── 9. Commit and trigger ─────────────────────────────────────────────────────
+step "Step 9: Commit metadata and trigger submission"
 
 echo ""
 info "Staging fastlane/ changes..."
@@ -232,10 +310,18 @@ else
 fi
 
 echo ""
-info "Triggering ${WORKFLOW} for v${VERSION}..."
+read -rp "Run as dry-run (upload metadata without submitting for review)? [y/N] " DRY_RUN
+DRY_RUN_FLAG="false"
+if [[ "$DRY_RUN" =~ ^[Yy]$ ]]; then
+  DRY_RUN_FLAG="true"
+  warn "Dry-run mode — will upload metadata but NOT submit for review"
+fi
+
+info "Triggering ${WORKFLOW} for v${VERSION} (dry_run=${DRY_RUN_FLAG})..."
 gh workflow run "$WORKFLOW" \
   --repo "$REPO" \
-  --field "version=${VERSION}"
+  --field "version=${VERSION}" \
+  --field "dry_run=${DRY_RUN_FLAG}"
 
 echo ""
 ok "Workflow triggered!"

@@ -1,6 +1,41 @@
 default_platform(:ios)
 
+# ── Shared helper ──────────────────────────────────────────────────────────────
+# Common deliver options used by both submit and test lanes.
+def shared_deliver_options(api_key)
+  {
+    api_key: api_key,
+    app_identifier: "com.swatkatz.babybaton",
+    automatic_release: false,
+    force: true,                       # skip HTML verification report
+    skip_binary_upload: true,          # EAS already uploaded the binary
+    skip_screenshots: true,            # screenshots uploaded manually — see resize_screenshots lane
+    precheck_include_in_app_purchases: false,
+    precheck_default_rule_level: :warn,  # warn but don't block — precheck has false positives on copyright/URLs
+    primary_category: "LIFESTYLE",
+  }
+end
+
 platform :ios do
+  # ── Test lane (dry run) ────────────────────────────────────────────────────
+  desc "Upload metadata WITHOUT submitting for review (dry-run test)"
+  lane :test do
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_CONTENT"],
+      is_key_content_base64: true,
+    )
+
+    opts = shared_deliver_options(api_key)
+    opts[:submit_for_review] = false
+
+    deliver(opts)
+
+    UI.success("Dry-run complete — metadata uploaded, review NOT submitted.")
+  end
+
+  # ── Submit lane (real submission) ──────────────────────────────────────────
   desc "Upload metadata + screenshots and submit for App Store review"
   lane :submit do
     api_key = app_store_connect_api_key(
@@ -10,17 +45,41 @@ platform :ios do
       is_key_content_base64: true,
     )
 
-    deliver(
-      api_key: api_key,
-      app_identifier: "com.swatkatz.babybaton",
-      submit_for_review: true,
-      automatic_release: false,
-      force: true,                       # skip HTML verification report
-      skip_binary_upload: true,          # EAS already uploaded the binary
-      skip_screenshots: true,              # upload manually — Simulator resolutions don't match Fastlane's expected sizes
-      precheck_include_in_app_purchases: false,
-      precheck_default_rule_level: :warn,  # warn but don't block — precheck has false positives on copyright/URLs
-      primary_category: "LIFESTYLE",
-    )
+    opts = shared_deliver_options(api_key)
+    opts[:submit_for_review] = true
+
+    deliver(opts)
+  end
+
+  # ── Screenshot resize lane ────────────────────────────────────────────────
+  desc "Resize screenshots to App Store expected dimensions using sips (macOS only)"
+  lane :resize_screenshots do
+    # App Store expected dimensions
+    iphone_target = { w: 1284, h: 2778 }  # iPhone 6.7"
+    ipad_target   = { w: 2048, h: 2732 }  # iPad 12.9"
+
+    screenshots_dir = File.expand_path("../fastlane/screenshots")
+
+    Dir.glob("#{screenshots_dir}/**/*.png").each do |file|
+      # Read current dimensions via sips
+      width  = `sips -g pixelWidth "#{file}" | tail -1 | awk '{print $2}'`.strip.to_i
+      height = `sips -g pixelHeight "#{file}" | tail -1 | awk '{print $2}'`.strip.to_i
+
+      # Determine target based on aspect ratio (portrait orientation)
+      if width > 1500  # iPad-class
+        target = ipad_target
+      else
+        target = iphone_target
+      end
+
+      if width != target[:w] || height != target[:h]
+        UI.message("Resizing #{File.basename(file)}: #{width}x#{height} -> #{target[:w]}x#{target[:h]}")
+        sh("sips", "--resampleHeightWidth", target[:h].to_s, target[:w].to_s, file)
+      else
+        UI.message("#{File.basename(file)}: already #{width}x#{height} — skipping")
+      end
+    end
+
+    UI.success("Screenshot resize complete.")
   end
 end

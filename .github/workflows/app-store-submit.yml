@@ -18,10 +18,15 @@ on:
         description: 'App version being submitted (e.g. 1.0.0)'
         required: true
         type: string
+      dry_run:
+        description: 'Dry run — upload metadata without submitting for review'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   submit:
-    name: Submit to App Store Review
+    name: ${{ inputs.dry_run && 'Test Upload (dry run)' || 'Submit to App Store Review' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,9 +38,15 @@ jobs:
       - name: Install Fastlane
         run: gem install fastlane --no-document
 
-      - name: Upload metadata, screenshots, and submit for review
+      - name: Upload metadata${{ inputs.dry_run && ' (dry run)' || ' and submit for review' }}
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
-        run: fastlane submit
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Running in dry-run mode — will NOT submit for review"
+            fastlane test
+          else
+            fastlane submit
+          fi
